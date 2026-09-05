@@ -1,0 +1,19 @@
+{
+  "name": "EKats Lage-/Frühwarn-Dashboard",
+  "short_name": "EKats",
+  "description": "Live-Lagedaten für Feuerwehr-Führungsebenen: Wetterwarnungen, Pegelstände, Hochwasserlage, Waldbrand-Hotspots.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#14232f",
+  "theme_color": "#14232f",
+  "lang": "de",
+  "icons": [
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

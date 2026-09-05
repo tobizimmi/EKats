@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Anmelden – EKats</title>
+  <link rel="stylesheet" href="/css/style.css" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <meta name="theme-color" content="#14232f" />
+</head>
+<body>
+  <div class="login-wrap">
+    <div class="card login-card">
+      <h1>EKats Lage-/Frühwarn-Dashboard</h1>
+      <p class="muted">Anmeldung für Wehrführung, Führungsstab und Mitglieder.</p>
+      <form id="login-form" novalidate>
+        <label>
+          <span>E-Mail</span>
+          <input type="email" id="email" name="email" autocomplete="username" required />
+        </label>
+        <label>
+          <span>Passwort</span>
+          <input type="password" id="password" name="password" autocomplete="current-password" required />
+        </label>
+        <p class="error-message" id="login-error" role="alert"></p>
+        <button type="submit" class="primary">Anmelden</button>
+      </form>
+      <p class="muted attribution">
+        <a href="/datenschutz.html">Datenschutz</a> · <a href="/impressum.html">Impressum</a>
+      </p>
+    </div>
+  </div>
+  <script src="/js/api.js"></script>
+  <script src="/js/auth.js"></script>
+</body>
+</html>

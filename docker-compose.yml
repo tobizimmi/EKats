@@ -1,0 +1,19 @@
+services:
+  postgres:
+    image: postgis/postgis:16-3.4
+    environment:
+      POSTGRES_USER: ekats
+      POSTGRES_PASSWORD: ekats
+      POSTGRES_DB: ekats
+    ports:
+      - "5432:5432"
+    volumes:
+      - ekats_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ekats -d ekats"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  ekats_pgdata:

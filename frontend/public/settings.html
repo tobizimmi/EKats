@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Einstellungen – EKats</title>
+  <link rel="stylesheet" href="/css/style.css" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <meta name="theme-color" content="#14232f" />
+</head>
+<body>
+  <header class="app-header">
+    <div class="brand">🚒 EKats Lagedashboard</div>
+    <nav>
+      <a href="/">Karte</a>
+      <a href="/settings.html">Einstellungen</a>
+      <span id="header-user" class="muted"></span>
+      <button id="logout-button" type="button">Abmelden</button>
+    </nav>
+  </header>
+  <main class="stack">
+    <div class="card">
+      <h2 class="section-title">Benachrichtigungen</h2>
+      <p class="muted" id="push-status">Status wird geladen …</p>
+      <button id="push-button" class="secondary" type="button">Push-Benachrichtigungen aktivieren</button>
+    </div>
+
+    <div class="card" data-role="stab-only" hidden>
+      <h2 class="section-title">Alarmregeln (Schwellenwerte)</h2>
+      <p class="muted">
+        Nur die Rolle „Stab“ kann Schwellenwerte konfigurieren. Benachrichtigungskanäle (Push/E-Mail)
+        gelten je Regel für den anlegenden Account.
+      </p>
+      <form id="rule-form" class="form-row">
+        <label>
+          <span>Quelle</span>
+          <select id="rule-source">
+            <option value="dwd_unwetter">DWD Unwetterwarnung (Warnstufe 1-4)</option>
+            <option value="pegelonline">Pegelstand (Wasserstand in cm)</option>
+            <option value="hochwasserzentralen">Hochwasserlage (Meldestufe 0-4)</option>
+            <option value="waldbrandindex">Waldbrandgefahrenindex (Stufe 1-5)</option>
+            <option value="firms">Feuer-Hotspot (Radius in km)</option>
+          </select>
+        </label>
+        <label>
+          <span id="rule-target-label">Bezug (optional, z.B. Bundesland-Code)</span>
+          <input id="rule-target" type="text" placeholder="z.B. NW oder Pegelname" />
+        </label>
+        <label>
+          <span id="rule-threshold-label">Schwellenwert</span>
+          <input id="rule-threshold" type="number" step="0.1" required />
+        </label>
+        <label class="checkbox-inline">
+          <input id="rule-channel-push" type="checkbox" checked />
+          <span>Push</span>
+        </label>
+        <label class="checkbox-inline">
+          <input id="rule-channel-email" type="checkbox" />
+          <span>E-Mail</span>
+        </label>
+        <button type="submit" class="primary">Regel anlegen</button>
+      </form>
+      <p class="error-message" id="rule-error" role="alert"></p>
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Quelle</th>
+            <th>Bezug</th>
+            <th>Schwelle</th>
+            <th>Kanäle</th>
+            <th>Aktiv</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="rule-table-body"></tbody>
+      </table>
+    </div>
+
+    <div class="card" data-role="stab-only" hidden>
+      <h2 class="section-title">Mitglieder der Wehr</h2>
+      <form id="user-form" class="form-row">
+        <label>
+          <span>E-Mail</span>
+          <input id="user-email" type="email" required />
+        </label>
+        <label>
+          <span>Passwort</span>
+          <input id="user-password" type="password" minlength="8" required />
+        </label>
+        <label>
+          <span>Rolle</span>
+          <select id="user-role">
+            <option value="mitglied">Mitglied (nur Lesezugriff)</option>
+            <option value="stab">Stab (voller Zugriff)</option>
+          </select>
+        </label>
+        <button type="submit" class="primary">Konto anlegen</button>
+      </form>
+      <p class="error-message" id="user-error" role="alert"></p>
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>E-Mail</th>
+            <th>Rolle</th>
+            <th>Angelegt</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="user-table-body"></tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <h2 class="section-title">Eigenes Konto</h2>
+      <p class="muted">
+        Datensparsamkeit/DSGVO: Sie können Ihr Konto inkl. aller Alarmregeln und Push-Anmeldungen
+        jederzeit vollständig löschen.
+      </p>
+      <button id="delete-account-button" class="secondary" type="button">Mein Konto löschen</button>
+    </div>
+  </main>
+  <script src="/js/api.js"></script>
+  <script src="/js/header.js"></script>
+  <script src="/js/severity.js"></script>
+  <script src="/js/sw-register.js"></script>
+  <script src="/js/push.js"></script>
+  <script src="/js/settings.js"></script>
+</body>
+</html>

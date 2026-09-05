@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lagedashboard – EKats</title>
+  <link rel="stylesheet" href="/vendor/leaflet/leaflet.css" />
+  <link rel="stylesheet" href="/css/style.css" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <meta name="theme-color" content="#14232f" />
+</head>
+<body>
+  <div id="offline-banner" hidden></div>
+  <header class="app-header">
+    <div class="brand">🚒 EKats Lagedashboard</div>
+    <nav>
+      <a href="/">Karte</a>
+      <a href="/settings.html">Einstellungen</a>
+      <span id="header-user" class="muted"></span>
+      <button id="logout-button" type="button">Abmelden</button>
+    </nav>
+  </header>
+  <main>
+    <div class="layer-toggle-bar" id="layer-toggles"></div>
+    <div class="dashboard-grid">
+      <div id="map"></div>
+      <div class="card stack">
+        <div>
+          <h2 class="section-title">Lage-Übersicht</h2>
+          <p class="muted" id="list-updated"></p>
+          <ul class="situation-list" id="situation-list"></ul>
+        </div>
+        <div class="detail-panel" id="detail-panel" hidden>
+          <h3 class="section-title">Details</h3>
+          <dl id="detail-content"></dl>
+        </div>
+      </div>
+    </div>
+    <p class="attribution">
+      Quellen: DWD (Wetterwarnungen, Waldbrandgefahrenindex), Wasserstraßen- und Schifffahrtsverwaltung
+      des Bundes (PEGELONLINE), Hochwasserzentralen der Länder, NASA FIRMS (LANCE, NASA/GSFC).
+    </p>
+  </main>
+  <script src="/vendor/leaflet/leaflet.js"></script>
+  <script src="/js/api.js"></script>
+  <script src="/js/header.js"></script>
+  <script src="/js/severity.js"></script>
+  <script src="/js/sw-register.js"></script>
+  <script src="/js/offline.js"></script>
+  <script src="/js/map.js"></script>
+  <script src="/js/list.js"></script>
+  <script src="/js/app.js"></script>
+</body>
+</html>
