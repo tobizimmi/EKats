@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Admin – EKats</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <meta name="theme-color" content="#14232f" />
+</head>
+<body>
+  <header class="app-header">
+    <div class="brand">🚒 EKats Lagedashboard</div>
+    <nav>
+      <a href="./">Karte</a>
+      <a href="settings.html">Einstellungen</a>
+      <a href="admin.html" data-role="admin-only" hidden>Admin</a>
+      <span id="header-user" class="muted"></span>
+      <button id="logout-button" type="button">Abmelden</button>
+    </nav>
+  </header>
+  <main class="stack">
+    <div class="card" id="admin-guard-notice" hidden>
+      <p>Dieser Bereich ist nur für die Rolle „Admin“ zugänglich.</p>
+    </div>
+
+    <div id="admin-content" class="stack" hidden>
+      <div class="card">
+        <h2 class="section-title">Wehr-Einstellungen</h2>
+        <form id="wehr-form" class="form-row">
+          <label>
+            <span>Name der Wehr</span>
+            <input id="wehr-name" type="text" required />
+          </label>
+          <label>
+            <span>Kartenmittelpunkt – Breitengrad</span>
+            <input id="wehr-lat" type="number" step="0.0001" min="-90" max="90" />
+          </label>
+          <label>
+            <span>Kartenmittelpunkt – Längengrad</span>
+            <input id="wehr-lon" type="number" step="0.0001" min="-180" max="180" />
+          </label>
+          <button type="submit" class="primary">Speichern</button>
+        </form>
+        <p class="error-message" id="wehr-error" role="alert"></p>
+        <p class="muted">
+          Der Kartenmittelpunkt bestimmt den Startausschnitt der Kartenansicht und den Bezugspunkt
+          für den NASA-FIRMS-Suchradius (<code>FIRMS_RADIUS_KM</code> in <code>.env</code>).
+        </p>
+      </div>
+
+      <div class="card">
+        <h2 class="section-title">Nutzerverwaltung</h2>
+        <p class="muted">
+          Rollen: <strong>Admin</strong> (voller Zugriff inkl. Nutzerverwaltung),
+          <strong>Stab</strong> (Lage-Zugriff + Schwellenwerte konfigurieren),
+          <strong>Mitglied</strong> (nur Lesezugriff).
+        </p>
+        <form id="user-form" class="form-row">
+          <label>
+            <span>E-Mail</span>
+            <input id="user-email" type="email" required />
+          </label>
+          <label>
+            <span>Passwort</span>
+            <input id="user-password" type="password" minlength="8" required />
+          </label>
+          <label>
+            <span>Rolle</span>
+            <select id="user-role">
+              <option value="mitglied">Mitglied</option>
+              <option value="stab">Stab</option>
+              <option value="admin">Admin</option>
+            </select>
+          </label>
+          <button type="submit" class="primary">Konto anlegen</button>
+        </form>
+        <p class="error-message" id="user-error" role="alert"></p>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>E-Mail</th>
+              <th>Rolle</th>
+              <th>Angelegt</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="user-table-body"></tbody>
+        </table>
+      </div>
+
+      <div class="card">
+        <h2 class="section-title">Lizenz</h2>
+        <p class="muted">
+          Lizenzverwaltung ist für eine spätere Ausbaustufe vorgesehen (u.a. für den Betrieb
+          mehrerer Wehren/Kunden auf einer gemeinsamen Installation). Aktuell gibt es keine
+          Lizenzbeschränkung.
+        </p>
+      </div>
+    </div>
+  </main>
+  <script src="js/api.js"></script>
+  <script src="js/header.js"></script>
+  <script src="js/severity.js"></script>
+  <script src="js/admin.js"></script>
+</body>
+</html>

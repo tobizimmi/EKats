@@ -32,6 +32,14 @@
   box-sizing: border-box;
 }
 
+/* Eigene Layout-Klassen wie .stack/.dashboard-grid setzen display:flex/grid direkt auf das
+   Element - eine Autoren-Regel schlaegt das Browser-Standardverhalten von [hidden] IMMER,
+   unabhaengig von Spezifitaet (andere CSS-Herkunft). Ohne diese Regel bleibt ein Element mit
+   z.B. class="stack" trotz hidden-Attribut sichtbar. */
+[hidden] {
+  display: none !important;
+}
+
 body {
   margin: 0;
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;

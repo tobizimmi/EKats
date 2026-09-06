@@ -61,37 +61,6 @@ async function loadRules() {
   });
 }
 
-async function loadUsers() {
-  const tbody = document.getElementById('user-table-body');
-  tbody.innerHTML = '';
-  const users = await api.get('/users');
-  users.forEach((user) => {
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td>${user.email}</td>
-      <td>${user.role === 'stab' ? 'Stab' : 'Mitglied'}</td>
-      <td>${formatTimestampFallback(user.created_at)}</td>
-      <td></td>`;
-    const actionCell = tr.querySelector('td:last-child');
-    const deleteBtn = document.createElement('button');
-    deleteBtn.className = 'secondary';
-    deleteBtn.type = 'button';
-    deleteBtn.textContent = 'Löschen';
-    deleteBtn.addEventListener('click', async () => {
-      if (!confirm(`Konto ${user.email} wirklich löschen?`)) return;
-      await api.delete(`/users/${user.id}`);
-      loadUsers();
-    });
-    actionCell.appendChild(deleteBtn);
-    tbody.appendChild(tr);
-  });
-}
-
-function formatTimestampFallback(iso) {
-  if (typeof formatTimestamp === 'function') return formatTimestamp(iso);
-  return iso ? new Date(iso).toLocaleString('de-DE') : '-';
-}
-
 (async function bootstrapSettings() {
   const user = await initHeader();
   if (!user) return;
@@ -103,13 +72,16 @@ function formatTimestampFallback(iso) {
 
   document.getElementById('delete-account-button').addEventListener('click', async () => {
     if (!confirm('Ihr Konto wird endgültig gelöscht. Fortfahren?')) return;
-    await api.delete('/users/me');
-    window.location.href = 'login.html';
+    try {
+      await api.delete('/users/me');
+      window.location.href = 'login.html';
+    } catch (err) {
+      alert(err.message);
+    }
   });
 
-  if (user.role === 'stab') {
+  if (user.role !== 'mitglied') {
     await loadRules();
-    await loadUsers();
 
     document.getElementById('rule-form').addEventListener('submit', async (event) => {
       event.preventDefault();
@@ -129,23 +101,6 @@ function formatTimestampFallback(iso) {
         event.target.reset();
         updateRuleFormLabels();
         await loadRules();
-      } catch (err) {
-        errorEl.textContent = err.message;
-      }
-    });
-
-    document.getElementById('user-form').addEventListener('submit', async (event) => {
-      event.preventDefault();
-      const errorEl = document.getElementById('user-error');
-      errorEl.textContent = '';
-      try {
-        await api.post('/users', {
-          email: document.getElementById('user-email').value.trim(),
-          password: document.getElementById('user-password').value,
-          role: document.getElementById('user-role').value,
-        });
-        event.target.reset();
-        await loadUsers();
       } catch (err) {
         errorEl.textContent = err.message;
       }

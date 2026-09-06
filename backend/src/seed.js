@@ -33,10 +33,10 @@ async function seed() {
 
   await query(
     'INSERT INTO app_user (wehr_id, email, password_hash, role) VALUES ($1, $2, $3, $4)',
-    [wehrId, config.seed.adminEmail, passwordHash, 'stab']
+    [wehrId, config.seed.adminEmail, passwordHash, 'admin']
   );
 
-  console.log(`[seed] Stab-Account angelegt: ${config.seed.adminEmail}`);
+  console.log(`[seed] Admin-Account angelegt: ${config.seed.adminEmail}`);
   if (!config.seed.adminPassword) {
     console.log(
       `[seed] Kein SEED_ADMIN_PASSWORD gesetzt — zufaelliges Passwort generiert (bitte sofort notieren und nach dem ersten Login aendern):`

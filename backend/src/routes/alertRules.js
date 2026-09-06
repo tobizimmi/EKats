@@ -30,7 +30,7 @@ const ruleSchema = z.object({
   channelEmail: z.boolean().optional().default(false),
 });
 
-router.post('/', requireRole('stab'), async (req, res, next) => {
+router.post('/', requireRole('stab', 'admin'), async (req, res, next) => {
   try {
     const parsed = ruleSchema.safeParse(req.body);
     if (!parsed.success) {
@@ -52,7 +52,7 @@ router.post('/', requireRole('stab'), async (req, res, next) => {
 
 const updateSchema = ruleSchema.partial().extend({ active: z.boolean().optional() });
 
-router.patch('/:id', requireRole('stab'), async (req, res, next) => {
+router.patch('/:id', requireRole('stab', 'admin'), async (req, res, next) => {
   try {
     const parsed = updateSchema.safeParse(req.body);
     if (!parsed.success) {
@@ -97,7 +97,7 @@ router.patch('/:id', requireRole('stab'), async (req, res, next) => {
   }
 });
 
-router.delete('/:id', requireRole('stab'), async (req, res, next) => {
+router.delete('/:id', requireRole('stab', 'admin'), async (req, res, next) => {
   try {
     const { rowCount } = await query('DELETE FROM alert_rule WHERE id = $1 AND user_id = $2', [
       req.params.id,

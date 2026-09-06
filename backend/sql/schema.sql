@@ -13,13 +13,16 @@ CREATE TABLE IF NOT EXISTS wehr (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- Benutzer (schlanke Rollen fuer V1: 'stab' = voller Zugriff+Konfiguration, 'mitglied' = nur Lesen)
+-- Benutzer, drei Rollenstufen:
+--   'admin'    - voller Zugriff + Nutzerverwaltung/Wehr-Einstellungen (Admin-Bereich)
+--   'stab'     - voller Lage-Zugriff + Schwellenwerte konfigurieren, aber keine Nutzerverwaltung
+--   'mitglied' - nur Lesezugriff auf Karte/Liste
 CREATE TABLE IF NOT EXISTS app_user (
     id SERIAL PRIMARY KEY,
     wehr_id INTEGER NOT NULL REFERENCES wehr(id) ON DELETE CASCADE,
     email TEXT NOT NULL UNIQUE,
     password_hash TEXT NOT NULL,
-    role TEXT NOT NULL CHECK (role IN ('stab', 'mitglied')),
+    role TEXT NOT NULL CHECK (role IN ('admin', 'stab', 'mitglied')),
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 

@@ -15,6 +15,7 @@
     <nav>
       <a href="./">Karte</a>
       <a href="settings.html">Einstellungen</a>
+      <a href="admin.html" data-role="admin-only" hidden>Admin</a>
       <span id="header-user" class="muted"></span>
       <button id="logout-button" type="button">Abmelden</button>
     </nav>
@@ -29,8 +30,8 @@
     <div class="card" data-role="stab-only" hidden>
       <h2 class="section-title">Alarmregeln (Schwellenwerte)</h2>
       <p class="muted">
-        Nur die Rolle „Stab“ kann Schwellenwerte konfigurieren. Benachrichtigungskanäle (Push/E-Mail)
-        gelten je Regel für den anlegenden Account.
+        Nur die Rollen „Stab“ und „Admin“ können Schwellenwerte konfigurieren. Benachrichtigungskanäle
+        (Push/E-Mail) gelten je Regel für den anlegenden Account.
       </p>
       <form id="rule-form" class="form-row">
         <label>
@@ -74,40 +75,6 @@
           </tr>
         </thead>
         <tbody id="rule-table-body"></tbody>
-      </table>
-    </div>
-
-    <div class="card" data-role="stab-only" hidden>
-      <h2 class="section-title">Mitglieder der Wehr</h2>
-      <form id="user-form" class="form-row">
-        <label>
-          <span>E-Mail</span>
-          <input id="user-email" type="email" required />
-        </label>
-        <label>
-          <span>Passwort</span>
-          <input id="user-password" type="password" minlength="8" required />
-        </label>
-        <label>
-          <span>Rolle</span>
-          <select id="user-role">
-            <option value="mitglied">Mitglied (nur Lesezugriff)</option>
-            <option value="stab">Stab (voller Zugriff)</option>
-          </select>
-        </label>
-        <button type="submit" class="primary">Konto anlegen</button>
-      </form>
-      <p class="error-message" id="user-error" role="alert"></p>
-      <table class="data-table">
-        <thead>
-          <tr>
-            <th>E-Mail</th>
-            <th>Rolle</th>
-            <th>Angelegt</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody id="user-table-body"></tbody>
       </table>
     </div>
 

@@ -43,8 +43,8 @@ cp .env.example .env
 # .env ausfuellen: DATABASE_URL, JWT_SECRET, SEED_ADMIN_PASSWORD, ggf. NASA_FIRMS_MAP_KEY, SMTP_*
 
 npm install
-npm run migrate   # legt Schema inkl. PostGIS-Erweiterung an (sql/schema.sql)
-npm run seed      # legt erste Wehr + Stab-Account an (SEED_ADMIN_EMAIL/-PASSWORD)
+npm run migrate   # frische DB: Baseline-Schema; bestehende DB: nur neue sql/migrations/*.sql
+npm run seed      # legt erste Wehr + Admin-Account an (SEED_ADMIN_EMAIL/-PASSWORD)
 npm start         # startet Server (Port 3000) + Cron-Scheduler
 ```
 
@@ -114,10 +114,10 @@ Das Skript ist **idempotent** (mehrfach ausführbar) und erledigt automatisch:
 - Datenbank + Rolle anlegen, PostGIS aktivieren
 - `backend/.env` generieren (zufällige Secrets, VAPID-Schlüsselpaar, Cookie-Pfad `/EKats/`) —
   **wird bei erneutem Lauf nicht überschrieben**
-- `npm ci`, Schema-Migration, Erst-Setup (Wehr + Stab-Account), DWD-Stationsimport
+- `npm ci`, Schema-Migration, Erst-Setup (Wehr + erster Admin-Account), DWD-Stationsimport
 - einen systemd-Service `ekats` einrichten und starten (siehe `deploy/ekats.service` als Referenz)
 
-Am Ende gibt das Skript die Zugangsdaten des ersten Stab-Accounts aus (E-Mail/Passwort einmalig
+Am Ende gibt das Skript die Zugangsdaten des ersten Admin-Accounts aus (E-Mail/Passwort einmalig
 notieren). Anpassbar per Umgebungsvariable, z.B. anderer Port oder andere Admin-E-Mail:
 
 ```bash
@@ -212,10 +212,19 @@ Regel/Datapoint/Kanal-Kombination löst wegen `alert_log` nur einmal aus (siehe
 
 ## Rollen
 
-- **Stab** (Wehrführung/Führungsstab): voller Zugriff, kann Schwellenwerte konfigurieren,
-  Mitgliederkonten anlegen/löschen.
+Drei Stufen, jede höhere umfasst die Rechte der niedrigeren:
+
 - **Mitglied**: nur Lesezugriff auf Karte/Liste, kann eigene Push-Anmeldung verwalten und das
   eigene Konto löschen.
+- **Stab**: zusätzlich Schwellenwerte (Alarmregeln) konfigurieren.
+- **Admin**: zusätzlich Admin-Bereich (`/admin.html`) — Nutzerverwaltung (Konten anlegen, Rolle
+  ändern, löschen) und Wehr-Einstellungen (Name, Kartenmittelpunkt). Die letzte "admin"-Rolle
+  einer Wehr kann sich nicht selbst degradieren oder löschen (Aussperr-Schutz).
+
+Bereits bestehende Installationen (vor Einführung der Admin-Rolle): der bzw. die bisherigen
+`stab`-Accounts werden beim nächsten `deploy/update.sh` automatisch einmalig zu `admin`
+hochgestuft (siehe `backend/sql/migrations/001_add_admin_role.sql`) — kein manueller Eingriff
+nötig, kein Zugriffsverlust.
 
 ## Sicherheit & Datenschutz
 
@@ -260,11 +269,12 @@ zwischengespeichert.
 
 ```
 backend/
-  sql/schema.sql          PostgreSQL/PostGIS-Schema
+  sql/schema.sql          Baseline-Schema (frische Installationen)
+  sql/migrations/         Inkrementelle Migrationen (bestehende Installationen)
   src/
     fetchers/              5 Datenquellen-Connectors + gemeinsames Normalisierungsformat
     notifications/         Schwellenwert-Engine, Web-Push, E-Mail
-    routes/                REST-API (Auth, Nutzer, Datapoints, Alarmregeln, Push)
+    routes/                REST-API (Auth, Nutzer, Wehr, Datapoints, Alarmregeln, Push)
     middleware/             JWT-Auth, Rollen-Check, Error-Handling
     scheduler.js            Cron-Jobs (Fetch + Cleanup)
     app.js / index.js       Express-App-Setup / Server-Start

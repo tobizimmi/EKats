@@ -13,6 +13,7 @@ const usersRoutes = require('./routes/users');
 const datapointsRoutes = require('./routes/datapoints');
 const alertRulesRoutes = require('./routes/alertRules');
 const pushRoutes = require('./routes/push');
+const wehrRoutes = require('./routes/wehr');
 
 function createApp() {
   const app = express();
@@ -63,6 +64,7 @@ function createApp() {
   app.use('/api/datapoints', datapointsRoutes);
   app.use('/api/alert-rules', alertRulesRoutes);
   app.use('/api/push', pushRoutes);
+  app.use('/api/wehr', wehrRoutes);
 
   app.use('/api', notFoundHandler);
 
