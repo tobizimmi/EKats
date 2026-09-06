@@ -56,7 +56,9 @@ async function loadAndRenderDatapoints() {
 
   initMap(user.wehrCenter);
   registerServiceWorker();
+  initObjectsUi(user);
 
   await loadAndRenderDatapoints();
+  await loadObjects();
   setInterval(loadAndRenderDatapoints, REFRESH_INTERVAL_MS);
 })();

@@ -2,10 +2,13 @@
 // Tile-Quelle: OpenStreetMap-Standardkacheln (keine Drittanbieter-Tracking-Skripte, nur Kachelbilder).
 
 const SEVERITY_COLORS = ['#6b7280', '#2e7d32', '#f9a825', '#ef6c00', '#c62828'];
+const OBJECT_LAYER_KEY = 'objects';
 
 let map;
 let layerGroups = {};
 let markersByDatapointId = new Map();
+let markersByObjectId = new Map();
+let placementCallback = null;
 
 function initMap(center) {
   map = L.map('map', { zoomControl: true }).setView(
@@ -21,14 +24,34 @@ function initMap(center) {
   Object.keys(SOURCE_LABELS).forEach((source) => {
     layerGroups[source] = L.layerGroup().addTo(map);
   });
+  layerGroups[OBJECT_LAYER_KEY] = L.layerGroup().addTo(map);
+
+  map.on('click', (event) => {
+    if (!placementCallback) return;
+    const cb = placementCallback;
+    disarmObjectPlacement();
+    cb(event.latlng);
+  });
 
   buildLayerToggles();
+}
+
+// Aktiviert den "naechster Kartenklick platziert ein neues Objekt"-Modus (siehe objects.js).
+function armObjectPlacement(callback) {
+  placementCallback = callback;
+  map.getContainer().classList.add('placing-object');
+}
+
+function disarmObjectPlacement() {
+  placementCallback = null;
+  map.getContainer().classList.remove('placing-object');
 }
 
 function buildLayerToggles() {
   const container = document.getElementById('layer-toggles');
   container.innerHTML = '';
-  Object.entries(SOURCE_LABELS).forEach(([source, label]) => {
+  const allLayers = { ...SOURCE_LABELS, [OBJECT_LAYER_KEY]: 'Kritische Objekte' };
+  Object.entries(allLayers).forEach(([source, label]) => {
     const id = `layer-toggle-${source}`;
     const wrapper = document.createElement('label');
     wrapper.setAttribute('for', id);
@@ -78,4 +101,28 @@ function focusDatapointOnMap(dp) {
   map.flyTo([dp.lat, dp.lon], Math.max(map.getZoom(), 12));
   const marker = markersByDatapointId.get(dp.id);
   if (marker) marker.openTooltip();
+}
+
+// Kritische Objekte werden bewusst als Quadrat (statt Kreis) dargestellt, damit sie sich auf den
+// ersten Blick von den nach Dringlichkeit eingefaerbten Lage-Markern unterscheiden.
+const objectIcon = L.divIcon({
+  className: 'object-marker',
+  html: '<div class="object-marker-inner"></div>',
+  iconSize: [16, 16],
+  iconAnchor: [8, 8],
+});
+
+function renderObjects(objects) {
+  layerGroups[OBJECT_LAYER_KEY].clearLayers();
+  markersByObjectId.clear();
+
+  objects
+    .filter((obj) => obj.lat !== null && obj.lon !== null)
+    .forEach((obj) => {
+      const marker = L.marker([obj.lat, obj.lon], { icon: objectIcon });
+      marker.bindTooltip(obj.name);
+      marker.on('click', () => window.selectObject(obj));
+      marker.addTo(layerGroups[OBJECT_LAYER_KEY]);
+      markersByObjectId.set(obj.id, marker);
+    });
 }

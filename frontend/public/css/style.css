@@ -369,3 +369,58 @@ table.data-table td {
   color: var(--text-muted);
   margin-top: 0.5rem;
 }
+
+#add-object-button {
+  margin-bottom: 0.75rem;
+}
+
+/* Marker fuer kritische Objekte: bewusst ein Quadrat statt Kreis, damit sie sich von den nach
+   Dringlichkeit eingefaerbten runden Lage-Markern unterscheiden (siehe js/map.js). */
+.object-marker-inner {
+  width: 14px;
+  height: 14px;
+  background: #6d28d9;
+  border: 2px solid #ffffff;
+  box-shadow: 0 0 0 1px #6d28d9;
+  transform: rotate(45deg);
+}
+
+#map.placing-object {
+  cursor: crosshair;
+}
+
+.app-dialog {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-elevated);
+  color: var(--text);
+  padding: 1.25rem;
+  max-width: 480px;
+  width: calc(100% - 2rem);
+}
+
+.app-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.app-dialog label {
+  margin-bottom: 0.75rem;
+}
+
+.app-dialog textarea {
+  width: 100%;
+  padding: 0.55rem 0.6rem;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  resize: vertical;
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}

@@ -24,6 +24,9 @@
   </header>
   <main>
     <div class="layer-toggle-bar" id="layer-toggles"></div>
+    <button id="add-object-button" type="button" class="secondary" data-role="stab-only" hidden>
+      Objekt anlegen
+    </button>
     <div class="dashboard-grid">
       <div id="map"></div>
       <div class="card stack">
@@ -43,6 +46,56 @@
       des Bundes (PEGELONLINE), Hochwasserzentralen der Länder, NASA FIRMS (LANCE, NASA/GSFC).
     </p>
   </main>
+
+  <dialog id="object-dialog" class="app-dialog">
+    <form id="object-form" method="dialog">
+      <h3 id="object-dialog-title" class="section-title">Objekt</h3>
+      <label>
+        <span>Name</span>
+        <input id="object-name" type="text" required maxlength="200" />
+      </label>
+      <label>
+        <span>Kategorie</span>
+        <select id="object-category">
+          <option value="schule_kita">Schule/Kita</option>
+          <option value="krankenhaus_pflege">Krankenhaus/Pflegeeinrichtung</option>
+          <option value="industrie_gefahrstoff">Industrie/Gefahrstoffbetrieb</option>
+          <option value="versammlungsstaette">Versammlungsstätte</option>
+          <option value="sonstiges" selected>Sonstiges</option>
+        </select>
+      </label>
+      <label>
+        <span>Adresse</span>
+        <input id="object-address" type="text" maxlength="300" />
+      </label>
+      <label>
+        <span>Besondere Gefahren</span>
+        <textarea id="object-hazards" rows="2" maxlength="2000"></textarea>
+      </label>
+      <label>
+        <span>Zufahrt / Schlüsseldepot</span>
+        <textarea id="object-access-info" rows="2" maxlength="2000"></textarea>
+      </label>
+      <label>
+        <span>Ansprechpartner Name</span>
+        <input id="object-contact-name" type="text" maxlength="200" />
+      </label>
+      <label>
+        <span>Ansprechpartner Telefon</span>
+        <input id="object-contact-phone" type="text" maxlength="50" />
+      </label>
+      <label>
+        <span>Sonstige Hinweise</span>
+        <textarea id="object-notes" rows="2" maxlength="2000"></textarea>
+      </label>
+      <p class="error-message" role="alert"></p>
+      <div class="dialog-actions">
+        <button id="object-delete-button" type="button" class="secondary" hidden>Löschen</button>
+        <button id="object-cancel-button" type="button" class="secondary">Abbrechen</button>
+        <button id="object-save-button" type="submit" class="primary">Speichern</button>
+      </div>
+    </form>
+  </dialog>
   <script src="vendor/leaflet/leaflet.js"></script>
   <script src="js/api.js"></script>
   <script src="js/header.js"></script>
@@ -51,6 +104,7 @@
   <script src="js/offline.js"></script>
   <script src="js/map.js"></script>
   <script src="js/list.js"></script>
+  <script src="js/objects.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

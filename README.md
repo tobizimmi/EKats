@@ -226,6 +226,23 @@ Bereits bestehende Installationen (vor Einführung der Admin-Rolle): der bzw. di
 hochgestuft (siehe `backend/sql/migrations/001_add_admin_role.sql`) — kein manueller Eingriff
 nötig, kein Zugriffsverlust.
 
+## Objektverwaltung (kritische Objekte)
+
+Auf der Karte lassen sich kritische Objekte (Schulen/Kitas, Krankenhäuser/Pflegeeinrichtungen,
+Industrie-/Gefahrstoffbetriebe, Versammlungsstätten, Sonstiges) direkt anlegen und pflegen —
+eigener Layer, als Quadrat dargestellt (unterscheidbar von den runden, nach Dringlichkeit
+eingefärbten Lage-Markern).
+
+- **Anlegen** (Rolle Stab/Admin): Button „Objekt anlegen“ klicken, dann auf die gewünschte Position
+  in der Karte klicken — öffnet ein Formular für Name, Kategorie, Adresse, besondere Gefahren,
+  Zufahrt/Schlüsseldepot und Ansprechpartner.
+- **Bearbeiten/Löschen** (Stab/Admin): bestehendes Objekt auf der Karte anklicken.
+- **Ansehen** (Mitglied): Klick öffnet dieselbe Ansicht schreibgeschützt.
+
+Bewusste V1-Einschränkung: keine Datei-Anhänge (Grundrisse/Einsatzpläne als PDF) — nur
+Ortsangabe plus Freitext-Hinweise. Objekte sind je Wehr gespeichert (`critical_object`-Tabelle,
+`backend/sql/migrations/002_add_critical_objects.sql`).
+
 ## Sicherheit & Datenschutz
 
 - Passwörter: bcrypt (Cost 12)
@@ -274,7 +291,7 @@ backend/
   src/
     fetchers/              5 Datenquellen-Connectors + gemeinsames Normalisierungsformat
     notifications/         Schwellenwert-Engine, Web-Push, E-Mail
-    routes/                REST-API (Auth, Nutzer, Wehr, Datapoints, Alarmregeln, Push)
+    routes/                REST-API (Auth, Nutzer, Wehr, Datapoints, Alarmregeln, Objekte, Push)
     middleware/             JWT-Auth, Rollen-Check, Error-Handling
     scheduler.js            Cron-Jobs (Fetch + Cleanup)
     app.js / index.js       Express-App-Setup / Server-Start

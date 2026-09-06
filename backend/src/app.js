@@ -14,6 +14,7 @@ const datapointsRoutes = require('./routes/datapoints');
 const alertRulesRoutes = require('./routes/alertRules');
 const pushRoutes = require('./routes/push');
 const wehrRoutes = require('./routes/wehr');
+const objectsRoutes = require('./routes/objects');
 
 function createApp() {
   const app = express();
@@ -65,6 +66,7 @@ function createApp() {
   app.use('/api/alert-rules', alertRulesRoutes);
   app.use('/api/push', pushRoutes);
   app.use('/api/wehr', wehrRoutes);
+  app.use('/api/objects', objectsRoutes);
 
   app.use('/api', notFoundHandler);
 
