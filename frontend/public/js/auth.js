@@ -1,7 +1,7 @@
 (async function checkExistingSession() {
   try {
     await api.get('/auth/me');
-    window.location.href = '/';
+    window.location.href = './';
   } catch (err) {
     // keine gueltige Session -> auf der Login-Seite bleiben
   }
@@ -17,7 +17,7 @@ document.getElementById('login-form').addEventListener('submit', async (event) =
 
   try {
     await api.post('/auth/login', { email, password });
-    window.location.href = '/';
+    window.location.href = './';
   } catch (err) {
     errorEl.textContent = err.message || 'Anmeldung fehlgeschlagen.';
   }

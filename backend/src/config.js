@@ -7,6 +7,10 @@ function required(name, fallback = undefined) {
 
 const config = {
   env: process.env.NODE_ENV || 'development',
+  // Standardmaessig NUR localhost: der Node-Prozess soll in Produktion nie direkt oeffentlich
+  // erreichbar sein, sondern ausschliesslich ueber einen TLS-terminierenden Reverse-Proxy
+  // (Apache/nginx) davor - siehe deploy/apache-ekats.conf.example.
+  host: process.env.HOST || '127.0.0.1',
   port: parseInt(process.env.PORT || '3000', 10),
   baseUrl: process.env.BASE_URL || `http://localhost:${process.env.PORT || 3000}`,
 
@@ -15,6 +19,10 @@ const config = {
   jwtSecret: required('JWT_SECRET', 'dev-insecure-secret-change-me'),
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || '12h',
   cookieSecure: process.env.COOKIE_SECURE === 'true',
+  // Pfad-Scope des Auth-Cookies. Bei Deployment unter einem Unterpfad (z.B. "/EKats/", siehe
+  // README "Deployment") auf genau diesen Pfad einschraenken, damit das Cookie nicht bei jedem
+  // Request an andere Anwendungen auf derselben Domain mitgeschickt wird.
+  cookiePath: process.env.COOKIE_PATH || '/',
 
   vapidPublicKey: process.env.VAPID_PUBLIC_KEY || '',
   vapidPrivateKey: process.env.VAPID_PRIVATE_KEY || '',

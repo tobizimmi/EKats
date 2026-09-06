@@ -6,7 +6,7 @@ async function initHeader() {
   try {
     user = await api.get('/auth/me');
   } catch (err) {
-    window.location.href = '/login.html';
+    window.location.href = 'login.html';
     return null;
   }
 
@@ -25,7 +25,7 @@ async function initHeader() {
       try {
         await api.post('/auth/logout');
       } finally {
-        window.location.href = '/login.html';
+        window.location.href = 'login.html';
       }
     });
   }

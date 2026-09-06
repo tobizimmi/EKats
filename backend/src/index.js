@@ -4,7 +4,9 @@ const { startScheduler } = require('./scheduler');
 
 const app = createApp();
 
-app.listen(config.port, () => {
-  console.log(`[server] EKats Backend laeuft auf ${config.baseUrl} (Port ${config.port}, env=${config.env})`);
+app.listen(config.port, config.host, () => {
+  console.log(
+    `[server] EKats Backend laeuft auf http://${config.host}:${config.port} (extern via ${config.baseUrl}, env=${config.env})`
+  );
   startScheduler();
 });

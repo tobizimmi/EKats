@@ -17,12 +17,12 @@ function setAuthCookie(res, token) {
     secure: config.cookieSecure,
     sameSite: 'strict',
     maxAge: 12 * 60 * 60 * 1000,
-    path: '/',
+    path: config.cookiePath,
   });
 }
 
 function clearAuthCookie(res) {
-  res.clearCookie(COOKIE_NAME, { path: '/' });
+  res.clearCookie(COOKIE_NAME, { path: config.cookiePath });
 }
 
 function extractToken(req) {

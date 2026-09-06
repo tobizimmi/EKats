@@ -1,0 +1,30 @@
+# systemd-Unit fuer den EKats-Backend-Prozess.
+#
+# Dies ist eine DOKUMENTATIONS-VORLAGE mit Beispielpfad /var/www/EKats. install.sh erzeugt beim
+# Ausfuehren automatisch die tatsaechliche Datei unter /etc/systemd/system/ekats.service mit dem
+# korrekten, tatsaechlichen Installationspfad - diese Datei hier muss dafuer NICHT manuell angepasst
+# werden. Nur relevant, falls jemand die Unit von Hand statt per install.sh einrichten will.
+
+[Unit]
+Description=EKats Lage-/Fruehwarn-Dashboard (Backend)
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=simple
+User=ekats
+Group=ekats
+WorkingDirectory=/var/www/EKats/backend
+EnvironmentFile=/var/www/EKats/backend/.env
+ExecStart=/usr/bin/node src/index.js
+Restart=on-failure
+RestartSec=5
+# Haertung: eigener Nutzer ohne Login-Shell (siehe install.sh), kein Schreibzugriff ausserhalb
+# des eigenen Arbeitsverzeichnisses noetig.
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/var/www/EKats/backend
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

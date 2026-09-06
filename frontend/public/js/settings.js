@@ -104,7 +104,7 @@ function formatTimestampFallback(iso) {
   document.getElementById('delete-account-button').addEventListener('click', async () => {
     if (!confirm('Ihr Konto wird endgültig gelöscht. Fortfahren?')) return;
     await api.delete('/users/me');
-    window.location.href = '/login.html';
+    window.location.href = 'login.html';
   });
 
   if (user.role === 'stab') {

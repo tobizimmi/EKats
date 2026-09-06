@@ -69,6 +69,84 @@ npm run import-dwd-stations
 
 (Läuft danach automatisch wöchentlich über den Scheduler, siehe `FETCH_DWD_STATIONS_IMPORT_CRON`.)
 
+## Deployment auf zimmimail.de (Produktivbetrieb)
+
+Zielbild: eigener VPS mit Root-Zugriff, bestehender Apache-Webserver (wie bei FKatInfo), EKats
+erreichbar unter `https://zimmimail.de/EKats/` — als Unterpfad der bestehenden Domain, damit das
+vorhandene TLS-Zertifikat mitgenutzt wird und keine neue Subdomain/kein neues Zertifikat nötig ist.
+Das Frontend verwendet ausschließlich relative Pfade und funktioniert dadurch unverändert unter
+jedem Unterpfad; das Backend bindet nur an `127.0.0.1` und ist nie direkt öffentlich erreichbar,
+sondern ausschließlich über Apache als Reverse-Proxy.
+
+### 1. Repository auf den Server holen
+
+```bash
+git clone https://github.com/tobizimmi/EKats.git /var/www/EKats
+```
+
+(Setzt voraus, dass der Server bereits Zugriff auf das GitHub-Repo hat — z.B. über denselben
+Mechanismus, mit dem auch FKatInfo dort geklont wurde: hinterlegter Deploy-Key/SSH-Key oder ein
+Personal-Access-Token in der Remote-URL. Ist das Repo privat und noch kein Zugriff eingerichtet,
+zunächst wie gewohnt einen Deploy-Key in den GitHub-Repo-Einstellungen hinzufügen.)
+
+### 2. Installationsskript ausführen
+
+```bash
+cd /var/www/EKats
+sudo bash deploy/install.sh
+```
+
+Das Skript ist **idempotent** (mehrfach ausführbar) und erledigt automatisch:
+
+- Node.js 20 installieren (falls nicht vorhanden)
+- PostgreSQL + PostGIS-Erweiterung installieren
+- einen dedizierten Systembenutzer `ekats` ohne Login-Shell anlegen
+- Datenbank + Rolle anlegen, PostGIS aktivieren
+- `backend/.env` generieren (zufällige Secrets, VAPID-Schlüsselpaar, Cookie-Pfad `/EKats/`) —
+  **wird bei erneutem Lauf nicht überschrieben**
+- `npm ci`, Schema-Migration, Erst-Setup (Wehr + Stab-Account), DWD-Stationsimport
+- einen systemd-Service `ekats` einrichten und starten (siehe `deploy/ekats.service` als Referenz)
+
+Am Ende gibt das Skript die Zugangsdaten des ersten Stab-Accounts aus (E-Mail/Passwort einmalig
+notieren). Anpassbar per Umgebungsvariable, z.B. anderer Port oder andere Admin-E-Mail:
+
+```bash
+EKATS_PORT=3001 EKATS_ADMIN_EMAIL=wehrfuehrer@zimmimail.de sudo -E bash deploy/install.sh
+```
+
+### 3. Apache als Reverse-Proxy einbinden (manueller Schritt)
+
+`install.sh` fasst die bestehende, produktive zimmimail.de-Apache-Konfiguration bewusst **nicht**
+automatisch an. Stattdessen den Inhalt von `deploy/apache-ekats.conf.example` in den bestehenden
+`<VirtualHost *:443>`-Block für zimmimail.de einfügen, dann:
+
+```bash
+sudo a2enmod proxy proxy_http headers
+sudo apache2ctl configtest
+sudo systemctl reload apache2
+```
+
+Danach ist EKats erreichbar unter `https://zimmimail.de/EKats/`.
+
+### 4. Spätere Updates
+
+```bash
+cd /var/www/EKats
+sudo bash deploy/update.sh
+```
+
+Zieht den neuesten Stand per `git pull`, aktualisiert Abhängigkeiten, führt die (additive,
+gefahrlose) Schema-Migration erneut aus und startet den Service neu. Lässt `.env` und die
+Apache-Konfiguration unangetastet.
+
+### Nützliche Befehle auf dem Server
+
+```bash
+systemctl status ekats            # Läuft der Prozess?
+journalctl -u ekats -f            # Live-Logs (Fetcher-Läufe, Fehler, Alarme)
+systemctl restart ekats           # Neustart, z.B. nach manueller .env-Änderung
+```
+
 ## Datenquellen
 
 | Quelle | Zweck | API-Key | Update-Intervall (Standard) |

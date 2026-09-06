@@ -38,7 +38,10 @@ function createApp() {
       },
     })
   );
-  app.use(cors({ origin: config.baseUrl, credentials: true }));
+  // Browser-Origin-Header enthaelt nie einen Pfad (nur Schema+Host+Port) - falls BASE_URL einen
+  // Unterpfad traegt (z.B. "https://zimmimail.de/EKats", siehe README "Deployment"), muss der Pfad
+  // fuer den CORS-Vergleich abgeschnitten werden.
+  app.use(cors({ origin: new URL(config.baseUrl).origin, credentials: true }));
   app.use(cookieParser());
   app.use(express.json({ limit: '200kb' }));
 

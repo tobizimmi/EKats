@@ -3,30 +3,35 @@
 // voller Offline-Betrieb (das ist Modul 2) - API-Aufrufe gehen immer ans Netz, Kartenkacheln werden
 // nicht vorab zwischengespeichert.
 
+// Bewusst RELATIV zum Service-Worker-Skript (kein fuehrender "/"): die Cache API und
+// self.registration.scope loesen relative URLs relativ zu self.location auf. So funktioniert
+// dieselbe sw.js unveraendert egal ob die App an der Domain-Root oder einem Unterpfad
+// (z.B. https://zimmimail.de/EKats/) haengt - siehe README "Deployment".
 const CACHE_NAME = 'ekats-shell-v1';
 const APP_SHELL = [
-  '/',
-  '/login.html',
-  '/settings.html',
-  '/datenschutz.html',
-  '/impressum.html',
-  '/css/style.css',
-  '/js/api.js',
-  '/js/severity.js',
-  '/js/header.js',
-  '/js/offline.js',
-  '/js/map.js',
-  '/js/list.js',
-  '/js/app.js',
-  '/js/auth.js',
-  '/js/settings.js',
-  '/js/push.js',
-  '/js/sw-register.js',
-  '/vendor/leaflet/leaflet.js',
-  '/vendor/leaflet/leaflet.css',
-  '/manifest.webmanifest',
-  '/icons/icon.svg',
+  './',
+  'login.html',
+  'settings.html',
+  'datenschutz.html',
+  'impressum.html',
+  'css/style.css',
+  'js/api.js',
+  'js/severity.js',
+  'js/header.js',
+  'js/offline.js',
+  'js/map.js',
+  'js/list.js',
+  'js/app.js',
+  'js/auth.js',
+  'js/settings.js',
+  'js/push.js',
+  'js/sw-register.js',
+  'vendor/leaflet/leaflet.js',
+  'vendor/leaflet/leaflet.css',
+  'manifest.webmanifest',
+  'icons/icon.svg',
 ];
+const SCOPE_PATH = new URL(self.registration ? self.registration.scope : './', self.location).pathname;
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -47,7 +52,7 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
   // API-Aufrufe: immer ans Netz, nie aus dem Cache beantworten (Live-Daten).
-  if (url.pathname.startsWith('/api/')) {
+  if (url.pathname.startsWith(`${SCOPE_PATH}api/`)) {
     return;
   }
 
@@ -79,8 +84,8 @@ self.addEventListener('push', (event) => {
   event.waitUntil(
     self.registration.showNotification(payload.title || 'EKats-Alarm', {
       body: payload.body || '',
-      icon: '/icons/icon.svg',
-      badge: '/icons/icon.svg',
+      icon: 'icons/icon.svg',
+      badge: 'icons/icon.svg',
       data: payload,
     })
   );
@@ -88,5 +93,5 @@ self.addEventListener('push', (event) => {
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  event.waitUntil(self.clients.openWindow('/'));
+  event.waitUntil(self.clients.openWindow(self.registration.scope));
 });

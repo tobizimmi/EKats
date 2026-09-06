@@ -1,0 +1,22 @@
+# EKats unter https://zimmimail.de/EKats/ per Reverse-Proxy auf den lokalen Node-Prozess.
+#
+# WICHTIG: install.sh fasst die bestehende zimmimail.de-VHost-Konfiguration NICHT automatisch an
+# (fremde, produktive Konfiguration - siehe README "Deployment"). Diesen Block manuell in den
+# bestehenden <VirtualHost *:443>-Block fuer zimmimail.de einfuegen (z.B. vor einem etwaigen
+# FKatInfo-.htaccess-Rewrite-Catch-all), dann:
+#
+#   sudo a2enmod proxy proxy_http headers
+#   sudo apache2ctl configtest
+#   sudo systemctl reload apache2
+#
+# Passt den Port unten an, falls beim install.sh-Aufruf ein anderer EKATS_PORT gewaehlt wurde
+# (Standard: 3000).
+
+    # --- EKats (Lage-/Fruehwarn-Dashboard) ---
+    RedirectMatch ^/EKats$ /EKats/
+    ProxyPreserveHost On
+    ProxyPass /EKats/ http://127.0.0.1:3000/
+    ProxyPassReverse /EKats/ http://127.0.0.1:3000/
+    <Location /EKats/>
+        RequestHeader set X-Forwarded-Proto "https"
+    </Location>
