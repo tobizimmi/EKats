@@ -40,7 +40,25 @@ BACKEND_DIR="$REPO_DIR/backend"
 ENV_FILE="$BACKEND_DIR/.env"
 [ -f "$BACKEND_DIR/package.json" ] || die "backend/package.json nicht gefunden unter $REPO_DIR - falsches Verzeichnis?"
 
+# Verhindert "could not change directory ... Permission denied"-Meldungen von "sudo -u postgres":
+# sudo versucht das aktuelle Arbeitsverzeichnis fuer den Zielbenutzer beizubehalten: liegt das
+# Repo (wie z.B. bei Plesk ueblich) in einem Verzeichnis, in das der postgres-Systembenutzer nicht
+# hineinwechseln darf, meldet sudo das (harmlos) bei jedem einzelnen Aufruf. Ab hier bewusst in
+# einem neutralen Verzeichnis weiterarbeiten; alle Pfade oben wurden bereits absolut aufgeloest.
+cd /
+
 log "Installationsverzeichnis: $REPO_DIR"
+
+if [[ "$REPO_DIR" == *"/httpdocs"* || "$REPO_DIR" == *"/httpdocs/"* ]]; then
+  warn "Das Repo liegt unter einem 'httpdocs'-Verzeichnis - das ist bei Plesk/cPanel typischerweise \
+der oeffentliche Webserver-Dokumentenstamm der Domain. backend/.env (Secrets!) und der gesamte \
+Quellcode liegen damit im gleichen Baum, den Apache/nginx fuer die Domain ausliefert. Nur der \
+ProxyPass-Reverse-Proxy fuer ${EKATS_BASE_PATH}/ (siehe deploy/apache-ekats.conf.example) verhindert \
+direkten Zugriff darauf - eine Fehlkonfiguration dort wuerde die .env offenlegen. Empfehlung: das \
+Repo stattdessen AUSSERHALB von httpdocs ablegen (bei Plesk z.B. im privaten Vhost-Verzeichnis, \
+Geschwisterordner von httpdocs) und nur bei Bedarf per ProxyPass verlinken. Wird hier nicht \
+automatisch verschoben, um keine laufende Installation zu zerstoeren."
+fi
 
 # ---------------------------------------------------------------------------
 log "Pruefe/installiere Node.js (>= 20)"
@@ -79,6 +97,7 @@ fi
 # ---------------------------------------------------------------------------
 log "Konfiguration (.env)"
 if [ -f "$ENV_FILE" ]; then
+  FRESH_ENV=false
   log "Vorhandene $ENV_FILE gefunden - wird NICHT ueberschrieben, bestehende Werte werden wiederverwendet."
   existing_var() { grep -E "^$1=" "$ENV_FILE" | tail -1 | cut -d= -f2-; }
   DATABASE_URL_EXISTING="$(existing_var DATABASE_URL || true)"
@@ -88,6 +107,7 @@ if [ -f "$ENV_FILE" ]; then
   EKATS_PORT="$(existing_var PORT || echo "$EKATS_PORT")"
   ADMIN_PASSWORD_NOTE="(unveraendert, siehe vorherige Installation - bei Bedarf in $ENV_FILE nachsehen bzw. in der App aendern)"
 else
+  FRESH_ENV=true
   EKATS_DB_PASSWORD="${EKATS_DB_PASSWORD:-$(openssl rand -hex 24)}"
   JWT_SECRET="$(openssl rand -hex 48)"
   ADMIN_PASSWORD="${EKATS_ADMIN_PASSWORD:-$(openssl rand -base64 18)}"
@@ -99,6 +119,12 @@ log "Datenbank/Rolle anlegen (idempotent)"
 role_exists=$(sudo -u postgres psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='${EKATS_DB_USER}'")
 if [ "$role_exists" != "1" ]; then
   sudo -u postgres psql -c "CREATE ROLE ${EKATS_DB_USER} LOGIN PASSWORD '${EKATS_DB_PASSWORD}';"
+elif [ "$FRESH_ENV" = true ]; then
+  # Rolle existiert bereits (z.B. Rest eines fruehereren, abgebrochenen Laufs), aber wir generieren
+  # gerade eine NEUE .env mit einem NEUEN Passwort - ohne diesen Sync wuerde .env ein Passwort
+  # enthalten, das nicht zum bestehenden Rollen-Passwort passt ("password authentication failed").
+  log "Rolle '${EKATS_DB_USER}' existiert bereits - synchronisiere ihr Passwort mit der neuen .env."
+  sudo -u postgres psql -c "ALTER ROLE ${EKATS_DB_USER} WITH PASSWORD '${EKATS_DB_PASSWORD}';"
 else
   log "Rolle '${EKATS_DB_USER}' existiert bereits, ueberspringe."
 fi
@@ -144,6 +170,19 @@ fi
 # ---------------------------------------------------------------------------
 log "npm-Abhaengigkeiten installieren (npm ci)"
 (cd "$BACKEND_DIR" && npm ci)
+
+# bcrypt hat ein natives Compile-Postinstall-Skript (node-gyp-build). Manche Hosting-Setups (siehe
+# ggf. eine "allow-scripts"-Warnung oben) blockieren Postinstall-Skripte standardmaessig - dann
+# fehlt die kompilierte Bindung und bcrypt.hash()/compare() crasht erst beim ersten Login-Versuch.
+# Hier frueh und klar pruefen statt das dem Nutzer beim Login ueberlassen.
+if ! (cd "$BACKEND_DIR" && node -e "require('bcrypt')" 2>/tmp/ekats-bcrypt-check.log); then
+  warn "bcrypt konnte nicht geladen werden (vermutlich Postinstall-Skript blockiert - siehe evtl. \
+'allow-scripts'-Warnung oben). Details: $(cat /tmp/ekats-bcrypt-check.log 2>/dev/null)"
+  die "Ohne funktionierendes bcrypt startet die App nicht. Entweder das Postinstall-Skript freigeben \
+(z.B. 'npm approve-scripts --allow-scripts-pending' in $BACKEND_DIR, dann 'npm rebuild bcrypt' und \
+dieses Skript erneut ausfuehren) oder in package.json auf 'bcryptjs' (reines JS, kein Compile noetig) \
+wechseln."
+fi
 
 log "Datenbank-Schema migrieren"
 (cd "$BACKEND_DIR" && npm run migrate)
@@ -212,12 +251,13 @@ cat <<SUMMARY
    E-Mail:    ${EKATS_ADMIN_EMAIL}
    Passwort:  ${ADMIN_PASSWORD_NOTE}
 
- NAECHSTER SCHRITT (manuell, da bestehende Apache-Config nicht automatisch geaendert wird):
- Den Inhalt von deploy/apache-ekats.conf.example in den bestehenden <VirtualHost *:443>-Block
- fuer ${EKATS_DOMAIN} einfuegen, dann:
-   sudo a2enmod proxy proxy_http headers
-   sudo apache2ctl configtest
-   sudo systemctl reload apache2
+ NAECHSTER SCHRITT (manuell, da bestehende Apache/Plesk-Config nicht automatisch geaendert wird):
+ Siehe deploy/apache-ekats.conf.example fuer den genauen Block + zwei Wege, ihn dauerhaft
+ (Plesk-Reconfigure-sicher) einzubinden:
+   - Panel: Websites & Domains -> ${EKATS_DOMAIN} -> "Apache & nginx-Einstellungen" ->
+     Feld "Zusaetzliche Apache-Direktiven fuer HTTPS"
+   - CLI: /var/www/vhosts/system/${EKATS_DOMAIN}/conf/vhost_ssl.conf ergaenzen, dann
+     'plesk sbin httpdmng --reconfigure-domain ${EKATS_DOMAIN}'
 
  Danach erreichbar unter: https://${EKATS_DOMAIN}${EKATS_BASE_PATH}/
 

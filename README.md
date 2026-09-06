@@ -71,17 +71,24 @@ npm run import-dwd-stations
 
 ## Deployment auf zimmimail.de (Produktivbetrieb)
 
-Zielbild: eigener VPS mit Root-Zugriff, bestehender Apache-Webserver (wie bei FKatInfo), EKats
-erreichbar unter `https://zimmimail.de/EKats/` — als Unterpfad der bestehenden Domain, damit das
-vorhandene TLS-Zertifikat mitgenutzt wird und keine neue Subdomain/kein neues Zertifikat nötig ist.
-Das Frontend verwendet ausschließlich relative Pfade und funktioniert dadurch unverändert unter
-jedem Unterpfad; das Backend bindet nur an `127.0.0.1` und ist nie direkt öffentlich erreichbar,
-sondern ausschließlich über Apache als Reverse-Proxy.
+Zielbild: VPS mit Root-Zugriff, verwaltet über **Plesk** (erkennbar am Pfad
+`/var/www/vhosts/<domain>/...`), EKats erreichbar unter `https://zimmimail.de/EKats/` — als
+Unterpfad der bestehenden Domain, damit das vorhandene TLS-Zertifikat mitgenutzt wird und keine
+neue Subdomain/kein neues Zertifikat nötig ist. Das Frontend verwendet ausschließlich relative
+Pfade und funktioniert dadurch unverändert unter jedem Unterpfad; das Backend bindet nur an
+`127.0.0.1` und ist nie direkt öffentlich erreichbar, sondern ausschließlich über Apache als
+Reverse-Proxy.
 
 ### 1. Repository auf den Server holen
 
+**Wichtig: NICHT unter `httpdocs/`** klonen. `httpdocs/` ist bei Plesk der öffentliche
+Web-Dokumentenstamm der Domain — Apache liefert von dort direkt Dateien aus. Läge der Quellcode
+(inkl. `backend/.env` mit Secrets) darin, wäre nur der weiter unten konfigurierte Reverse-Proxy die
+einzige Barriere gegen direkten Zugriff auf `.env` & Co. Stattdessen ins private Vhost-Verzeichnis
+(Geschwisterordner von `httpdocs`) klonen, das Apache nicht ausliefert:
+
 ```bash
-git clone https://github.com/tobizimmi/EKats.git /var/www/EKats
+git clone https://github.com/tobizimmi/EKats.git /var/www/vhosts/zimmimail.de/EKats
 ```
 
 (Setzt voraus, dass der Server bereits Zugriff auf das GitHub-Repo hat — z.B. über denselben
@@ -89,10 +96,13 @@ Mechanismus, mit dem auch FKatInfo dort geklont wurde: hinterlegter Deploy-Key/S
 Personal-Access-Token in der Remote-URL. Ist das Repo privat und noch kein Zugriff eingerichtet,
 zunächst wie gewohnt einen Deploy-Key in den GitHub-Repo-Einstellungen hinzufügen.)
 
+`install.sh` warnt automatisch, falls es doch unter einem `httpdocs`-Pfad ausgeführt wird, bricht
+aber nicht ab (falls es dafür einen bewussten Grund gibt).
+
 ### 2. Installationsskript ausführen
 
 ```bash
-cd /var/www/EKats
+cd /var/www/vhosts/zimmimail.de/EKats
 sudo bash deploy/install.sh
 ```
 
@@ -116,22 +126,25 @@ EKATS_PORT=3001 EKATS_ADMIN_EMAIL=wehrfuehrer@zimmimail.de sudo -E bash deploy/i
 
 ### 3. Apache als Reverse-Proxy einbinden (manueller Schritt)
 
-`install.sh` fasst die bestehende, produktive zimmimail.de-Apache-Konfiguration bewusst **nicht**
-automatisch an. Stattdessen den Inhalt von `deploy/apache-ekats.conf.example` in den bestehenden
-`<VirtualHost *:443>`-Block für zimmimail.de einfügen, dann:
+`install.sh` fasst die bestehende, produktive zimmimail.de-Konfiguration bewusst **nicht**
+automatisch an. Da der Server über **Plesk** verwaltet wird, würde eine von Hand editierte
+Apache-VirtualHost-Datei beim nächsten Plesk-Reconfigure wieder überschrieben — Plesk bietet dafür
+zwei offizielle, dauerhafte Wege (Details/genauer Wortlaut in `deploy/apache-ekats.conf.example`):
 
-```bash
-sudo a2enmod proxy proxy_http headers
-sudo apache2ctl configtest
-sudo systemctl reload apache2
-```
+- **Panel (einfacher):** Websites & Domains → zimmimail.de → „Apache & nginx-Einstellungen“ →
+  Feld „Zusätzliche Apache-Direktiven für **HTTPS**“ → Inhalt aus
+  `deploy/apache-ekats.conf.example` einfügen → Anwenden. Plesk aktiviert nötige Module und
+  generiert die Config selbst neu.
+- **CLI:** Block in `/var/www/vhosts/system/zimmimail.de/conf/vhost_ssl.conf` anhängen, dann
+  `sudo a2enmod proxy proxy_http headers && sudo plesk sbin httpdmng --reconfigure-domain zimmimail.de`.
 
-Danach ist EKats erreichbar unter `https://zimmimail.de/EKats/`.
+Danach kurz `sudo apache2ctl configtest` prüfen. Erreichbar ist EKats anschließend unter
+`https://zimmimail.de/EKats/`.
 
 ### 4. Spätere Updates
 
 ```bash
-cd /var/www/EKats
+cd /var/www/vhosts/zimmimail.de/EKats
 sudo bash deploy/update.sh
 ```
 
