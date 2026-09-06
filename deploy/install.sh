@@ -197,6 +197,20 @@ log "DWD-Stationslookup befuellen (best effort, braucht Internetzugang zu openda
 log "Dateirechte setzen"
 chown -R "${EKATS_SYSTEM_USER}:${EKATS_SYSTEM_USER}" "$REPO_DIR"
 
+# Plesk-Vhost-Verzeichnisse (z.B. /var/www/vhosts/<domain>) sind ueblicherweise nur fuer den
+# von Plesk angelegten Domain-Systembenutzer durchquerbar - unser eigener, dedizierter
+# EKATS_SYSTEM_USER darf sonst NICHT einmal per "cd" hineingelangen, obwohl er $REPO_DIR selbst
+# gehoert. Ohne dieses Recht scheitert der Service-Start mit systemd-Status "200/CHDIR"
+# (chdir ins WorkingDirectory schlaegt fehl -> Endlos-Restart-Schleife). "o+x" erlaubt nur das
+# gezielte Hineinwechseln (kein Directory-Listing, dafuer waere zusaetzlich Lese-Recht noetig).
+PARENT_DIR="$(dirname "$REPO_DIR")"
+if [ "$PARENT_DIR" != "/" ] && [ "$PARENT_DIR" != "/var/www" ]; then
+  chmod o+x "$PARENT_DIR" 2>/dev/null \
+    || warn "Konnte 'x'-Recht auf $PARENT_DIR nicht setzen. Falls der Service danach mit \
+'status=200/CHDIR' fehlschlaegt (siehe 'systemctl status ekats'), manuell pruefen: \
+'sudo chmod o+x $PARENT_DIR' (oder ${EKATS_SYSTEM_USER} zur Gruppe des Vhost-Verzeichnisses hinzufuegen)."
+fi
+
 # ---------------------------------------------------------------------------
 log "systemd-Service einrichten"
 cat > /etc/systemd/system/ekats.service <<EOF
@@ -233,7 +247,15 @@ PORT_FOR_CHECK="$(grep -E '^PORT=' "$ENV_FILE" | cut -d= -f2-)"
 if curl -sf "http://127.0.0.1:${PORT_FOR_CHECK}/api/health" >/dev/null; then
   echo "Backend antwortet auf Port ${PORT_FOR_CHECK}."
 else
-  warn "Backend antwortet NICHT. Logs pruefen: journalctl -u ekats -n 50 --no-pager"
+  if systemctl status ekats --no-pager 2>/dev/null | grep -q "200/CHDIR"; then
+    warn "Backend antwortet NICHT - Service scheitert mit 'status=200/CHDIR' (siehe 'systemctl \
+status ekats'): '${EKATS_SYSTEM_USER}' darf ein Verzeichnis oberhalb von ${BACKEND_DIR} nicht \
+durchqueren. Der automatische Fix oben ('chmod o+x' auf $PARENT_DIR) wurde bereits versucht - \
+falls es weiterhin auftritt, jeden Pfad-Bestandteil zwischen dort und ${BACKEND_DIR} pruefen \
+('namei -l ${BACKEND_DIR}') und die restriktive Ebene identifizieren, dann 'systemctl restart ekats'."
+  else
+    warn "Backend antwortet NICHT. Logs pruefen: journalctl -u ekats -n 50 --no-pager"
+  fi
 fi
 
 # ---------------------------------------------------------------------------
