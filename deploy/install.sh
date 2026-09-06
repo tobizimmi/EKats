@@ -32,6 +32,13 @@ log()  { echo -e "\n==> $*"; }
 warn() { echo -e "\n!! $*" >&2; }
 die()  { echo -e "\nFEHLER: $*" >&2; exit 1; }
 
+# Reiner TCP-Connect-Test (kein ss/netstat/lsof noetig, funktioniert auf jedem Debian/Ubuntu mit
+# Bash). Wichtig auf Servern mit mehreren Diensten/Docker-Containern: ein Port kann jederzeit
+# schon von etwas voellig anderem belegt sein (siehe README/Deployment-Erfahrungsbericht).
+port_in_use() {
+  (exec 3<>"/dev/tcp/127.0.0.1/$1") >/dev/null 2>&1
+}
+
 [ "$(id -u)" -eq 0 ] || die "Bitte als root ausfuehren (sudo bash deploy/install.sh)."
 command -v apt-get >/dev/null || die "Dieses Skript ist fuer Debian/Ubuntu (apt-get) geschrieben."
 
@@ -139,6 +146,25 @@ sudo -u postgres psql -d "${EKATS_DB_NAME}" -c "GRANT ALL ON SCHEMA public TO ${
 
 # ---------------------------------------------------------------------------
 if [ ! -f "$ENV_FILE" ]; then
+  PORT_AUTO_CHANGED=false
+  if port_in_use "$EKATS_PORT"; then
+    ORIGINAL_PORT="$EKATS_PORT"
+    for candidate in $(seq $((EKATS_PORT + 1)) $((EKATS_PORT + 30))); do
+      if ! port_in_use "$candidate"; then
+        EKATS_PORT="$candidate"
+        break
+      fi
+    done
+    if [ "$EKATS_PORT" = "$ORIGINAL_PORT" ]; then
+      die "Port ${ORIGINAL_PORT} und die naechsten 30 Ports sind alle belegt. Bitte EKATS_PORT explizit auf einen freien Port setzen."
+    fi
+    PORT_AUTO_CHANGED=true
+    warn "Port ${ORIGINAL_PORT} ist bereits belegt (auf diesem Server laufen offenbar weitere \
+Dienste/Docker-Container - 'sudo ss -ltnp | grep ${ORIGINAL_PORT}' zeigt was). Verwende \
+stattdessen freien Port ${EKATS_PORT}. WICHTIG: das ProxyPass-Ziel in \
+deploy/apache-ekats.conf.example muss diesen Port verwenden, nicht ${ORIGINAL_PORT}!"
+  fi
+
   log "Erzeuge $ENV_FILE"
   cp "$BACKEND_DIR/.env.example" "$ENV_FILE"
   BASE_URL="https://${EKATS_DOMAIN}${EKATS_BASE_PATH}"
@@ -267,7 +293,9 @@ cat <<SUMMARY
  App-Verzeichnis:     ${REPO_DIR}
  Konfiguration:       ${ENV_FILE}
  systemd-Service:     ekats.service (systemctl status ekats)
- Lokaler Port:        ${PORT_FOR_CHECK} (nur 127.0.0.1, nicht oeffentlich)
+ Lokaler Port:        ${PORT_FOR_CHECK} (nur 127.0.0.1, nicht oeffentlich)$([ "${PORT_AUTO_CHANGED:-false}" = true ] && echo "
+ !!! Port war belegt, automatisch auf ${PORT_FOR_CHECK} ausgewichen - ProxyPass-Ziel in
+     deploy/apache-ekats.conf.example MUSS diesen Port verwenden (nicht den Default 3000)! !!!")
 
  Login (Rolle "Stab"):
    E-Mail:    ${EKATS_ADMIN_EMAIL}
