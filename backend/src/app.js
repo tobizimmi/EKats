@@ -17,6 +17,7 @@ const wehrRoutes = require('./routes/wehr');
 const objectsRoutes = require('./routes/objects');
 const vehiclesRoutes = require('./routes/vehicles');
 const stationsRoutes = require('./routes/stations');
+const auditLogRoutes = require('./routes/auditLog');
 
 function createApp() {
   const app = express();
@@ -71,6 +72,7 @@ function createApp() {
   app.use('/api/objects', objectsRoutes);
   app.use('/api/vehicles', vehiclesRoutes);
   app.use('/api/stations', stationsRoutes);
+  app.use('/api/audit-log', auditLogRoutes);
 
   app.use('/api', notFoundHandler);
 

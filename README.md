@@ -315,15 +315,62 @@ müssen einzeln über den Datei-Download-Endpunkt geholt werden.
 
 ## Sicherheit & Datenschutz
 
-- Passwörter: bcrypt (Cost 12)
-- Auth: JWT in httpOnly-/Secure-/SameSite=Strict-Cookie (kein `localStorage`-Token)
+### Authentifizierung & Sitzungen
+
+- Passwörter: bcrypt (Cost 12), Mindestlänge 8 Zeichen
+- Auth: JWT in httpOnly-/Secure-/SameSite=Strict-Cookie (kein `localStorage`-Token), Cookie-Laufzeit
+  synchron zu `JWT_EXPIRES_IN`
+- **Session-Revocation**: jeder Nutzer trägt eine `token_version` in der DB, die im JWT mitgeführt
+  wird. Bei Passwortänderung/-Reset wird sie hochgezählt — alle zuvor ausgestellten Tokens dieses
+  Kontos werden dadurch sofort ungültig, statt bis zu `JWT_EXPIRES_IN` (Standard 12h) gültig zu
+  bleiben. Rolle und Wehr-Zugehörigkeit werden bei **jedem** Request frisch aus der DB gelesen (nicht
+  aus dem ggf. veralteten Token-Payload) — eine Rollenänderung oder -degradierung wirkt dadurch
+  sofort, nicht erst nach Ablauf des alten Tokens.
+- **Login-Schutz**: IP-basiertes Rate-Limit (10 Versuche/15 Min. über alle Konten) **plus**
+  Konto-Lockout (5 Fehlversuche sperren ein einzelnes Konto 15 Minuten, unabhängig von der IP) —
+  schützt sowohl vor Angriffen von einer IP als auch vor verteilten Versuchen auf ein Konto.
+- **Passwort ändern**: Self-Service unter „Einstellungen“ (erfordert aktuelles Passwort, meldet alle
+  *anderen* Sitzungen ab) sowie Admin-Reset in der Nutzerverwaltung (setzt ein neues Passwort direkt,
+  meldet alle Sitzungen des Zielkontos ab) — es gibt (noch) keinen E-Mail-basierten
+  Self-Service-Reset (siehe „Bekannte V1-Vereinfachungen“).
+- **Produktions-Startup-Guard** (`backend/src/config.js`): der Server verweigert den Start, wenn
+  `NODE_ENV=production` und `JWT_SECRET` fehlt/zu kurz ist (< 32 Zeichen) oder noch den
+  Entwicklungs-Default trägt — verhindert den häufigsten Fehlkonfigurationsfall (vergessenes
+  `JWT_SECRET`, mit dem sich sonst beliebige Admin-Sitzungen fälschen ließen). Fehlendes
+  `COOKIE_SECURE=true` in Produktion erzeugt eine deutliche Warnung.
+
+### Nachvollziehbarkeit
+
+- **Audit-Log** (`audit_log`-Tabelle, sichtbar im Admin-Bereich): protokolliert sicherheitsrelevante
+  Aktionen — Nutzer angelegt/gelöscht, Rolle geändert, Passwort geändert/durch Admin zurückgesetzt,
+  Konto-Sperrung, Objekt gelöscht — inkl. handelndem Konto, Ziel, Zeitstempel und IP.
+
+### Weitere Maßnahmen
+
 - Rate-Limiting auf allen `/api`-Endpunkten, engeres Limit zusätzlich auf `/api/auth/login`
 - Security-Header via `helmet` (inkl. Content-Security-Policy)
 - Keine Drittanbieter-Tracking-Skripte; Leaflet lokal vendored; einzige externe Verbindung im
   Frontend sind die OpenStreetMap-Kartenkacheln (nur Bilder)
-- DSGVO: jeder Nutzer kann sein Konto jederzeit vollständig löschen (`DELETE /api/users/me`,
-  kaskadiert auf Push-Subscriptions/Alarmregeln/Alert-Log)
+- Datei-Anhänge (Objektverwaltung) werden außerhalb des Web-Roots gespeichert und ausschließlich
+  über einen authentifizierten Endpunkt ausgeliefert
+- `npm audit` (Backend): 0 bekannte Schwachstellen zum Stand dieser Version
 - `.env` ist gitignored — niemals Secrets committen
+
+### DSGVO
+
+- **Recht auf Löschung**: jeder Nutzer kann sein Konto jederzeit vollständig löschen
+  (`DELETE /api/users/me`, kaskadiert auf Push-Subscriptions/Alarmregeln/Alert-Log)
+- **Recht auf Auskunft/Datenübertragbarkeit**: „Meine Daten herunterladen“ in den Einstellungen
+  (`GET /api/users/me/export`) liefert Profil, eigene Alarmregeln und Push-Subscription-Metadaten
+  als JSON
+- **Verantwortlichkeit**: Audit-Log (siehe oben) dokumentiert, wer sicherheitsrelevante Änderungen
+  vorgenommen hat
+- **Personenbezogene Daten Dritter**: Die Objektverwaltung erlaubt das Erfassen von
+  Ansprechpartner-Name/-Telefon zu kritischen Objekten (z.B. Schulleitung) — das sind
+  personenbezogene Daten *dritter* Personen, keine Nutzerdaten. Der Betreiber (die Wehr) ist hierfür
+  datenschutzrechtlich Verantwortlicher und muss dies im eigenen Verarbeitungsverzeichnis
+  dokumentieren; die Anwendung stellt keine automatisierte Lösch-/Auskunftsfunktion für diese
+  Drittdaten bereit (Löschung erfolgt durch Bearbeiten/Löschen des jeweiligen Objekts).
 - `/datenschutz.html` und `/impressum.html` sind technisch vorbereitete Platzhalterseiten — der
   Betreiber muss sie vor Produktivbetrieb rechtlich prüfen/ausfüllen lassen (siehe Hinweise auf den
   Seiten selbst)
@@ -350,6 +397,11 @@ zwischengespeichert.
   Login/Dashboard gehen von genau einer Wehr aus (siehe Abschnitt 6 der `CLAUDE.md` zu Modul 3).
 - **NASA FIRMS** nutzt einen einzigen globalen `MAP_KEY` (nicht pro Nutzer) und einen festen Radius
   (`FIRMS_RADIUS_KM`) um den Wehr-Kartenmittelpunkt.
+- **Kein E-Mail-basierter Passwort-Self-Service-Reset**: Passwort ändern erfordert entweder das
+  aktuelle Passwort (Self-Service) oder ein Admin-Konto (Reset in der Nutzerverwaltung) - es gibt
+  keinen "Passwort vergessen"-Link mit E-Mail-Versand.
+- **Kein 2FA/TOTP**: Für eine höhere Absicherung von Admin-Konten wäre eine
+  Zwei-Faktor-Authentifizierung sinnvoll, ist aber noch nicht umgesetzt.
 - Siehe außerdem den Abschnitt „Verifikationsstand der Fetcher“ oben.
 
 ## Projektstruktur

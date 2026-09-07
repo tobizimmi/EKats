@@ -70,6 +70,26 @@ async function loadRules() {
 
   await initPushUi(document.getElementById('push-status'), document.getElementById('push-button'));
 
+  document.getElementById('password-form').addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const errorEl = document.getElementById('password-error');
+    errorEl.textContent = '';
+    try {
+      await api.patch('/users/me/password', {
+        currentPassword: document.getElementById('password-current').value,
+        newPassword: document.getElementById('password-new').value,
+      });
+      event.target.reset();
+      errorEl.classList.remove('error-message');
+      errorEl.classList.add('muted');
+      errorEl.textContent = 'Passwort geändert.';
+    } catch (err) {
+      errorEl.classList.remove('muted');
+      errorEl.classList.add('error-message');
+      errorEl.textContent = err.message;
+    }
+  });
+
   document.getElementById('delete-account-button').addEventListener('click', async () => {
     if (!confirm('Ihr Konto wird endgültig gelöscht. Fortfahren?')) return;
     try {

@@ -23,8 +23,32 @@ CREATE TABLE IF NOT EXISTS app_user (
     email TEXT NOT NULL UNIQUE,
     password_hash TEXT NOT NULL,
     role TEXT NOT NULL CHECK (role IN ('admin', 'stab', 'mitglied')),
+    -- token_version: bei Passwortaenderung/-reset hochgezaehlt, macht alle zuvor ausgestellten
+    -- JWTs sofort ungueltig (siehe backend/src/middleware/auth.js).
+    token_version INTEGER NOT NULL DEFAULT 0,
+    -- Login-Lockout zusaetzlich zum IP-basierten Rate-Limit (siehe routes/auth.js).
+    failed_login_count INTEGER NOT NULL DEFAULT 0,
+    locked_until TIMESTAMPTZ,
+    last_login_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- Audit-Log fuer sicherheitsrelevante Aktionen (DSGVO-Rechenschaftspflicht + Vorfall-Forensik).
+CREATE TABLE IF NOT EXISTS audit_log (
+    id BIGSERIAL PRIMARY KEY,
+    wehr_id INTEGER REFERENCES wehr(id) ON DELETE CASCADE,
+    actor_user_id INTEGER REFERENCES app_user(id) ON DELETE SET NULL,
+    actor_email TEXT,
+    action TEXT NOT NULL,
+    target_type TEXT,
+    target_id TEXT,
+    details JSONB NOT NULL DEFAULT '{}'::jsonb,
+    ip_address TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_audit_log_wehr ON audit_log(wehr_id);
+CREATE INDEX IF NOT EXISTS idx_audit_log_created_at ON audit_log(created_at);
 
 -- Web-Push Subscriptions (fuer Benachrichtigungen)
 CREATE TABLE IF NOT EXISTS push_subscription (

@@ -29,6 +29,7 @@ async function loadUsers(currentUserId) {
       try {
         await api.patch(`/users/${user.id}`, { role: roleSelect.value });
         await loadUsers(currentUserId);
+        await loadAuditLog();
       } catch (err) {
         alert(err.message);
         roleSelect.value = user.role;
@@ -40,25 +41,70 @@ async function loadUsers(currentUserId) {
     createdCell.textContent = formatTimestamp(user.created_at);
 
     const actionCell = document.createElement('td');
+
+    const resetBtn = document.createElement('button');
+    resetBtn.className = 'secondary';
+    resetBtn.type = 'button';
+    resetBtn.textContent = 'Passwort zurücksetzen';
+    resetBtn.addEventListener('click', async () => {
+      const newPassword = prompt(`Neues Passwort für ${user.email} (mind. 8 Zeichen):`);
+      if (!newPassword) return;
+      try {
+        await api.post(`/users/${user.id}/reset-password`, { newPassword });
+        alert('Passwort zurückgesetzt. Bitte dem Nutzer sicher mitteilen.');
+        await loadAuditLog();
+      } catch (err) {
+        alert(err.message);
+      }
+    });
+
     const deleteBtn = document.createElement('button');
     deleteBtn.className = 'secondary';
     deleteBtn.type = 'button';
     deleteBtn.textContent = 'Löschen';
+    deleteBtn.style.marginLeft = '0.4rem';
     deleteBtn.addEventListener('click', async () => {
       if (!confirm(`Konto ${user.email} wirklich löschen?`)) return;
       try {
         await api.delete(`/users/${user.id}`);
         await loadUsers(currentUserId);
+        await loadAuditLog();
       } catch (err) {
         alert(err.message);
       }
     });
+    actionCell.appendChild(resetBtn);
     actionCell.appendChild(deleteBtn);
 
     tr.appendChild(emailCell);
     tr.appendChild(roleCell);
     tr.appendChild(createdCell);
     tr.appendChild(actionCell);
+    tbody.appendChild(tr);
+  });
+}
+
+async function loadAuditLog() {
+  const tbody = document.getElementById('audit-log-table-body');
+  tbody.innerHTML = '';
+  const entries = await api.get('/audit-log');
+
+  if (entries.length === 0) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = '<td colspan="5" class="muted">Keine Einträge.</td>';
+    tbody.appendChild(tr);
+    return;
+  }
+
+  entries.forEach((entry) => {
+    const tr = document.createElement('tr');
+    const detailsText = entry.details && Object.keys(entry.details).length ? JSON.stringify(entry.details) : '-';
+    tr.innerHTML = `
+      <td>${formatTimestamp(entry.created_at)}</td>
+      <td>${entry.action}</td>
+      <td>${entry.actor_email || '-'}</td>
+      <td>${entry.target_type || '-'}${entry.target_id ? ` #${entry.target_id}` : ''}</td>
+      <td class="muted">${detailsText}</td>`;
     tbody.appendChild(tr);
   });
 }
@@ -139,6 +185,7 @@ async function loadVehicles() {
   await loadUsers(user.id);
   await loadStations();
   await loadVehicles();
+  await loadAuditLog();
 
   document.getElementById('station-form').addEventListener('submit', async (event) => {
     event.preventDefault();
@@ -202,6 +249,7 @@ async function loadVehicles() {
       });
       event.target.reset();
       await loadUsers(user.id);
+      await loadAuditLog();
     } catch (err) {
       errorEl.textContent = err.message;
     }

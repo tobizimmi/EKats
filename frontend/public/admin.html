@@ -149,6 +149,27 @@
       </div>
 
       <div class="card">
+        <h2 class="section-title">Audit-Log</h2>
+        <p class="muted">
+          Sicherheitsrelevante Aktionen der letzten Zeit (Nutzer angelegt/gelöscht, Rolle geändert,
+          Passwort geändert/zurückgesetzt, Konto gesperrt, Objekt gelöscht) - für Nachvollziehbarkeit
+          und DSGVO-Rechenschaftspflicht.
+        </p>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Zeitpunkt</th>
+              <th>Aktion</th>
+              <th>Von</th>
+              <th>Ziel</th>
+              <th>Details</th>
+            </tr>
+          </thead>
+          <tbody id="audit-log-table-body"></tbody>
+        </table>
+      </div>
+
+      <div class="card">
         <h2 class="section-title">Lizenz</h2>
         <p class="muted">
           Lizenzverwaltung ist für eine spätere Ausbaustufe vorgesehen (u.a. für den Betrieb

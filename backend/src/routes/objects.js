@@ -8,6 +8,7 @@ const { z } = require('zod');
 const { query } = require('../db');
 const { requireAuth, requireRole } = require('../middleware/auth');
 const config = require('../config');
+const { logAudit } = require('../audit');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -230,13 +231,23 @@ router.post('/:id/mark-reviewed', requireRole('stab', 'admin'), async (req, res,
 
 router.delete('/:id', requireRole('stab', 'admin'), async (req, res, next) => {
   try {
-    const { rowCount } = await query('DELETE FROM critical_object WHERE id = $1 AND wehr_id = $2', [
+    const { rows } = await query('DELETE FROM critical_object WHERE id = $1 AND wehr_id = $2 RETURNING name', [
       req.params.id,
       req.user.wehrId,
     ]);
-    if (rowCount === 0) {
+    if (rows.length === 0) {
       return res.status(404).json({ ok: false, error: 'Objekt nicht gefunden.' });
     }
+    await logAudit({
+      wehrId: req.user.wehrId,
+      actorUserId: req.user.id,
+      actorEmail: req.user.email,
+      action: 'object.delete',
+      targetType: 'critical_object',
+      targetId: req.params.id,
+      details: { name: rows[0].name },
+      ip: req.ip,
+    });
     return res.json({ ok: true, data: null });
   } catch (err) {
     return next(err);

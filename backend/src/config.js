@@ -70,4 +70,37 @@ const config = {
   allowedUploadMimeTypes: ['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'application/pdf'],
 };
 
+const INSECURE_JWT_SECRET_DEFAULT = 'dev-insecure-secret-change-me';
+
+// Verhindert den haeufigsten Produktiv-Fehlkonfigurationsfall: JWT_SECRET in .env vergessen zu
+// setzen. Ohne diesen Guard wuerde der Server klaglos mit dem oeffentlich bekannten Default-Secret
+// starten - damit koennte jeder gueltige Admin-JWTs faelschen. In Produktion daher harter Abbruch
+// statt stiller Fallback; in Entwicklung nur eine Warnung (Default bleibt praktisch fuer lokales
+// Arbeiten ohne .env).
+function assertSafeToStart() {
+  const insecureSecret = config.jwtSecret === INSECURE_JWT_SECRET_DEFAULT || config.jwtSecret.length < 32;
+  if (config.env === 'production') {
+    if (insecureSecret) {
+      throw new Error(
+        'JWT_SECRET ist nicht gesetzt oder zu kurz (< 32 Zeichen). In Produktion wird der Start ' +
+          'verweigert, da sonst jeder gueltige Admin-Sitzungen faelschen koennte. ' +
+          'Erzeugen mit: node -e "console.log(require(\'crypto\').randomBytes(48).toString(\'base64\'))"'
+      );
+    }
+    if (!config.cookieSecure) {
+      console.warn(
+        '[config] WARNUNG: COOKIE_SECURE ist nicht auf "true" gesetzt, obwohl NODE_ENV=production ' +
+          'ist. Das Auth-Cookie wird dann auch ueber unverschluesseltes HTTP uebertragen. Nur ' +
+          'ignorieren, wenn TLS zwingend ausserhalb dieses Prozesses erzwungen wird.'
+      );
+    }
+  } else if (insecureSecret) {
+    console.warn(
+      '[config] JWT_SECRET nutzt den unsicheren Entwicklungs-Default - fuer Produktivbetrieb in ' +
+        '.env unbedingt einen langen zufaelligen Wert setzen (siehe .env.example).'
+    );
+  }
+}
+
 module.exports = config;
+module.exports.assertSafeToStart = assertSafeToStart;

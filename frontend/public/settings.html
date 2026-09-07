@@ -84,12 +84,36 @@
     </div>
 
     <div class="card">
+      <h2 class="section-title">Passwort ändern</h2>
+      <form id="password-form" class="form-row">
+        <label>
+          <span>Aktuelles Passwort</span>
+          <input id="password-current" type="password" required autocomplete="current-password" />
+        </label>
+        <label>
+          <span>Neues Passwort</span>
+          <input id="password-new" type="password" minlength="8" required autocomplete="new-password" />
+        </label>
+        <button type="submit" class="primary">Passwort ändern</button>
+      </form>
+      <p class="error-message" id="password-error" role="alert"></p>
+      <p class="muted">
+        Das Ändern des Passworts meldet alle anderen Sitzungen dieses Kontos automatisch ab
+        (z.B. falls Sie es auf einem verlorenen Gerät geändert haben) - diese Sitzung hier bleibt aktiv.
+      </p>
+    </div>
+
+    <div class="card">
       <h2 class="section-title">Eigenes Konto</h2>
       <p class="muted">
-        Datensparsamkeit/DSGVO: Sie können Ihr Konto inkl. aller Alarmregeln und Push-Anmeldungen
-        jederzeit vollständig löschen.
+        Datensparsamkeit/DSGVO: Sie können Ihre gespeicherten Daten (Profil, Alarmregeln,
+        Push-Anmeldungen) herunterladen (Recht auf Auskunft/Datenübertragbarkeit) oder Ihr Konto
+        inkl. aller Alarmregeln und Push-Anmeldungen jederzeit vollständig löschen.
       </p>
-      <button id="delete-account-button" class="secondary" type="button">Mein Konto löschen</button>
+      <a id="export-data-link" class="button-link" href="api/users/me/export">Meine Daten herunterladen</a>
+      <button id="delete-account-button" class="secondary" type="button" style="margin-left: 0.5rem;">
+        Mein Konto löschen
+      </button>
     </div>
   </main>
   <script src="js/api.js"></script>

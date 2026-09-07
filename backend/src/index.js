@@ -2,6 +2,8 @@ const { createApp } = require('./app');
 const config = require('./config');
 const { startScheduler } = require('./scheduler');
 
+config.assertSafeToStart();
+
 const app = createApp();
 
 app.listen(config.port, config.host, () => {

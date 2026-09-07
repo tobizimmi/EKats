@@ -2,7 +2,8 @@ const express = require('express');
 const bcrypt = require('bcrypt');
 const { z } = require('zod');
 const { query } = require('../db');
-const { requireAuth, requireRole } = require('../middleware/auth');
+const { requireAuth, requireRole, signToken, setAuthCookie } = require('../middleware/auth');
+const { logAudit } = require('../audit');
 
 const router = express.Router();
 
@@ -50,6 +51,16 @@ router.post('/', requireRole('admin'), async (req, res, next) => {
        RETURNING id, email, role, created_at`,
       [req.user.wehrId, email, passwordHash, role]
     );
+    await logAudit({
+      wehrId: req.user.wehrId,
+      actorUserId: req.user.id,
+      actorEmail: req.user.email,
+      action: 'user.create',
+      targetType: 'app_user',
+      targetId: rows[0].id,
+      details: { email, role },
+      ip: req.ip,
+    });
     return res.status(201).json({ ok: true, data: rows[0] });
   } catch (err) {
     if (err.code === '23505') {
@@ -88,7 +99,113 @@ router.patch('/:id', requireRole('admin'), async (req, res, next) => {
     if (rows.length === 0) {
       return res.status(404).json({ ok: false, error: 'Nutzer nicht gefunden.' });
     }
+    await logAudit({
+      wehrId: req.user.wehrId,
+      actorUserId: req.user.id,
+      actorEmail: req.user.email,
+      action: 'user.role_change',
+      targetType: 'app_user',
+      targetId,
+      details: { newRole: role, email: rows[0].email },
+      ip: req.ip,
+    });
     return res.json({ ok: true, data: rows[0] });
+  } catch (err) {
+    return next(err);
+  }
+});
+
+const changeOwnPasswordSchema = z.object({
+  currentPassword: z.string().min(1),
+  newPassword: z.string().min(8, 'Neues Passwort muss mindestens 8 Zeichen haben.'),
+});
+
+// Self-Service Passwortaenderung: erfordert das aktuelle Passwort. Zaehlt token_version hoch
+// (macht alle ANDEREN, evtl. gestohlenen Sitzungen sofort ungueltig), stellt aber sofort ein neues
+// Token fuer die eigene, gerade genutzte Sitzung aus - sonst waere man nach dem Aendern des
+// eigenen Passworts durch den eigenen token_version-Bump direkt selbst ausgeloggt.
+router.patch('/me/password', async (req, res, next) => {
+  try {
+    const parsed = changeOwnPasswordSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ ok: false, error: parsed.error.issues[0].message });
+    }
+    const { currentPassword, newPassword } = parsed.data;
+
+    const { rows } = await query('SELECT id, email, role, wehr_id, password_hash FROM app_user WHERE id = $1', [
+      req.user.id,
+    ]);
+    const user = rows[0];
+    if (!user) return res.status(404).json({ ok: false, error: 'Nutzer nicht gefunden.' });
+
+    const valid = await bcrypt.compare(currentPassword, user.password_hash);
+    if (!valid) {
+      return res.status(401).json({ ok: false, error: 'Aktuelles Passwort ist falsch.' });
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 12);
+    const { rows: updated } = await query(
+      `UPDATE app_user SET password_hash = $1, token_version = token_version + 1
+       WHERE id = $2 RETURNING token_version`,
+      [passwordHash, user.id]
+    );
+
+    await logAudit({
+      wehrId: user.wehr_id,
+      actorUserId: user.id,
+      actorEmail: user.email,
+      action: 'user.password_change',
+      targetType: 'app_user',
+      targetId: user.id,
+      ip: req.ip,
+    });
+
+    const token = signToken({ ...user, token_version: updated[0].token_version });
+    setAuthCookie(res, token);
+    return res.json({ ok: true, data: null });
+  } catch (err) {
+    return next(err);
+  }
+});
+
+const adminResetPasswordSchema = z.object({
+  newPassword: z.string().min(8, 'Neues Passwort muss mindestens 8 Zeichen haben.'),
+});
+
+// Admin setzt das Passwort eines anderen Kontos der eigenen Wehr direkt neu (z.B. wenn ein
+// Mitglied sein Passwort vergessen hat und es keinen E-Mail-Versand fuer einen Self-Service-Reset
+// gibt). token_version wird hochgezaehlt: alle bestehenden Sitzungen dieses Kontos werden dadurch
+// sofort ungueltig.
+router.post('/:id/reset-password', requireRole('admin'), async (req, res, next) => {
+  try {
+    const parsed = adminResetPasswordSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ ok: false, error: parsed.error.issues[0].message });
+    }
+    const targetId = Number(req.params.id);
+    const passwordHash = await bcrypt.hash(parsed.data.newPassword, 12);
+
+    const { rows } = await query(
+      `UPDATE app_user SET password_hash = $1, token_version = token_version + 1
+       WHERE id = $2 AND wehr_id = $3 RETURNING id, email`,
+      [passwordHash, targetId, req.user.wehrId]
+    );
+    if (rows.length === 0) {
+      return res.status(404).json({ ok: false, error: 'Nutzer nicht gefunden.' });
+    }
+
+    await logAudit({
+      wehrId: req.user.wehrId,
+      actorUserId: req.user.id,
+      actorEmail: req.user.email,
+      action: 'user.password_reset_by_admin',
+      targetType: 'app_user',
+      targetId,
+      details: { email: rows[0].email },
+      ip: req.ip,
+    });
+
+    return res.json({ ok: true, data: null });
   } catch (err) {
     return next(err);
   }
@@ -105,7 +222,17 @@ router.delete('/me', async (req, res, next) => {
         error: 'Du bist der letzte Admin dieser Wehr - ernenne zuerst einen weiteren Account zum Admin.',
       });
     }
+    const { rows } = await query('SELECT email FROM app_user WHERE id = $1', [req.user.id]);
     await query('DELETE FROM app_user WHERE id = $1', [req.user.id]);
+    await logAudit({
+      wehrId: req.user.wehrId,
+      actorUserId: null,
+      actorEmail: rows[0]?.email,
+      action: 'user.self_delete',
+      targetType: 'app_user',
+      targetId: req.user.id,
+      ip: req.ip,
+    });
     res.json({ ok: true, data: null });
   } catch (err) {
     next(err);
@@ -123,6 +250,10 @@ router.delete('/:id', requireRole('admin'), async (req, res, next) => {
       });
     }
 
+    const { rows: targetRows } = await query('SELECT email FROM app_user WHERE id = $1 AND wehr_id = $2', [
+      targetId,
+      req.user.wehrId,
+    ]);
     const { rowCount } = await query('DELETE FROM app_user WHERE id = $1 AND wehr_id = $2', [
       targetId,
       req.user.wehrId,
@@ -130,7 +261,55 @@ router.delete('/:id', requireRole('admin'), async (req, res, next) => {
     if (rowCount === 0) {
       return res.status(404).json({ ok: false, error: 'Nutzer nicht gefunden.' });
     }
+    await logAudit({
+      wehrId: req.user.wehrId,
+      actorUserId: req.user.id,
+      actorEmail: req.user.email,
+      action: 'user.delete',
+      targetType: 'app_user',
+      targetId,
+      details: { email: targetRows[0]?.email },
+      ip: req.ip,
+    });
     return res.json({ ok: true, data: null });
+  } catch (err) {
+    return next(err);
+  }
+});
+
+// DSGVO Art. 15/20: eigene gespeicherte Daten als JSON-Datei herunterladen (Recht auf Auskunft/
+// Datenuebertragbarkeit). Umfasst Profil, eigene Alarmregeln und Push-Subscription-Metadaten
+// (ohne die kryptografischen Push-Schluessel selbst - technische Geheimnisse, kein Mehrwert fuer
+// den Nutzer beim Einsehen der eigenen Daten).
+router.get('/me/export', async (req, res, next) => {
+  try {
+    const { rows: userRows } = await query(
+      `SELECT u.id, u.email, u.role, u.created_at, u.last_login_at, w.name AS wehr_name
+       FROM app_user u JOIN wehr w ON w.id = u.wehr_id WHERE u.id = $1`,
+      [req.user.id]
+    );
+    if (userRows.length === 0) return res.status(404).json({ ok: false, error: 'Nutzer nicht gefunden.' });
+
+    const { rows: alertRules } = await query(
+      `SELECT source, target_ref, threshold_key, threshold_value, channel_push, channel_email, active, created_at
+       FROM alert_rule WHERE user_id = $1 ORDER BY created_at`,
+      [req.user.id]
+    );
+    const { rows: pushSubscriptions } = await query(
+      'SELECT endpoint, created_at FROM push_subscription WHERE user_id = $1 ORDER BY created_at',
+      [req.user.id]
+    );
+
+    const exportData = {
+      exportedAt: new Date().toISOString(),
+      profile: userRows[0],
+      alertRules,
+      pushSubscriptions,
+    };
+
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="ekats-meine-daten-${Date.now()}.json"`);
+    return res.send(JSON.stringify(exportData, null, 2));
   } catch (err) {
     return next(err);
   }
