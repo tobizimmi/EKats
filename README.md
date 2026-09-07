@@ -235,13 +235,65 @@ eingefärbten Lage-Markern).
 
 - **Anlegen** (Rolle Stab/Admin): Button „Objekt anlegen“ klicken, dann auf die gewünschte Position
   in der Karte klicken — öffnet ein Formular für Name, Kategorie, Adresse, besondere Gefahren,
-  Zufahrt/Schlüsseldepot und Ansprechpartner.
-- **Bearbeiten/Löschen** (Stab/Admin): bestehendes Objekt auf der Karte anklicken.
-- **Ansehen** (Mitglied): Klick öffnet dieselbe Ansicht schreibgeschützt.
+  Zufahrt/Schlüsseldepot, Ansprechpartner und Überprüfungsintervall.
+- **Bearbeiten/Löschen** (Stab/Admin): bestehendes Objekt auf der Karte oder in der Objekt-Liste
+  anklicken.
+- **Ansehen** (Mitglied): Klick öffnet dieselbe Ansicht schreibgeschützt (Formularfelder,
+  Aufgaben-Formular und Anhangs-Upload sind deaktiviert/ausgeblendet).
 
-Bewusste V1-Einschränkung: keine Datei-Anhänge (Grundrisse/Einsatzpläne als PDF) — nur
-Ortsangabe plus Freitext-Hinweise. Objekte sind je Wehr gespeichert (`critical_object`-Tabelle,
+Objekte sind je Wehr gespeichert (`critical_object`-Tabelle,
 `backend/sql/migrations/002_add_critical_objects.sql`).
+
+### Fahrzeuge/Wachen und Aufgaben (Einsatzpläne)
+
+Im Admin-Bereich werden **Wachen** und **Fahrzeuge** als eigene Stammdaten gepflegt (je Wehr, nur
+Admin darf anlegen/löschen — jede Rolle darf sie lesen, z.B. um sie einer Aufgabe zuzuordnen).
+Ein Fahrzeug kann optional einer Wache zugeordnet werden.
+
+Je Objekt lassen sich beliebig viele **Aufgaben** hinterlegen (Titel + Beschreibung), jede Aufgabe
+ist **entweder** einem Fahrzeug **oder** einer Wache zugeordnet (serverseitig per CHECK-Constraint
+erzwungen). Für jedes Fahrzeug/jede Wache mit mindestens einer Aufgabe an einem Objekt erscheint im
+Objekt-Dialog ein PDF-Download-Link („PDF: <Name>“) — das erzeugte PDF enthält Objektname/-adresse
+und die für dieses Fahrzeug/diese Wache hinterlegten Aufgaben (`backend/src/routes/objects.js`,
+`renderTasksPdf` via `pdfkit`). Anlegen/Bearbeiten/Löschen von Aufgaben ist Stab/Admin vorbehalten.
+
+Schema: `vehicle`, `station`, `critical_object_task` (`backend/sql/migrations/003_add_tasks_vehicles_attachments.sql`).
+
+### Datei-Anhänge (Lagepläne/Grundrisse)
+
+Je Objekt können Dateien (PNG/JPEG/WebP/GIF/PDF, Größenlimit über `MAX_UPLOAD_MB` in `.env`,
+Standard 15 MB) hochgeladen werden — z.B. Lagepläne oder Grundrisse. Dateien werden **außerhalb**
+des Web-Roots unter `backend/storage/objects/` abgelegt und ausschließlich über einen
+authentifizierten Download-Endpunkt ausgeliefert (nie als statische Datei erreichbar). Hochladen/
+Löschen ist Stab/Admin vorbehalten, Ansehen/Herunterladen allen Rollen möglich.
+
+Schema: `critical_object_attachment` (`backend/sql/migrations/003_add_tasks_vehicles_attachments.sql`).
+
+### Überprüfungs-Turnus
+
+Je Objekt lässt sich ein Überprüfungsintervall in Monaten hinterlegen (z.B. „alle 12 Monate den
+Lageplan aktualisieren“). Der Objekt-Dialog zeigt den Status („Zuletzt überprüft … · Fällig …“,
+inkl. Hervorhebung bei Überfälligkeit) und einen Button „Jetzt als überprüft markieren“
+(Stab/Admin), der `last_reviewed_at` auf jetzt setzt. Ohne Intervall gilt ein Objekt als „kein
+Turnus definiert“ und taucht nie als überfällig auf.
+
+Schema: `critical_object.review_interval_months` / `last_reviewed_at`, `next_review_at` wird bei
+jeder Abfrage aus `COALESCE(last_reviewed_at, created_at) + review_interval_months` berechnet
+(`backend/sql/migrations/004_add_object_review_schedule.sql`).
+
+### Objekt-Übersichtsliste
+
+Ein zweiter Tab neben der Lage-Übersicht („Objekte“) zeigt alle Objekte der eigenen Wehr als Liste,
+mit Volltextsuche (Name/Adresse), Kategorie-Filter, Sortierung (Name/Kategorie/Fälligkeit) und
+einem Schnellfilter „Nur überfällige“. Ein Klick auf einen Listeneintrag öffnet denselben
+Objekt-Dialog wie ein Klick auf den Kartenmarker.
+
+### Export
+
+Im Admin-Bereich („Objektdaten-Export“) lassen sich alle Objekte der eigenen Wehr inkl. aller
+Aufgaben und Anhangs-**Metadaten** (Dateiname/Typ/Größe, nicht die Binärdateien selbst) als
+JSON-Datei herunterladen (`GET /api/objects/export`, Stab/Admin). Die eigentlichen Anhangsdateien
+müssen einzeln über den Datei-Download-Endpunkt geholt werden.
 
 ## Sicherheit & Datenschutz
 

@@ -15,6 +15,8 @@ const alertRulesRoutes = require('./routes/alertRules');
 const pushRoutes = require('./routes/push');
 const wehrRoutes = require('./routes/wehr');
 const objectsRoutes = require('./routes/objects');
+const vehiclesRoutes = require('./routes/vehicles');
+const stationsRoutes = require('./routes/stations');
 
 function createApp() {
   const app = express();
@@ -67,6 +69,8 @@ function createApp() {
   app.use('/api/push', pushRoutes);
   app.use('/api/wehr', wehrRoutes);
   app.use('/api/objects', objectsRoutes);
+  app.use('/api/vehicles', vehiclesRoutes);
+  app.use('/api/stations', stationsRoutes);
 
   app.use('/api', notFoundHandler);
 

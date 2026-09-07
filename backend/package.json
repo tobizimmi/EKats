@@ -28,7 +28,9 @@
     "cookie-parser": "^1.4.6",
     "web-push": "^3.6.7",
     "nodemailer": "^10.0.0",
-    "zod": "^3.23.8"
+    "zod": "^3.23.8",
+    "multer": "^2.3.0",
+    "pdfkit": "^0.20.2"
   },
   "overrides": {
     "qs": "^6.16.0"

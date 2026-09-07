@@ -98,8 +98,9 @@ CREATE TABLE IF NOT EXISTS alert_log (
 );
 
 -- Objektverwaltung: kritische Objekte (Schulen, Pflegeeinrichtungen, Gefahrstoffbetriebe, ...),
--- die Wehrfuehrung/Stab direkt auf der Karte anlegen/pflegen koennen. Bewusst ohne Datei-Anhaenge
--- (Grundrisse/Einsatzplaene als PDF) in dieser Ausbaustufe - reine Ortsangabe + Freitext-Hinweise.
+-- die Wehrfuehrung/Stab direkt auf der Karte anlegen/pflegen koennen. Ergaenzt um Aufgaben je
+-- Fahrzeug/Wache und Datei-Anhaenge (Lageplaene) - siehe vehicle/station/critical_object_task/
+-- critical_object_attachment weiter unten.
 CREATE TABLE IF NOT EXISTS critical_object (
     id SERIAL PRIMARY KEY,
     wehr_id INTEGER NOT NULL REFERENCES wehr(id) ON DELETE CASCADE,
@@ -114,6 +115,10 @@ CREATE TABLE IF NOT EXISTS critical_object (
     contact_name TEXT,
     contact_phone TEXT,
     notes TEXT,
+    -- Ueberpruefungs-Turnus: faellig = COALESCE(last_reviewed_at, created_at) + review_interval_months.
+    -- review_interval_months = NULL heisst "kein Turnus definiert" (keine Faelligkeit in der Liste).
+    review_interval_months INTEGER CHECK (review_interval_months IS NULL OR review_interval_months > 0),
+    last_reviewed_at TIMESTAMPTZ,
     created_by INTEGER REFERENCES app_user(id) ON DELETE SET NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -121,3 +126,65 @@ CREATE TABLE IF NOT EXISTS critical_object (
 
 CREATE INDEX IF NOT EXISTS idx_critical_object_wehr ON critical_object(wehr_id);
 CREATE INDEX IF NOT EXISTS idx_critical_object_geom ON critical_object USING GIST(geom);
+
+-- Wachen (Geraetehaeuser/Stationen) einer Wehr - Stammdaten, von "admin" gepflegt.
+CREATE TABLE IF NOT EXISTS station (
+    id SERIAL PRIMARY KEY,
+    wehr_id INTEGER NOT NULL REFERENCES wehr(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    address TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_station_wehr ON station(wehr_id);
+
+-- Fahrzeuge einer Wehr, optional einer Wache zugeordnet - Stammdaten, von "admin" gepflegt.
+CREATE TABLE IF NOT EXISTS vehicle (
+    id SERIAL PRIMARY KEY,
+    wehr_id INTEGER NOT NULL REFERENCES wehr(id) ON DELETE CASCADE,
+    station_id INTEGER REFERENCES station(id) ON DELETE SET NULL,
+    name TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_vehicle_wehr ON vehicle(wehr_id);
+
+-- Aufgaben/Anweisungen je kritischem Objekt, jeweils einem Fahrzeug ODER einer Wache zugeordnet
+-- (Einsatzplan-Baustein: "Fahrzeug X macht bei Einsatz an Objekt Y konkret Z"). Als PDF je
+-- Fahrzeug/Wache exportierbar, siehe routes/objects.js.
+CREATE TABLE IF NOT EXISTS critical_object_task (
+    id SERIAL PRIMARY KEY,
+    critical_object_id INTEGER NOT NULL REFERENCES critical_object(id) ON DELETE CASCADE,
+    vehicle_id INTEGER REFERENCES vehicle(id) ON DELETE CASCADE,
+    station_id INTEGER REFERENCES station(id) ON DELETE CASCADE,
+    title TEXT NOT NULL,
+    description TEXT,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT critical_object_task_target CHECK (
+        (vehicle_id IS NOT NULL AND station_id IS NULL) OR
+        (vehicle_id IS NULL AND station_id IS NOT NULL)
+    )
+);
+
+CREATE INDEX IF NOT EXISTS idx_object_task_object ON critical_object_task(critical_object_id);
+CREATE INDEX IF NOT EXISTS idx_object_task_vehicle ON critical_object_task(vehicle_id);
+CREATE INDEX IF NOT EXISTS idx_object_task_station ON critical_object_task(station_id);
+
+-- Datei-Anhaenge je kritischem Objekt (Lageplaene/Grundrisse als Bild oder PDF). Die Datei selbst
+-- liegt ausserhalb von frontend/public auf der Platte (backend/storage/objects/, siehe config.js);
+-- storage_key ist der Dateiname dort. Ausgeliefert wird sie ausschliesslich ueber einen
+-- authentifizierten Download-Endpunkt, nie als statische Datei.
+CREATE TABLE IF NOT EXISTS critical_object_attachment (
+    id SERIAL PRIMARY KEY,
+    critical_object_id INTEGER NOT NULL REFERENCES critical_object(id) ON DELETE CASCADE,
+    filename TEXT NOT NULL,
+    mime_type TEXT NOT NULL,
+    size_bytes BIGINT NOT NULL,
+    storage_key TEXT NOT NULL UNIQUE,
+    uploaded_by INTEGER REFERENCES app_user(id) ON DELETE SET NULL,
+    uploaded_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_object_attachment_object ON critical_object_attachment(critical_object_id);

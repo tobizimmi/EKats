@@ -2,6 +2,8 @@ node_modules/
 .env
 *.log
 storage/logs/
+backend/storage/objects/*
+!backend/storage/objects/.gitkeep
 dist/
 build/
 .DS_Store

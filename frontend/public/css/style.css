@@ -186,6 +186,16 @@ button.secondary {
   cursor: pointer;
 }
 
+.button-link {
+  display: inline-block;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 0.55rem 0.9rem;
+  border-radius: 6px;
+  text-decoration: none;
+}
+
 .error-message {
   color: var(--danger);
   font-size: 0.9rem;
@@ -241,6 +251,29 @@ button.secondary {
   padding: 0;
   max-height: 65vh;
   overflow-y: auto;
+}
+
+.tab-bar {
+  display: flex;
+  gap: 0.25rem;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 0.75rem;
+}
+
+.tab-button {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 0.5rem 0.75rem;
+  font: inherit;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.tab-button.active {
+  color: var(--text);
+  border-bottom-color: var(--accent);
 }
 
 .situation-list li {
@@ -395,8 +428,46 @@ table.data-table td {
   background: var(--bg-elevated);
   color: var(--text);
   padding: 1.25rem;
-  max-width: 480px;
+  max-width: 520px;
   width: calc(100% - 2rem);
+  max-height: calc(100vh - 4rem);
+  overflow-y: auto;
+}
+
+.app-dialog hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 1rem 0;
+}
+
+.plain-list {
+  list-style: none;
+  margin: 0 0 0.75rem;
+  padding: 0;
+}
+
+.plain-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.9rem;
+}
+
+.plain-list li:last-child {
+  border-bottom: none;
+}
+
+.plain-list .item-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.plain-list .item-meta {
+  color: var(--text-muted);
+  font-size: 0.8rem;
 }
 
 .app-dialog::backdrop {

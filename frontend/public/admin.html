@@ -51,6 +51,59 @@
       </div>
 
       <div class="card">
+        <h2 class="section-title">Wachen</h2>
+        <form id="station-form" class="form-row">
+          <label>
+            <span>Name</span>
+            <input id="station-name" type="text" required />
+          </label>
+          <label>
+            <span>Adresse (optional)</span>
+            <input id="station-address" type="text" />
+          </label>
+          <button type="submit" class="primary">Wache anlegen</button>
+        </form>
+        <p class="error-message" id="station-error" role="alert"></p>
+        <table class="data-table">
+          <thead>
+            <tr><th>Name</th><th>Adresse</th><th></th></tr>
+          </thead>
+          <tbody id="station-table-body"></tbody>
+        </table>
+      </div>
+
+      <div class="card">
+        <h2 class="section-title">Fahrzeuge</h2>
+        <form id="vehicle-form" class="form-row">
+          <label>
+            <span>Name</span>
+            <input id="vehicle-name" type="text" placeholder="z.B. LF 20-1" required />
+          </label>
+          <label>
+            <span>Wache (optional)</span>
+            <select id="vehicle-station"><option value="">–</option></select>
+          </label>
+          <button type="submit" class="primary">Fahrzeug anlegen</button>
+        </form>
+        <p class="error-message" id="vehicle-error" role="alert"></p>
+        <table class="data-table">
+          <thead>
+            <tr><th>Name</th><th>Wache</th><th></th></tr>
+          </thead>
+          <tbody id="vehicle-table-body"></tbody>
+        </table>
+      </div>
+
+      <div class="card">
+        <h2 class="section-title">Objektdaten-Export</h2>
+        <p class="muted">
+          Exportiert alle kritischen Objekte inkl. Aufgaben und Anhangs-Metadaten (nicht die
+          Dateien selbst) als JSON-Datei.
+        </p>
+        <a id="object-export-link" class="button-link" href="api/objects/export">Alle Objektdaten exportieren</a>
+      </div>
+
+      <div class="card">
         <h2 class="section-title">Nutzerverwaltung</h2>
         <p class="muted">
           Rollen: <strong>Admin</strong> (voller Zugriff inkl. Nutzerverwaltung),

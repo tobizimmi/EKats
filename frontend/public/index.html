@@ -30,10 +30,47 @@
     <div class="dashboard-grid">
       <div id="map"></div>
       <div class="card stack">
-        <div>
+        <div class="tab-bar">
+          <button type="button" class="tab-button active" id="tab-button-lage">Lage</button>
+          <button type="button" class="tab-button" id="tab-button-objekte">Objekte</button>
+        </div>
+        <div id="tab-panel-lage">
           <h2 class="section-title">Lage-Übersicht</h2>
           <p class="muted" id="list-updated"></p>
           <ul class="situation-list" id="situation-list"></ul>
+        </div>
+        <div id="tab-panel-objekte" hidden>
+          <h2 class="section-title">Objekt-Übersicht</h2>
+          <div class="form-row">
+            <label>
+              <span>Suche</span>
+              <input id="object-list-search" type="text" placeholder="Name/Adresse" />
+            </label>
+            <label>
+              <span>Kategorie</span>
+              <select id="object-list-category-filter">
+                <option value="">Alle</option>
+                <option value="schule_kita">Schule/Kita</option>
+                <option value="krankenhaus_pflege">Krankenhaus/Pflegeeinrichtung</option>
+                <option value="industrie_gefahrstoff">Industrie/Gefahrstoffbetrieb</option>
+                <option value="versammlungsstaette">Versammlungsstätte</option>
+                <option value="sonstiges">Sonstiges</option>
+              </select>
+            </label>
+            <label>
+              <span>Sortierung</span>
+              <select id="object-list-sort">
+                <option value="name">Name</option>
+                <option value="category">Kategorie</option>
+                <option value="due">Fälligkeit</option>
+              </select>
+            </label>
+            <label class="checkbox-inline">
+              <input id="object-list-overdue-filter" type="checkbox" />
+              <span>Nur überfällige</span>
+            </label>
+          </div>
+          <ul class="situation-list" id="object-list"></ul>
         </div>
         <div class="detail-panel" id="detail-panel" hidden>
           <h3 class="section-title">Details</h3>
@@ -88,6 +125,56 @@
         <span>Sonstige Hinweise</span>
         <textarea id="object-notes" rows="2" maxlength="2000"></textarea>
       </label>
+      <label>
+        <span>Überprüfungsintervall (Monate, leer = kein Turnus)</span>
+        <input id="object-review-interval" type="number" min="1" step="1" />
+      </label>
+      <p class="muted" id="object-review-status"></p>
+      <button id="object-mark-reviewed-button" type="button" class="secondary" hidden>
+        Jetzt als überprüft markieren
+      </button>
+
+      <div id="object-extra-sections" hidden>
+        <hr />
+        <h4 class="section-title">Aufgaben (Fahrzeuge/Wachen)</h4>
+        <ul class="plain-list" id="object-task-list"></ul>
+        <div class="form-row" id="object-task-form-row" hidden>
+          <label>
+            <span>Titel</span>
+            <input id="object-task-title" type="text" maxlength="200" />
+          </label>
+          <label>
+            <span>Zuordnung</span>
+            <select id="object-task-target-type">
+              <option value="vehicle">Fahrzeug</option>
+              <option value="station">Wache</option>
+            </select>
+          </label>
+          <label>
+            <span>Fahrzeug/Wache</span>
+            <select id="object-task-target-id"></select>
+          </label>
+          <label>
+            <span>Beschreibung</span>
+            <input id="object-task-description" type="text" maxlength="4000" />
+          </label>
+          <button id="object-task-add-button" type="button" class="secondary">Aufgabe hinzufügen</button>
+        </div>
+        <p class="error-message" id="object-task-error" role="alert"></p>
+
+        <h4 class="section-title">PDF-Aufgabenzettel</h4>
+        <div id="object-pdf-links" class="muted">Keine Aufgaben hinterlegt.</div>
+
+        <hr />
+        <h4 class="section-title">Anhänge (Lagepläne/Grundrisse)</h4>
+        <ul class="plain-list" id="object-attachment-list"></ul>
+        <div id="object-attachment-form-row" hidden>
+          <input id="object-attachment-file" type="file" accept="image/png,image/jpeg,image/webp,image/gif,application/pdf" />
+          <button id="object-attachment-upload-button" type="button" class="secondary">Hochladen</button>
+        </div>
+        <p class="error-message" id="object-attachment-error" role="alert"></p>
+      </div>
+
       <p class="error-message" role="alert"></p>
       <div class="dialog-actions">
         <button id="object-delete-button" type="button" class="secondary" hidden>Löschen</button>

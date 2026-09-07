@@ -1,3 +1,4 @@
+const path = require('path');
 require('dotenv').config();
 
 function required(name, fallback = undefined) {
@@ -60,6 +61,13 @@ const config = {
   dataRetentionDays: parseInt(process.env.DATA_RETENTION_DAYS || '14', 10),
 
   userAgent: 'EKats/1.0 (+https://github.com/tobizimmi/ekats)',
+
+  // Datei-Anhaenge (Lageplaene/Grundrisse) zu kritischen Objekten. Bewusst AUSSERHALB von
+  // frontend/public, damit Dateien nicht als statische Assets direkt erreichbar sind - Auslieferung
+  // ausschliesslich ueber den authentifizierten Download-Endpunkt in routes/objects.js.
+  uploadDir: process.env.UPLOAD_DIR || path.join(__dirname, '..', 'storage', 'objects'),
+  maxUploadMb: parseInt(process.env.MAX_UPLOAD_MB || '15', 10),
+  allowedUploadMimeTypes: ['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'application/pdf'],
 };
 
 module.exports = config;

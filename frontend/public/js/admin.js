@@ -63,6 +63,68 @@ async function loadUsers(currentUserId) {
   });
 }
 
+async function loadStations() {
+  const tbody = document.getElementById('station-table-body');
+  tbody.innerHTML = '';
+  const stations = await api.get('/stations');
+
+  const stationSelect = document.getElementById('vehicle-station');
+  stationSelect.innerHTML = '<option value="">–</option>';
+  stations.forEach((station) => {
+    const opt = document.createElement('option');
+    opt.value = station.id;
+    opt.textContent = station.name;
+    stationSelect.appendChild(opt);
+  });
+
+  stations.forEach((station) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${station.name}</td><td>${station.address || '-'}</td><td></td>`;
+    const deleteBtn = document.createElement('button');
+    deleteBtn.className = 'secondary';
+    deleteBtn.type = 'button';
+    deleteBtn.textContent = 'Löschen';
+    deleteBtn.addEventListener('click', async () => {
+      if (!confirm(`Wache "${station.name}" wirklich löschen?`)) return;
+      try {
+        await api.delete(`/stations/${station.id}`);
+        await loadStations();
+        await loadVehicles();
+      } catch (err) {
+        alert(err.message);
+      }
+    });
+    tr.querySelector('td:last-child').appendChild(deleteBtn);
+    tbody.appendChild(tr);
+  });
+  return stations;
+}
+
+async function loadVehicles() {
+  const tbody = document.getElementById('vehicle-table-body');
+  tbody.innerHTML = '';
+  const vehicles = await api.get('/vehicles');
+  vehicles.forEach((vehicle) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${vehicle.name}</td><td>${vehicle.station_name || '-'}</td><td></td>`;
+    const deleteBtn = document.createElement('button');
+    deleteBtn.className = 'secondary';
+    deleteBtn.type = 'button';
+    deleteBtn.textContent = 'Löschen';
+    deleteBtn.addEventListener('click', async () => {
+      if (!confirm(`Fahrzeug "${vehicle.name}" wirklich löschen?`)) return;
+      try {
+        await api.delete(`/vehicles/${vehicle.id}`);
+        await loadVehicles();
+      } catch (err) {
+        alert(err.message);
+      }
+    });
+    tr.querySelector('td:last-child').appendChild(deleteBtn);
+    tbody.appendChild(tr);
+  });
+}
+
 (async function bootstrapAdmin() {
   const user = await initHeader();
   if (!user) return;
@@ -75,6 +137,41 @@ async function loadUsers(currentUserId) {
 
   await loadWehr();
   await loadUsers(user.id);
+  await loadStations();
+  await loadVehicles();
+
+  document.getElementById('station-form').addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const errorEl = document.getElementById('station-error');
+    errorEl.textContent = '';
+    try {
+      await api.post('/stations', {
+        name: document.getElementById('station-name').value.trim(),
+        address: document.getElementById('station-address').value.trim() || null,
+      });
+      event.target.reset();
+      await loadStations();
+    } catch (err) {
+      errorEl.textContent = err.message;
+    }
+  });
+
+  document.getElementById('vehicle-form').addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const errorEl = document.getElementById('vehicle-error');
+    errorEl.textContent = '';
+    const stationId = document.getElementById('vehicle-station').value;
+    try {
+      await api.post('/vehicles', {
+        name: document.getElementById('vehicle-name').value.trim(),
+        stationId: stationId ? Number(stationId) : null,
+      });
+      event.target.reset();
+      await loadVehicles();
+    } catch (err) {
+      errorEl.textContent = err.message;
+    }
+  });
 
   document.getElementById('wehr-form').addEventListener('submit', async (event) => {
     event.preventDefault();
