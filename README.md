@@ -193,6 +193,24 @@ in dieser Entwicklungsumgebung generell nicht getestet werden** (auch für die v
 Connectors nicht) — bitte nach dem ersten Deploy einmal `npm run fetch -- <quelle>` pro Quelle
 manuell laufen lassen und die Logs/`live_datapoint`-Tabelle prüfen.
 
+### Addon-Seiten je Datenquelle
+
+Jede der fünf Datenquellen hat zusätzlich zum kombinierten Dashboard eine eigene Seite mit
+Mini-Karte + Liste, gefiltert auf genau diese Quelle (analog zur Objekt-Übersicht):
+
+| Seite | Quelle |
+|---|---|
+| `dwd-unwetter.html` | DWD-Unwetterwarnungen |
+| `pegelonline.html` | Pegelstände (PEGELONLINE) |
+| `hochwasserzentralen.html` | Hochwasserlage |
+| `waldbrandindex.html` | Waldbrandgefahrenindex |
+| `firms.html` | Feuer-Hotspots (NASA FIRMS) |
+
+Nur das **Dashboard** (`index.html`) zeigt weiterhin alle Quellen (inkl. kritische Objekte)
+gemeinsam auf einer Karte mit Layer-Toggles. Die Addon-Seiten teilen sich ein gemeinsames Skript
+(`js/addon.js`) — welche Quelle eine Seite anzeigt, steht im `data-addon-source`-Attribut auf
+`<body>` (nicht als Inline-`<script>`, das würde an der Content-Security-Policy scheitern).
+
 ## Benachrichtigungen (Schwellenwerte)
 
 Konfigurierbar unter „Einstellungen“ (nur Rolle „Stab“). `threshold_key` je Quelle:

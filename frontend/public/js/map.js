@@ -1,7 +1,6 @@
 // Kartenansicht: ein Leaflet-Layer je Quelle, einzeln ein-/ausblendbar (siehe CLAUDE.md 2.2).
 // Tile-Quelle: OpenStreetMap-Standardkacheln (keine Drittanbieter-Tracking-Skripte, nur Kachelbilder).
 
-const SEVERITY_COLORS = ['#6b7280', '#2e7d32', '#f9a825', '#ef6c00', '#c62828'];
 const OBJECT_LAYER_KEY = 'objects';
 
 let map;

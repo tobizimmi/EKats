@@ -11,6 +11,10 @@ const SOURCE_LABELS = {
   waldbrandindex: 'Waldbrandgefahrenindex',
 };
 
+// Gemeinsame Farbskala fuer Karten-Marker, genutzt vom Dashboard (map.js) und den
+// Addon-Einzelseiten (addon.js).
+const SEVERITY_COLORS = ['#6b7280', '#2e7d32', '#f9a825', '#ef6c00', '#c62828'];
+
 function meldestufeNumber(severity) {
   const map = {
     kein_hochwasser: 0,
