@@ -39,6 +39,11 @@ function createApp() {
           connectSrc: ["'self'"],
           workerSrc: ["'self'"],
           manifestSrc: ["'self'"],
+          // Verstoesse werden serverseitig geloggt (siehe /api/csp-report unten) statt nur in der
+          // Browser-Konsole eines einzelnen Nutzers zu verschwinden - genau ein solcher, nur durch
+          // manuelles Einfuegen der Konsolenausgabe entdeckter Verstoss (Service Worker blockierte
+          // Kartenkacheln) war die Ursache fuer die "Karte bleibt grau"-Stoerung.
+          reportUri: '/api/csp-report',
         },
       },
     })
@@ -62,6 +67,21 @@ function createApp() {
   );
 
   app.get('/api/health', (req, res) => res.json({ ok: true, data: { status: 'up' } }));
+
+  // CSP-Verstoss-Reports: unauthentifiziert (der Browser sendet sie automatisch, es gibt keine
+  // Session in diesem Moment) und oeffentlich erreichbar - daher eigenes, strenges Rate-Limit und
+  // strikt begrenzte Body-Groesse, damit dieser Endpunkt nicht fuer Log-Flooding missbraucht werden
+  // kann. Nur geloggt, nicht dauerhaft gespeichert (kein Nutzerbezug, reine Betriebsdiagnose).
+  app.post(
+    '/api/csp-report',
+    rateLimit({ windowMs: 60 * 1000, limit: 20, standardHeaders: false, legacyHeaders: false }),
+    express.json({ type: ['application/json', 'application/csp-report'], limit: '20kb' }),
+    (req, res) => {
+      const report = req.body?.['csp-report'] || req.body;
+      console.warn('[csp-violation]', JSON.stringify(report).slice(0, 2000));
+      res.status(204).end();
+    }
+  );
 
   app.use('/api/auth', authRoutes);
   app.use('/api/users', usersRoutes);

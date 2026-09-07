@@ -348,7 +348,11 @@ müssen einzeln über den Datei-Download-Endpunkt geholt werden.
 ### Weitere Maßnahmen
 
 - Rate-Limiting auf allen `/api`-Endpunkten, engeres Limit zusätzlich auf `/api/auth/login`
-- Security-Header via `helmet` (inkl. Content-Security-Policy)
+- Security-Header via `helmet` (inkl. Content-Security-Policy). CSP-Verstöße werden serverseitig
+  geloggt (`POST /api/csp-report`, eigenes striktes Rate-Limit) statt nur in der Browser-Konsole
+  eines einzelnen Nutzers zu verschwinden - Lehre aus einem realen Vorfall (siehe Changelog: der
+  Service Worker blockierte Kartenkacheln per CSP, die Karte blieb grau, bis ein Nutzer die
+  Konsolenausgabe manuell weitergab)
 - Keine Drittanbieter-Tracking-Skripte; Leaflet lokal vendored; einzige externe Verbindung im
   Frontend sind die OpenStreetMap-Kartenkacheln (nur Bilder)
 - Datei-Anhänge (Objektverwaltung) werden außerhalb des Web-Roots gespeichert und ausschließlich
@@ -388,6 +392,52 @@ mit Zeitstempel des letzten Standes. Kein voller Offline-Betrieb mit Sync (das i
 Fahrzeugeinsatz) — API-Aufrufe gehen immer live ans Netz, Kartenkacheln werden nicht vorab
 zwischengespeichert.
 
+## Geplant: Wetter-Entwicklung (Windrichtung/-geschwindigkeit, Gewitterzug)
+
+Recherche-Ergebnis zur Anforderung „Windrichtung und wie sie sich entwickelt/ändert, ziehende
+Gewitter“ — **bewusst noch nicht implementiert**, siehe Begründung unten.
+
+### Windrichtung/-geschwindigkeit (Empfehlung: MOSMIX-S, machbar)
+
+DWD Open Data bietet stündliche Stationsvorhersagen (**MOSMIX-S**, ~40 Parameter inkl.
+Windrichtung `DD` und -geschwindigkeit `FF` in 10m Höhe) als KMZ (gezipptes KML) je Station:
+`https://opendata.dwd.de/weather/local_forecasts/mos/MOSMIX_S/single_stations/<Stations-ID>/kml/MOSMIX_S_LATEST_<Stations-ID>.kmz`.
+Geplanter Ansatz (analog zu den bestehenden 5 Connectors):
+
+1. Nächstgelegene MOSMIX-Station zum Wehr-Kartenmittelpunkt bestimmen (`haversineKm`, bereits in
+   `backend/src/utils/geo.js` vorhanden).
+2. KMZ herunterladen, entpacken (einzelne Datei, keine neue Abhängigkeit nötig — ein minimaler
+   Parser für den ZIP-Local-File-Header genügt) und `DD`/`FF`-Zeitreihe aus dem KML extrahieren.
+3. **Kein Schema-Update nötig**: ein `live_datapoint`-Eintrag je Station (`source='wind'`),
+   `value_numeric`/`unit` = aktuelle Geschwindigkeit, die mehrstündige Entwicklung (Richtung +
+   Geschwindigkeit je Stunde) im `payload`-Feld (JSONB) — die Detail-Ansicht kann daraus eine
+   Zeitleiste rendern, das bestehende Muster (Addon-Seite + `js/detail.js`) passt unveraendert.
+
+**Grund, warum das noch nicht umgesetzt wurde**: Die MOSMIX-Stations-IDs sind ein **anderer
+Stationskatalog** als die bereits in EKats vorhandene `dwd_station`-Tabelle (die stammt aus den
+Klima-Tageswerten, nicht aus MOSMIX). Vor der Implementierung muss der korrekte MOSMIX-Stations-
+katalog (`https://opendata.dwd.de/weather/lib/met_application_mosmix/stationskatalog.cfg` o.ä.)
+geprüft und die Zuordnung nächste-Station-zu-Wehr-Standort gegen echte Daten verifiziert werden —
+das war aus dieser Sandbox heraus **nicht möglich** (kein ausgehender Netzwerkzugriff auf
+`opendata.dwd.de`, dieselbe Einschränkung wie beim `hochwasserzentralen.js`-Connector, siehe oben).
+Ungeprüften Code auszuliefern, der auf einer zusätzlichen, nicht verifizierbaren Annahme (korrekte
+Stations-ID-Zuordnung zwischen zwei verschiedenen DWD-Katalogen) aufbaut, wäre nach den gleichen
+Maßstäben, an die sich dieses Projekt bereits hält (siehe „Verifikationsstand der Fetcher“ oben),
+unehrlich. **Empfehlung**: in einer Session mit echtem Internetzugriff die Stations-ID-Zuordnung
+verifizieren, dann den Fetcher nach obigem Muster umsetzen (geschätzter Aufwand: ähnlich zu einem
+der 5 bestehenden Connectors, ca. 1 Fetcher-Datei + 1 Addon-Seite + Migration entfällt).
+
+### Gewitterzug / Niederschlagsbewegung (Empfehlung: eigene, spätere Phase)
+
+Für „wie zieht ein Gewitter“ liefert DWD **RADOLAN/RADVOR** Radar-Kompositen
+(`https://opendata.dwd.de/weather/radar/composite/`, 5-15-Minuten-Takt). Das ist ein
+**binäres 900×900-Rasterformat** mit eigener Projektion (polar-stereografisch) — die Auswertung
+(Kachel-Dekodierung, Koordinatentransformation, ggf. Zellverfolgung für "zieht nach Nordost")
+ist deutlich aufwändiger als jeder bestehende Connector und ohne Möglichkeit zur Live-Verifikation
+in dieser Umgebung ein zu hohes Risiko für blind geschriebenen, ungetesteten Code. Empfehlung:
+als eigene Phase mit echtem DWD-Netzwerkzugriff planen, ggf. zunächst simpler als eingebettetes
+Radar-Bild (DWD stellt auch fertige PNG-Loops bereit) statt eigener Zellverfolgung.
+
 ## Bekannte V1-Vereinfachungen
 
 - **PWA-Icon** ist aktuell nur als SVG hinterlegt (`frontend/public/icons/icon.svg`). Für optimale
@@ -403,6 +453,58 @@ zwischengespeichert.
 - **Kein 2FA/TOTP**: Für eine höhere Absicherung von Admin-Konten wäre eine
   Zwei-Faktor-Authentifizierung sinnvoll, ist aber noch nicht umgesetzt.
 - Siehe außerdem den Abschnitt „Verifikationsstand der Fetcher“ oben.
+
+## Gap-Analyse: Was fehlt für ein vollwertiges Produktivsystem?
+
+Über die bereits umgesetzte Sicherheits-/DSGVO-Härtung hinaus fehlen für ein rundum
+produktionsreifes System aus heutiger Sicht folgende Punkte — nach Priorität geordnet, mit
+Einschätzung, was sich ohne Netzwerkzugriff/Live-Server aus dieser Umgebung heraus sinnvoll schon
+umsetzen ließ vs. was echte Infrastruktur oder Live-Tests braucht:
+
+### Hohe Priorität
+
+- **Automatisierte Tests fehlen komplett.** Die gesamte Verifikation dieses Projekts (auch der
+  heutigen Fixes) lief über manuelle curl-/Playwright-Durchläufe in dieser Session - das ist nicht
+  wiederholbar und schützt nicht vor Regressionen bei künftigen Änderungen. Mehrere heute gefundene
+  Bugs (fehlende Tenant-Prüfung bei Fahrzeug/Aufgaben-IDs, stale Rolle im JWT, CSP blockiert
+  Service-Worker-Fetch) wären mit einer Test-Suite vermutlich schon vorher aufgefallen. Empfehlung:
+  `vitest` oder `jest` + `supertest` für die Backend-Routen (Start bei Auth/Autorisierung, da dort
+  der größte Schaden bei Fehlern entsteht), Playwright-Tests für die kritischen UI-Pfade dauerhaft
+  im Repo statt nur als Wegwerf-Skripte in `/tmp`.
+- **Kein CI-Pipeline** (z.B. GitHub Actions): Tests/Lint laufen aktuell nirgends automatisch bei
+  jedem Push/PR. Ohne (a) wenig sinnvoll umsetzbar, sollte danach folgen.
+- **Kein dokumentiertes Datenbank-Backup**: `deploy/` enthält kein Backup-Skript/keine Anleitung.
+  Empfehlung: `pg_dump`-Cron-Job + Aufbewahrungsfrist, idealerweise Offsite-Kopie (die Objekt-
+  Anhänge in `backend/storage/objects/` brauchen ein separates Datei-Backup).
+
+### Mittlere Priorität
+
+- **Kein Monitoring/Alerting für den Betrieb selbst**: Fehler landen nur in `journalctl`/Konsole.
+  Ein fehlschlagender Cron-Job (z.B. alle 5 Datenquellen-Fetcher gleichzeitig kaputt) fällt sonst
+  erst auf, wenn jemand die Karte leer sieht - wie im heutigen Vorfall. Empfehlung: einfacher
+  externer Uptime-Check gegen `/api/health` plus eine Alarmierung, wenn ein Fetcher mehrfach in
+  Folge fehlschlägt (Zähler existiert im Scheduler-Log bereits, wird aber nirgends ausgewertet).
+- **Passwort-Richtlinie ist minimal** (nur Mindestlänge 8). Für höhere Sicherheit optional: Prüfung
+  gegen bekannte kompromittierte Passwörter (z.B. HaveIBeenPwned-Prefix-API, datensparsam da nur
+  ein SHA1-Präfix übertragen wird) oder eine höhere Mindestlänge für Admin-Konten.
+- **2FA/TOTP** für Admin-Konten (siehe „Bekannte V1-Vereinfachungen“).
+- **Gebietsdefinition (Nachbar-Landkreise) und Verkehrsdaten**: beide bereits in früheren
+  Planungsrunden dieses Projekts als eigene Phasen vorgesehen, aber noch nicht begonnen.
+- **Mandantenfähigkeit (mehrere Wehren auf einer Installation)**: Schema ist vorbereitet
+  (`wehr`-Tabelle), aber bewusst als letzte, größere Ausbaustufe zurückgestellt (siehe frühere
+  Planung zu Platform-Admin vs. Wehr-Admin).
+
+### Niedrige Priorität / nice-to-have
+
+- PNG-Icon-Sets für die PWA (aktuell nur SVG, siehe oben)
+- Automatisierte Barrierefreiheits-Prüfung (a11y) der Oberfläche
+- Wetter-Entwicklung/Gewitterzug (siehe eigener Abschnitt oben) - bewusst noch nicht umgesetzt
+
+### Bereits erledigt (zur Einordnung, was heute dazugekommen ist)
+
+Session-Revocation, Login-Lockout, Audit-Log, Passwort ändern/Admin-Reset, DSGVO-Datenexport,
+Produktions-Startup-Guard für `JWT_SECRET`, CSP-Violation-Reporting sowie die Aufteilung der
+Datenquellen in eigene Addon-Seiten neben dem kombinierten Dashboard - siehe Abschnitte oben.
 
 ## Projektstruktur
 
