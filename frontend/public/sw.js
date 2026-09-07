@@ -7,7 +7,7 @@
 // self.registration.scope loesen relative URLs relativ zu self.location auf. So funktioniert
 // dieselbe sw.js unveraendert egal ob die App an der Domain-Root oder einem Unterpfad
 // (z.B. https://zimmimail.de/EKats/) haengt - siehe README "Deployment".
-const CACHE_NAME = 'ekats-shell-v4';
+const CACHE_NAME = 'ekats-shell-v5';
 const APP_SHELL = [
   './',
   'login.html',
@@ -63,6 +63,17 @@ self.addEventListener('fetch', (event) => {
 
   // API-Aufrufe: immer ans Netz, nie aus dem Cache beantworten (Live-Daten).
   if (url.pathname.startsWith(`${SCOPE_PATH}api/`)) {
+    return;
+  }
+
+  // Fremdorigin-Requests (Kartenkacheln von tile.openstreetmap.org) NICHT abfangen: ein fetch()
+  // AUS dem Service Worker heraus unterliegt der connect-src-Direktive der CSP (nicht img-src, das
+  // gilt nur fuer den regulaeren <img>-Ladepfad) - tile.openstreetmap.org steht bewusst nicht in
+  // connect-src, wurde also von jedem fetch() hier drin geblockt und die Karte blieb grau. Durch
+  // "return" ohne respondWith() laedt der Browser die Kachel ganz normal selbst (regulaerer
+  // img-src-Pfad) - das entspricht ohnehin der dokumentierten Absicht, Kartenkacheln nicht
+  // vorab zwischenzuspeichern.
+  if (url.origin !== self.location.origin) {
     return;
   }
 
