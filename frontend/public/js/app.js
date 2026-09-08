@@ -33,6 +33,7 @@ async function loadAndRenderDatapoints() {
   registerServiceWorker();
   initObjectsUi(user);
 
+  await loadBundeslandFeatures();
   await loadAndRenderDatapoints();
   await loadObjects();
   api

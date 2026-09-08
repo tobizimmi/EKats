@@ -12,6 +12,7 @@
 
 const { fetchJson } = require('./fetchers/httpClient');
 const { pool, query } = require('./db');
+const { codeForName } = require('./utils/bundeslaender');
 
 const SOURCE_URL = 'https://raw.githubusercontent.com/m-ad/geofeatures-ags-germany/master/geojson/counties.json';
 
@@ -45,13 +46,50 @@ async function importLandkreise() {
     throw new Error('Keine einzige Landkreis-Zeile importiert - Quellformat evtl. geaendert.');
   }
 
-  return { imported, total: geojson.features.length };
+  const bundeslaenderCount = await importBundeslaenderFromLandkreise();
+
+  return { imported, total: geojson.features.length, bundeslaenderCount };
+}
+
+// Aggregiert die gerade importierten Kreis-Polygone je Bundesland-Namen zu einer Flaeche (kein
+// zusaetzlicher Download noetig) - fuer die Kartendarstellung von DWD-Unwetterwarnungen, die nur
+// Bundesland-Ebene liefern (siehe fetchers/dwdUnwetter.js). codeForName() nutzt dieselbe
+// verifizierte Namens-Tabelle wie dwdStationsImport.js, damit z.B. Brandenburg garantiert als "BB"
+// (nicht "BR", ein Fehler im Quelldatensatz eines Alternativkandidaten) gespeichert wird.
+async function importBundeslaenderFromLandkreise() {
+  // ST_MakeValid() vor dem Union: die Quellgeometrie (GADM-Herkunft, siehe oben) enthaelt an
+  // manchen Bundeslandgrenzen minimal ungueltige Ringe, an denen ST_Union() sonst mit einer
+  // GEOS-TopologyException abbricht. ST_MakeValid() kann dabei vereinzelt entartete Punkt-/Linien-
+  // Reste als GeometryCollection zurueckgeben - ST_CollectionExtract(..., 3) behaelt nur die
+  // Flaechenanteile, bevor in die MultiPolygon-Spalte geschrieben wird.
+  const { rows } = await query(
+    `SELECT state, ST_AsGeoJSON(ST_Multi(ST_Union(ST_CollectionExtract(ST_MakeValid(geom), 3)))) AS geometry
+     FROM landkreis WHERE state IS NOT NULL GROUP BY state`
+  );
+
+  let count = 0;
+  for (const row of rows) {
+    const code = codeForName(row.state);
+    if (!code) {
+      console.warn(`[importLandkreise] Kein Bundesland-Code fuer "${row.state}" gefunden - uebersprungen.`);
+      continue;
+    }
+    await query(
+      `INSERT INTO bundesland (code, name, geom)
+       VALUES ($1, $2, ST_SetSRID(ST_GeomFromGeoJSON($3), 4326))
+       ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name, geom = EXCLUDED.geom`,
+      [code, row.state, row.geometry]
+    );
+    count += 1;
+  }
+  return count;
 }
 
 if (require.main === module) {
   importLandkreise()
-    .then(({ imported, total }) => {
+    .then(({ imported, total, bundeslaenderCount }) => {
       console.log(`landkreis: ${imported}/${total} Kreise importiert/aktualisiert.`);
+      console.log(`bundesland: ${bundeslaenderCount}/16 Flaechen aggregiert/aktualisiert.`);
       return pool.end();
     })
     .catch((err) => {

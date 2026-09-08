@@ -27,6 +27,16 @@ CREATE TABLE IF NOT EXISTS landkreis (
 
 CREATE INDEX IF NOT EXISTS idx_landkreis_geom ON landkreis USING GIST(geom);
 
+-- Bundesland-Flaechen fuer die Kartendarstellung von DWD-Unwetterwarnungen (nur Bundesland-Ebene
+-- verfuegbar). Materialisiert (aus landkreis aggregiert) statt live berechnet - siehe Migration 007.
+CREATE TABLE IF NOT EXISTS bundesland (
+    code CHAR(2) PRIMARY KEY,
+    name TEXT NOT NULL,
+    geom GEOMETRY(MultiPolygon, 4326) NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_bundesland_geom ON bundesland USING GIST(geom);
+
 ALTER TABLE wehr ADD COLUMN IF NOT EXISTS home_landkreis_ags CHAR(5) REFERENCES landkreis(ags);
 
 -- Benutzer, drei Rollenstufen:

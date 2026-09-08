@@ -239,6 +239,8 @@ ebenfalls wehrweit).
   Kreisgrenzen berechnet (`ST_Touches` in PostGIS) — bleibt dadurch immer korrekt.
 - Auf dem Dashboard erscheint das Zuständigkeitsgebiet als eigener Karten-Layer (Umriss, Heimat-
   Landkreis hervorgehoben, Nachbarn gestrichelt), ein-/ausblendbar wie die anderen Layer.
+- Als Nebenprodukt desselben Imports werden die 402 Kreis-Polygone zusätzlich je Bundesland zu 16
+  Flächen aggregiert (Tabelle `bundesland`) — Grundlage für „Warnungen als Fläche“, siehe unten.
 - **Bewusste Einschränkung**: Die Auswahl filtert aktuell **nicht** automatisch die angezeigten
   DWD-Unwetterwarnungen nach Landkreis — die DWD-Warnungen liefern nur Bundesland-Ebene (siehe
   `dwd_unwetter`-Connector-Kommentar), eine zuverlässige Zuordnung zu Kreis-Warnzellen würde die
@@ -426,18 +428,30 @@ Recherche-Ergebnis zur Anforderung „Windrichtung und wie sie sich entwickelt/�
 Gewitter, Warnungen als Fläche statt Punkt wie beim DWD“ — **bewusst noch nicht implementiert**,
 siehe Begründung unten.
 
-### Warnungen als Fläche statt Punkt (aktuell nicht sicher umsetzbar)
+### Warnungen als Fläche statt Punkt (Bundesland-Ebene implementiert, Kreis-Ebene noch offen)
 
-Mit dem neuen Zuständigkeitsgebiet-Feature (siehe oben) liegen jetzt echte Kreisgrenzen-Polygone
-im System vor — die fehlende Zutat für „Warnung als Fläche“ ist die Zuordnung DWD-Warncell-ID →
-Landkreis-AGS. Diese offizielle Zuordnungstabelle (`cap_warncellids_csv`) liegt auf `dwd.de`,
-einer aus dieser Entwicklungsumgebung nicht erreichbaren Domain, und es fand sich keine
-verlässliche Ersatzquelle. **Eine geratene/falsche Zuordnung würde eine Warnung auf der falschen
-Fläche anzeigen — bei einem Katastrophenschutz-Tool ein echtes Sicherheitsrisiko, kein
-kosmetisches Problem.** Deshalb bewusst nicht blind umgesetzt. Sobald die offizielle CSV von
-`dwd.de/DE/leistungen/opendata/help/warnungen/cap_warncellids_csv.html` verifiziert werden kann,
-ist die Umsetzung ein überschaubarer nächster Schritt (Join-Tabelle + Polygon-Rendering wie beim
-neuen Zuständigkeitsgebiet-Layer).
+**Bundesland-Ebene ist umgesetzt.** DWD-Unwetterwarnungen liefern den betroffenen Bundesland-Code
+(`stateShort`, z.B. `NW`) bereits direkt in der Quelle mit — diese Zuordnung ist offiziell und
+musste nicht rekonstruiert werden. Die 16 Bundesland-Flächen werden bei `npm run import-landkreise`
+als Nebenprodukt aus den unter „Zuständigkeitsgebiet“ importierten Landkreis-Polygonen aggregiert
+(`ST_Union` je Bundesland, Tabelle `bundesland`, Migration 007) und über `GET /api/bundeslaender`
+ausgeliefert. Auf Dashboard und `dwd-unwetter.html` erscheinen DWD-Unwetterwarnungen dadurch als
+eingefärbte Bundesland-Fläche statt als Punkt (`js/bundesland.js`, `createDatapointLayer()`) —
+alle anderen Datenquellen (Pegel, Hochwasser, Waldbrand, FIRMS) bleiben Punkt-Marker, da sie keine
+Flächenbezug liefern.
+
+**Kreis-Ebene (präzisere Warnfläche wie direkt beim DWD) ist weiterhin nicht sicher umsetzbar.**
+Mit dem Zuständigkeitsgebiet-Feature (siehe oben) liegen zwar echte Kreisgrenzen-Polygone im
+System vor — die fehlende Zutat für eine kreisscharfe Warnfläche ist aber die amtliche Zuordnung
+DWD-Warncell-ID → Landkreis-AGS. Diese offizielle Zuordnungstabelle (`cap_warncellids_csv`) liegt
+auf `dwd.de`, einer aus dieser Entwicklungsumgebung nicht erreichbaren Domain, und es fand sich
+keine verlässliche Ersatzquelle. **Eine geratene/falsche Zuordnung würde eine Warnung auf der
+falschen Fläche anzeigen — bei einem Katastrophenschutz-Tool ein echtes Sicherheitsrisiko, kein
+kosmetisches Problem.** Deshalb bewusst nicht blind umgesetzt; die jetzige Bundesland-Fläche ist
+der sichere Zwischenstand, der ohne ungeprüfte Zusatzannahmen auskommt. Sobald die offizielle CSV
+von `dwd.de/DE/leistungen/opendata/help/warnungen/cap_warncellids_csv.html` verifiziert werden
+kann, ist die Verfeinerung auf Kreis-Ebene ein überschaubarer nächster Schritt (Join-Tabelle +
+Wechsel von `bundesland`- auf `landkreis`-Polygone in `createDatapointLayer()`).
 
 ### Windrichtung/-geschwindigkeit (Empfehlung: MOSMIX-S, machbar)
 
@@ -476,9 +490,14 @@ Für „wie zieht ein Gewitter“ liefert DWD **RADOLAN/RADVOR** Radar-Komposite
 **binäres 900×900-Rasterformat** mit eigener Projektion (polar-stereografisch) — die Auswertung
 (Kachel-Dekodierung, Koordinatentransformation, ggf. Zellverfolgung für "zieht nach Nordost")
 ist deutlich aufwändiger als jeder bestehende Connector und ohne Möglichkeit zur Live-Verifikation
-in dieser Umgebung ein zu hohes Risiko für blind geschriebenen, ungetesteten Code. Empfehlung:
-als eigene Phase mit echtem DWD-Netzwerkzugriff planen, ggf. zunächst simpler als eingebettetes
-Radar-Bild (DWD stellt auch fertige PNG-Loops bereit) statt eigener Zellverfolgung.
+in dieser Umgebung ein zu hohes Risiko für blind geschriebenen, ungetesteten Code. **Korrektur
+einer früheren Annahme**: Die „kostenlosen RADOLAN-Kartendaten“ von DWD
+(`dwd.de/DE/leistungen/radolan/radolan_info/home_freie_radolan_kartendaten.html`, ebenfalls nicht
+erreichbar aus dieser Umgebung) sind laut Recherche **weiterhin die rohen Binär-Kompositdateien,
+keine fertigen Bild-Loops** — es gibt lediglich ein von DWD verlinktes Beispielprogramm namens
+`radolan2png` zur Konvertierung, das als Referenz für die Formatauswertung dienen kann. Empfehlung:
+als eigene Phase mit echtem DWD-Netzwerkzugriff planen, `radolan2png` als Ausgangspunkt für den
+eigenen Parser pruefen.
 
 ## Bekannte V1-Vereinfachungen
 

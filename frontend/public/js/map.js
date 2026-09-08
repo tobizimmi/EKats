@@ -83,29 +83,27 @@ function renderMap(datapoints) {
   Object.values(layerGroups).forEach((group) => group.clearLayers());
   markersByDatapointId.clear();
 
-  datapoints
-    .filter((dp) => dp.lat !== null && dp.lon !== null)
-    .forEach((dp) => {
-      const color = SEVERITY_COLORS[Math.min(severityScore(dp), 4)];
-      const marker = L.circleMarker([dp.lat, dp.lon], {
-        radius: 8,
-        color,
-        fillColor: color,
-        fillOpacity: 0.85,
-        weight: 2,
-      });
-      marker.bindTooltip(dp.title || SOURCE_LABELS[dp.source] || dp.source);
-      marker.on('click', () => window.selectDatapoint(dp));
-      marker.addTo(layerGroups[dp.source]);
-      markersByDatapointId.set(dp.id, marker);
-    });
+  datapoints.forEach((dp) => {
+    const layer = createDatapointLayer(dp);
+    if (!layer) return;
+    layer.bindTooltip(dp.title || SOURCE_LABELS[dp.source] || dp.source);
+    layer.on('click', () => window.selectDatapoint(dp));
+    layer.addTo(layerGroups[dp.source]);
+    markersByDatapointId.set(dp.id, layer);
+  });
 }
 
+// Funktioniert generisch fuer Punkt-Marker (circleMarker, hat getLatLng) und Flaechen-Layer
+// (L.geoJSON, hat getBounds) - siehe createDatapointLayer() in js/bundesland.js.
 function focusDatapointOnMap(dp) {
-  if (dp.lat === null || dp.lon === null) return;
-  map.flyTo([dp.lat, dp.lon], Math.max(map.getZoom(), 12));
-  const marker = markersByDatapointId.get(dp.id);
-  if (marker) marker.openTooltip();
+  const layer = markersByDatapointId.get(dp.id);
+  if (!layer) return;
+  if (typeof layer.getBounds === 'function') {
+    map.fitBounds(layer.getBounds());
+  } else if (typeof layer.getLatLng === 'function') {
+    map.flyTo(layer.getLatLng(), Math.max(map.getZoom(), 12));
+  }
+  layer.openTooltip();
 }
 
 // Kritische Objekte werden bewusst als Quadrat (statt Kreis) dargestellt, damit sie sich auf den

@@ -27,29 +27,27 @@ function renderAddonMap(datapoints) {
   addonMarkersById.forEach((marker) => addonMap.removeLayer(marker));
   addonMarkersById.clear();
 
-  datapoints
-    .filter((dp) => dp.lat !== null && dp.lon !== null)
-    .forEach((dp) => {
-      const color = SEVERITY_COLORS[Math.min(severityScore(dp), 4)];
-      const marker = L.circleMarker([dp.lat, dp.lon], {
-        radius: 8,
-        color,
-        fillColor: color,
-        fillOpacity: 0.85,
-        weight: 2,
-      });
-      marker.bindTooltip(dp.title || SOURCE_LABELS[dp.source] || dp.source);
-      marker.on('click', () => window.selectDatapoint(dp));
-      marker.addTo(addonMap);
-      addonMarkersById.set(dp.id, marker);
-    });
+  datapoints.forEach((dp) => {
+    const layer = createDatapointLayer(dp);
+    if (!layer) return;
+    layer.bindTooltip(dp.title || SOURCE_LABELS[dp.source] || dp.source);
+    layer.on('click', () => window.selectDatapoint(dp));
+    layer.addTo(addonMap);
+    addonMarkersById.set(dp.id, layer);
+  });
 }
 
+// Funktioniert generisch fuer Punkt-Marker (circleMarker, hat getLatLng) und Flaechen-Layer
+// (L.geoJSON, hat getBounds) - siehe createDatapointLayer() in js/bundesland.js.
 function focusAddonDatapointOnMap(dp) {
-  if (dp.lat === null || dp.lon === null) return;
-  addonMap.flyTo([dp.lat, dp.lon], Math.max(addonMap.getZoom(), 12));
-  const marker = addonMarkersById.get(dp.id);
-  if (marker) marker.openTooltip();
+  const layer = addonMarkersById.get(dp.id);
+  if (!layer) return;
+  if (typeof layer.getBounds === 'function') {
+    addonMap.fitBounds(layer.getBounds());
+  } else if (typeof layer.getLatLng === 'function') {
+    addonMap.flyTo(layer.getLatLng(), Math.max(addonMap.getZoom(), 12));
+  }
+  layer.openTooltip();
 }
 
 window.selectDatapoint = function selectDatapoint(dp) {
@@ -76,6 +74,7 @@ async function loadAndRenderAddonDatapoints() {
   initAddonMap(user.wehrCenter);
   registerServiceWorker();
 
+  await loadBundeslandFeatures();
   await loadAndRenderAddonDatapoints();
   setInterval(loadAndRenderAddonDatapoints, ADDON_REFRESH_INTERVAL_MS);
 })();

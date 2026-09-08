@@ -11,29 +11,10 @@
 
 const { fetchBuffer } = require('./httpClient');
 const { pool, query } = require('../db');
+const { BUNDESLAND_NAME_TO_CODE } = require('../utils/bundeslaender');
 
 const STATIONS_URL =
   'https://opendata.dwd.de/climate_environment/CDC/observations_germany/climate/daily/kl/recent/KL_Tageswerte_Beschreibung_Stationen.txt';
-
-const BUNDESLAND_NAME_TO_CODE = [
-  ['Schleswig-Holstein', 'SH'],
-  ['Hamburg', 'HH'],
-  ['Niedersachsen', 'NI'],
-  ['Bremen', 'HB'],
-  ['Nordrhein-Westfalen', 'NW'],
-  ['Hessen', 'HE'],
-  ['Rheinland-Pfalz', 'RP'],
-  ['Baden-Württemberg', 'BW'],
-  ['Bayern', 'BY'],
-  ['Saarland', 'SL'],
-  ['Berlin', 'BE'],
-  ['Brandenburg', 'BB'],
-  ['Mecklenburg-Vorpommern', 'MV'],
-  // Sachsen-Anhalt muss vor Sachsen geprueft werden, sonst Fehltreffer.
-  ['Sachsen-Anhalt', 'ST'],
-  ['Sachsen', 'SN'],
-  ['Thüringen', 'TH'],
-];
 
 const LINE_REGEX = /^(\d+)\s+(\d{8})\s+(\d{8})\s+(-?\d+)\s+([\d.-]+)\s+([\d.-]+)\s+(.*)$/u;
 
