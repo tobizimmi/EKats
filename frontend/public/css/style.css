@@ -286,6 +286,25 @@ button.secondary {
   background: color-mix(in srgb, var(--accent) 6%, transparent);
 }
 
+.situation-list li.situation-group-heading {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-muted);
+  cursor: default;
+  padding: 0.7rem 0.2rem 0.3rem;
+  border-bottom: none;
+}
+
+.situation-list li.situation-group-heading:hover {
+  background: none;
+}
+
+.situation-list li.situation-group-heading:first-child {
+  padding-top: 0.2rem;
+}
+
 .severity-dot {
   display: inline-block;
   width: 10px;

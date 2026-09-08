@@ -51,13 +51,26 @@ router.get('/', requireAuth, async (req, res, next) => {
 
     const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
 
+    // LEFT JOIN LATERAL statt fixer Zuordnung: ermittelt je Zeile den (einen) Landkreis, dessen
+    // Polygon die Geokoordinate enthaelt - fuer die Gruppierung "nach Landkreis" im Frontend (siehe
+    // js/list.js). Nur fuer Quellen mit Geokoordinate moeglich; die beiden Bundesland-Quellen
+    // (dwd_unwetter/waldbrandindex) haben kein geom und bleiben entsprechend ohne Landkreis-Zuordnung
+    // - das Frontend gruppiert sie stattdessen unter "ganzes Bundesland" (siehe payload.bundeslandCode).
     const { rows } = await query(
-      `SELECT id, source, external_id, title, value_numeric, unit, severity,
-              item_timestamp, fetched_at, valid_until, payload,
-              ST_Y(geom) AS lat, ST_X(geom) AS lon
+      `SELECT live_datapoint.id, live_datapoint.source, live_datapoint.external_id, live_datapoint.title,
+              live_datapoint.value_numeric, live_datapoint.unit, live_datapoint.severity,
+              live_datapoint.item_timestamp, live_datapoint.fetched_at, live_datapoint.valid_until,
+              live_datapoint.payload,
+              ST_Y(live_datapoint.geom) AS lat, ST_X(live_datapoint.geom) AS lon,
+              lk.ags AS landkreis_ags, lk.name AS landkreis_name
        FROM live_datapoint
+       LEFT JOIN LATERAL (
+         SELECT l.ags, l.name FROM landkreis l
+         WHERE live_datapoint.geom IS NOT NULL AND ST_Contains(l.geom, live_datapoint.geom)
+         LIMIT 1
+       ) lk ON true
        ${where}
-       ORDER BY fetched_at DESC
+       ORDER BY live_datapoint.fetched_at DESC
        LIMIT 2000`,
       params
     );

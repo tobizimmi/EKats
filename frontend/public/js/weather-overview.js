@@ -1,22 +1,10 @@
 // Wetter- & Lageuebersicht (Dashboard-Tab "Wetter"): fasst die Datenpunkte, die die API bereits auf
 // das Zustaendigkeitsgebiet der Wehr (Heimat-Landkreis + Nachbarlandkreise, siehe
 // backend/src/utils/zustaendigkeit.js) gefiltert hat, je Quelle kompakt zusammen - Anzahl je
-// Dringlichkeitsstufe als Badges, plus die wichtigsten Einzelmeldungen. Ergaenzt die chronologische
-// Lage-Liste (list.js) um eine nach Quelle gruppierte, auf einen Blick erfassbare Sicht. Nur auf dem
-// Dashboard eingebunden (index.html) - die Addon-Einzelseiten zeigen ohnehin nur eine Quelle.
-
-let gebietInfoCache = null;
-
-async function loadGebietInfo() {
-  if (gebietInfoCache) return gebietInfoCache;
-  try {
-    gebietInfoCache = await api.get('/wehr');
-  } catch (err) {
-    console.warn('[weather-overview] Zustaendigkeitsgebiet-Info konnte nicht geladen werden:', err);
-    gebietInfoCache = null;
-  }
-  return gebietInfoCache;
-}
+// Dringlichkeitsstufe als Badges, plus die wichtigsten Einzelmeldungen. Ergaenzt die nach Landkreis
+// gruppierte Lage-Liste (list.js, gebiet-info.js) um eine nach Quelle gruppierte, auf einen Blick
+// erfassbare Sicht. Nur auf dem Dashboard eingebunden (index.html) - die Addon-Einzelseiten zeigen
+// ohnehin nur eine Quelle.
 
 function renderGebietInfoLine(wehrInfo) {
   const el = document.getElementById('wetter-gebiet-info');

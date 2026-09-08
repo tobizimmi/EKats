@@ -254,6 +254,12 @@ ebenfalls wehrweit).
 - Ein neuer Dashboard-Tab **„Wetter“** fasst dieselben (bereits gebietsgefilterten) Datenpunkte je
   Quelle kompakt zusammen (Anzahl je Dringlichkeitsstufe als Badges, wichtigste Einzelmeldungen) —
   siehe „Wetter- & Lageübersicht“ unten.
+- Die **Lage-Liste** (Dashboard-Tab „Lage“ und alle fünf Addon-Einzelseiten, `js/list.js` +
+  `js/gebiet-info.js`) ist zusätzlich nach Landkreis gruppiert: Heimat-Landkreis zuerst, dann die
+  Nachbarn alphabetisch, danach eine Sammelgruppe „Ganzes Bundesland“ für die beiden
+  bundeslandweiten Quellen ohne Geokoordinate. Welcher Landkreis zu einer Meldung gehört, ermittelt
+  `GET /api/datapoints` selbst per `LEFT JOIN LATERAL` gegen die `landkreis`-Polygone (`ST_Contains`)
+  — eine feste Zuordnung wäre bei Meldungen nahe einer Kreisgrenze ungenau, die Live-Prüfung nicht.
 
 ### Datenquelle & Lizenzhinweis
 
