@@ -18,11 +18,16 @@ async function loadGebietInfo() {
 
 // Sortier-Rang je Landkreis-AGS fuer die Gruppen-Reihenfolge: Heimat zuerst (0), dann Nachbarn in
 // derselben Reihenfolge wie vom Backend geliefert (alphabetisch, siehe loadNeighborLandkreise()).
+// Ein Landkreis, der weder Heimat noch Nachbar ist, sollte bei korrekt filterndem Backend (siehe
+// utils/gebietFilter.js) gar nicht erst auftauchen - falls doch (z.B. Grenzfall an einer
+// Kreis-Dreiecksgrenze), landet er absichtlich HINTER allen echten Nachbarn, statt mit dem ersten
+// Nachbarn (Rang 1) zu kollidieren und die Reihenfolge durcheinanderzubringen.
 function landkreisRank(ags, gebietInfo) {
   if (!gebietInfo) return 1;
   if (ags === gebietInfo.home_landkreis_ags) return 0;
-  const idx = (gebietInfo.neighborLandkreise || []).findIndex((l) => l.ags === ags);
-  return idx === -1 ? 1 : idx + 1;
+  const neighbors = gebietInfo.neighborLandkreise || [];
+  const idx = neighbors.findIndex((l) => l.ags === ags);
+  return idx === -1 ? neighbors.length + 1 : idx + 1;
 }
 
 // Gruppen-Schluessel/-Label/-Rang fuer einen Datenpunkt. Quellen mit ermittelter Kreis-Zuordnung

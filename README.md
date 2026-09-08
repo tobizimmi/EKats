@@ -264,12 +264,16 @@ ebenfalls wehrweit).
   Flächen aggregiert (Tabelle `bundesland`) — Grundlage für „Warnungen als Fläche“, siehe unten.
 - **`GET /api/datapoints` filtert automatisch auf dieses Gebiet** (Heimat-Landkreis + Nachbarn,
   siehe `backend/src/utils/zustaendigkeit.js` + `utils/gebietFilter.js`): Quellen mit
-  Geokoordinate je Meldung (PEGELONLINE, Hochwasserzentralen, NASA FIRMS) müssen innerhalb der
-  Gebiets-Polygone liegen (`ST_Contains`); die beiden Bundesland-Quellen (DWD-Unwetterwarnungen,
-  Waldbrandgefahrenindex) müssen eines der im Gebiet vertretenen Bundesländer treffen — präziser
-  als Bundesland-Ebene ist auch hier nicht möglich (siehe „Warnungen als Fläche“ unten). Ist noch
-  kein Heimat-Landkreis konfiguriert, bleibt die Anzeige bewusst ungefiltert (bundesweit), statt
-  versehentlich alles auszublenden — das Dashboard zeigt dann einen Hinweis mit Link zur
+  Geokoordinate je Meldung (PEGELONLINE, Hochwasserzentralen, NASA FIRMS, Waldbrandgefahrenindex —
+  letzterer hat über die `dwd_station`-Zuordnung eine echte Stationskoordinate) müssen innerhalb der
+  Gebiets-Polygone liegen (`ST_Contains`). Nur DWD-Unwetterwarnungen liefern wirklich keine
+  Geokoordinate (nur den Bundesland-Code) und werden deshalb stattdessen gegen die im Gebiet
+  vertretenen Bundesländer geprüft — präziser als Bundesland-Ebene ist dort nicht möglich (siehe
+  „Warnungen als Fläche“ unten). *Frühere Version hatte den Waldbrandgefahrenindex fälschlich auch
+  nur auf Bundesland-Ebene geprüft — eine Station irgendwo im selben, oft großen Bundesland wurde
+  dadurch angezeigt und einem Nachbarlandkreis zugeordnet, obwohl sie geografisch weit entfernt lag.*
+  Ist noch kein Heimat-Landkreis konfiguriert, bleibt die Anzeige bewusst ungefiltert (bundesweit),
+  statt versehentlich alles auszublenden — das Dashboard zeigt dann einen Hinweis mit Link zur
   Einrichtung. Karte und Lage-Liste zeigen dadurch ausschließlich Meldungen aus dem eigenen und den
   angrenzenden Landkreisen, nicht mehr bundesweit.
 - Ein neuer Dashboard-Tab **„Wetter“** fasst dieselben (bereits gebietsgefilterten) Datenpunkte je

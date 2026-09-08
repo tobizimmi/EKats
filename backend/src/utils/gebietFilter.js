@@ -3,10 +3,14 @@
 // Von routes/datapoints.js genutzt (Karte, Lage-Liste und der Dashboard-Tab "Wetter" - siehe
 // frontend/public/js/weather-overview.js - teilen sich alle denselben Endpunkt).
 //
-// Quellen ohne Geokoordinate je Meldung (nur Bundesland-Code im Payload, siehe fetchers/*.js)
-// werden ueber den Bundesland-Code gefiltert, alle anderen ueber die Geokoordinate gegen die
-// Kreis-Polygone im Gebiet (ST_Contains).
-const BUNDESLAND_SCOPED_SOURCES = ['dwd_unwetter', 'waldbrandindex'];
+// Nur dwd_unwetter hat wirklich KEINE Geokoordinate je Meldung (DWD liefert nur den Bundesland-Code,
+// siehe fetchers/dwdUnwetter.js) und wird deshalb ueber den Bundesland-Code gefiltert. Alle anderen
+// Quellen - AUCH waldbrandindex, das ueber dwd_station eine echte Stations-Koordinate hat - werden
+// ueber die Geokoordinate gegen die Kreis-Polygone im Gebiet gefiltert (ST_Contains). Fruehere
+// Version hatte waldbrandindex faelschlich hier mit aufgefuehrt: eine WBI-Station irgendwo im selben,
+// oft großen Bundesland (z.B. Baden-Wuerttemberg) wurde dadurch angezeigt und faelschlich einem
+// "Nachbarlandkreis" zugeordnet, obwohl sie geografisch weit vom Zustaendigkeitsgebiet entfernt lag.
+const BUNDESLAND_SCOPED_SOURCES = ['dwd_unwetter'];
 
 // Mutiert `params` (haengt an) und gibt den SQL-Bedingungs-String zurueck, oder null wenn `gebiet`
 // null ist (kein Heimat-Landkreis konfiguriert -> keine Gebietsfilterung moeglich).
