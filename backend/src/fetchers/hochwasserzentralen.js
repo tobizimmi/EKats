@@ -1,100 +1,139 @@
-// Hochwasserzentralen-API (Laenderuebergreifendes Hochwasserportal, LHP). Kein API-Key noetig laut
-// Anbieter-Doku (hochwasserzentralen.de/webservices).
+// Hochwasserzentralen-API (Laenderuebergreifendes Hochwasserportal, LHP) - buendelt die Landes-
+// Pegelnetze aller deutschen Bundeslaender (nicht nur die Bundeswasserstrassen, die PEGELONLINE
+// abdeckt) an einer Stelle. Deckt damit auch die von den Laendern selbst betriebenen "weiteren
+// Pegel" ab (siehe README "Datenquellen").
 //
-// WICHTIGER HINWEIS ZUM VERIFIKATIONSSTAND (anders als die uebrigen vier Fetcher):
-// Diese Sandbox-Umgebung hat aus Netzwerkrichtlinien-Gruenden KEINEN ausgehenden Zugriff auf
-// hochwasserzentralen.de (im Gegensatz zu PEGELONLINE/DWD/NASA, die gegen den bereits produktiven
-// FKatInfo-Connector abgeglichen werden konnten - siehe deren Dateien fuer den Unterschied in
-// Vertrauenswuerdigkeit). Endpunkt-URL und Feldnamen unten sind nach bestem Wissen aus der
-// oeffentlichen Dokumentation rekonstruiert, aber NICHT live gegen eine echte Antwort verifiziert.
-// Vor Produktivbetrieb unbedingt pruefen:
-//   curl -s https://www.hochwasserzentralen.de/webservices/laender.json | head -c 2000
-// und PEGEL_URL/PEGEL_FIELD_CANDIDATES unten an die tatsaechliche Struktur anpassen. Bis dahin
-// scheitert dieser Fetcher defensiv (loggt eine Warnung, wirft aber keinen Fehler, der die anderen
-// Scheduler-Jobs mitreisst - siehe scheduler.js).
+// KORREKTUR EINER FRUEHEREN FEHLANNAHME: Dieser Connector zielte urspruenglich auf einen erfundenen
+// Endpunkt "webservices/pegel_alle.json" mit geratenen Feldnamen (lat/latitude/breite/...). Diese
+// Annahme war falsch - es gibt keinen solchen Endpunkt. Ersetzt durch die tatsaechlich vom Anbieter
+// betriebenen Endpunkte, dokumentiert im inoffiziellen, aber vom bundesAPI-Projekt gepflegten
+// OpenAPI-Spec https://github.com/bundesAPI/hochwasserzentralen-api (openapi.yaml, mit echten
+// Beispiel-Antworten). Damit steht dieser Connector jetzt auf einer deutlich solideren Basis als
+// zuvor, ist aber WEITERHIN NICHT LIVE GETESTET (hochwasserzentralen.de ist aus dieser
+// Entwicklungsumgebung nicht erreichbar, siehe README "Verifikationsstand der Fetcher") - vor
+// Produktivbetrieb unbedingt einmal `npm run fetch -- hochwasserzentralen` pruefen.
+//
+// Zwei Endpunkte:
+// 1. GET get_lagepegel.php (keine Parameter) - liefert ALLE Pegelstationen bundesweit (+ einzelne
+//    Nachbarland-Stationen, z.B. Schweiz) als parallele Arrays {PGNR[], LAT[], LON[], HW[]}
+//    (Stationsnummer, Koordinaten, grober Warnstatus-Code). KEIN Wasserstand-Messwert enthalten.
+// 2. POST get_infospegel.php (Formular-Parameter "pgnr") - liefert Detaildaten EINER Station:
+//    {PN, GW, W, HW, HW_TXT, ZEIT, ID_LAND, ...}. W ist Text mit eingebetteter Einheit (z.B.
+//    "12 cm"), ZEIT ein deutschsprachiger Relativ-Text ("Heute, 11:30 Uhr", keine Zeitzone) - wird
+//    deshalb NICHT in ein Datum umgerechnet (ein Rateversuch waere bei einer sicherheitsrelevanten
+//    Zeitangabe riskanter als sie wegzulassen), item_timestamp bleibt leer, das Frontend faellt in
+//    dem Fall auf fetched_at zurueck.
+//
+// Weil (2) nur einzelne Stationen liefert, waere ein bundesweiter Abruf tausende Einzelanfragen -
+// stattdessen wird (1) einmal geladen, auf Stationen im Umkreis (config.hochwasserzentralenRadiusKm)
+// um mindestens eine Wehr eingegrenzt, und nur fuer diese Teilmenge wird (2) einzeln nachgeladen -
+// analog zum Umkreis-Muster in nasaFirms.js.
 
-const { fetchJson } = require('./httpClient');
+const { fetchJson, postForm } = require('./httpClient');
 const { upsertDatapoints } = require('./normalize');
+const { haversineKm } = require('../utils/geo');
+const { query } = require('../db');
+const config = require('../config');
 
-const PEGEL_URL = 'https://www.hochwasserzentralen.de/webservices/pegel_alle.json';
+const LAGEPEGEL_URL = 'https://www.hochwasserzentralen.de/webservices/get_lagepegel.php';
+const INFOSPEGEL_URL = 'https://www.hochwasserzentralen.de/webservices/get_infospegel.php';
 
-// Mehrere bekannte Namens-Varianten pro Feld, da die exakte Antwortstruktur ungeprueft ist.
-function pick(obj, candidates) {
-  for (const key of candidates) {
-    if (obj[key] !== undefined && obj[key] !== null && obj[key] !== '') return obj[key];
-  }
+// Obergrenze fuer Einzelabrufe je Lauf, damit hochwasserzentralen.de nicht mit zu vielen Anfragen
+// belastet wird, falls mehrere Wehren mit weit auseinanderliegenden Gebieten konfiguriert sind.
+const MAX_STATIONS_PER_RUN = 80;
+
+function parseWasserstand(text) {
+  if (!text) return { value: null, unit: null };
+  const match = String(text).trim().match(/^(-?[\d.,]+)\s*(\S+)?/);
+  if (!match) return { value: null, unit: null };
+  const value = Number(match[1].replace(',', '.'));
+  return { value: Number.isNaN(value) ? null : value, unit: match[2] || null };
+}
+
+// HW ist laut Dokumentation nur ein grober, nicht naeher spezifizierter Warnstatus-Code - severity
+// wird deshalb ausschliesslich aus dem einzigen dokumentierten Klartext-Beispiel "Kein Hochwasser"
+// abgeleitet. Andere HW_TXT-Werte (z.B. konkrete Meldestufen-Texte) sind nicht verifiziert und
+// werden bewusst NICHT in eine geratene Kategorie gezwungen - der Rohtext bleibt in
+// payload.statusText erhalten und ist in der Detail-Ansicht sichtbar.
+function hwTextToSeverity(hwText) {
+  if (!hwText) return null;
+  if (hwText.trim().toLowerCase().includes('kein hochwasser')) return 'kein_hochwasser';
   return null;
 }
 
-function toNumber(value) {
-  if (value === null || value === undefined || value === '') return null;
-  const n = Number(String(value).replace(',', '.'));
-  return Number.isNaN(n) ? null : n;
-}
-
-function meldestufeToSeverity(stufe) {
-  const n = toNumber(stufe);
-  if (n === null) return null;
-  if (n <= 0) return 'kein_hochwasser';
-  if (n === 1) return 'meldestufe_1';
-  if (n === 2) return 'meldestufe_2';
-  if (n === 3) return 'meldestufe_3';
-  return 'meldestufe_4_plus';
-}
-
 async function fetchHochwasserzentralen() {
-  let raw;
-  try {
-    raw = await fetchJson(PEGEL_URL);
-  } catch (err) {
-    console.warn(
-      '[hochwasserzentralen] Abruf fehlgeschlagen - Endpunkt/Feldnamen sind unverifiziert, siehe ' +
-        'Kommentar am Dateianfang. Original-Fehler:',
-      err.message
-    );
-    return { source: 'hochwasserzentralen', fetched: 0, written: 0, skipped: 'Abruf fehlgeschlagen (unverifizierter Endpunkt)' };
+  const { rows: wehren } = await query(
+    'SELECT id, center_lat, center_lon FROM wehr WHERE center_lat IS NOT NULL AND center_lon IS NOT NULL'
+  );
+  if (wehren.length === 0) {
+    return { source: 'hochwasserzentralen', fetched: 0, written: 0, skipped: 'keine Wehr mit Kartenmittelpunkt konfiguriert' };
   }
 
-  const list = Array.isArray(raw) ? raw : Array.isArray(raw?.pegel) ? raw.pegel : Array.isArray(raw?.data) ? raw.data : null;
-  if (!list) {
-    console.warn('[hochwasserzentralen] Unerwartetes Antwortformat - ueberspringe diesen Lauf.');
-    return { source: 'hochwasserzentralen', fetched: 0, written: 0, skipped: 'unerwartetes Antwortformat' };
+  let lagepegel;
+  try {
+    lagepegel = await fetchJson(LAGEPEGEL_URL);
+  } catch (err) {
+    console.warn(
+      '[hochwasserzentralen] get_lagepegel.php nicht erreichbar - Endpunkt/Feldnamen sind nach ' +
+        'bestem Wissen aus einer Community-OpenAPI-Spec rekonstruiert, siehe Kommentar am Dateianfang. ' +
+        'Original-Fehler:',
+      err.message
+    );
+    return { source: 'hochwasserzentralen', fetched: 0, written: 0, skipped: 'Abruf fehlgeschlagen (get_lagepegel.php)' };
+  }
+
+  const { PGNR, LAT, LON } = lagepegel || {};
+  if (!Array.isArray(PGNR) || !Array.isArray(LAT) || !Array.isArray(LON)) {
+    console.warn('[hochwasserzentralen] Unerwartetes Antwortformat von get_lagepegel.php - ueberspringe diesen Lauf.');
+    return { source: 'hochwasserzentralen', fetched: 0, written: 0, skipped: 'unerwartetes Antwortformat (get_lagepegel.php)' };
+  }
+
+  const nearbyStations = [];
+  for (let i = 0; i < PGNR.length; i += 1) {
+    const lat = Number(LAT[i]);
+    const lon = Number(LON[i]);
+    if (Number.isNaN(lat) || Number.isNaN(lon) || !PGNR[i]) continue;
+    const isNearAnyWehr = wehren.some(
+      (wehr) => haversineKm(wehr.center_lat, wehr.center_lon, lat, lon) <= config.hochwasserzentralenRadiusKm
+    );
+    if (isNearAnyWehr) nearbyStations.push({ pgnr: PGNR[i], lat, lon });
+  }
+
+  const stationsToFetch = nearbyStations.slice(0, MAX_STATIONS_PER_RUN);
+  if (nearbyStations.length > MAX_STATIONS_PER_RUN) {
+    console.warn(
+      `[hochwasserzentralen] ${nearbyStations.length} Stationen im Umkreis gefunden, nur die ersten ${MAX_STATIONS_PER_RUN} werden abgerufen.`
+    );
   }
 
   const items = [];
-  for (const entry of list) {
-    const lat = toNumber(pick(entry, ['lat', 'latitude', 'breite', 'geoBreite']));
-    const lon = toNumber(pick(entry, ['lon', 'lng', 'longitude', 'laenge', 'geoLaenge']));
-    const id = pick(entry, ['id', 'pegel_id', 'pegelId', 'ags', 'nummer']);
-    const name = pick(entry, ['name', 'ort', 'pegelname', 'station']);
-    const gewaesser = pick(entry, ['gewaesser', 'fluss', 'gewaesser_name']);
-    const land = pick(entry, ['land', 'bundesland']);
-    const stufe = pick(entry, ['stufe', 'meldestufe', 'warnstufe']);
-    const wert = toNumber(pick(entry, ['wert', 'value', 'aktuellerWert', 'wasserstand']));
-    const einheit = pick(entry, ['einheit', 'unit']) || 'cm';
-    const zeitstempel = pick(entry, ['zeitstempel', 'datum', 'timestamp', 'zeit']);
+  for (const station of stationsToFetch) {
+    try {
+      const info = await postForm(INFOSPEGEL_URL, { pgnr: station.pgnr });
+      const { value, unit } = parseWasserstand(info.W);
 
-    if (id === null || (lat === null && lon === null)) continue;
-
-    let timestamp = null;
-    if (zeitstempel) {
-      const t = new Date(zeitstempel);
-      if (!Number.isNaN(t.getTime())) timestamp = t.toISOString();
+      items.push({
+        source: 'hochwasserzentralen',
+        external_id: station.pgnr,
+        title: [info.PN, info.GW].filter(Boolean).join(' / ') || `Pegel ${station.pgnr}`,
+        lat: station.lat,
+        lon: station.lon,
+        value_numeric: value,
+        unit,
+        severity: hwTextToSeverity(info.HW_TXT),
+        item_timestamp: null,
+        valid_until: null,
+        payload: {
+          gewaesser: info.GW ?? null,
+          land: info.ID_LAND ?? null,
+          meldestufeRoh: info.HW ?? null,
+          statusText: info.HW_TXT ?? null,
+          zeitRoh: info.ZEIT ?? null,
+        },
+      });
+    } catch (err) {
+      console.warn(`[hochwasserzentralen] Station ${station.pgnr} uebersprungen:`, err.message);
     }
-
-    items.push({
-      source: 'hochwasserzentralen',
-      external_id: String(id),
-      title: [name, gewaesser].filter(Boolean).join(' / ') || 'Hochwassermeldestelle',
-      lat,
-      lon,
-      value_numeric: wert,
-      unit: einheit,
-      severity: meldestufeToSeverity(stufe),
-      item_timestamp: timestamp,
-      valid_until: null,
-      payload: { gewaesser, land, meldestufeRoh: stufe },
-    });
   }
 
   const rows = await upsertDatapoints(items);

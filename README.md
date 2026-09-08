@@ -166,12 +166,18 @@ systemctl restart ekats           # Neustart, z.B. nach manueller .env-Änderung
 |---|---|---|---|
 | DWD Unwetterwarnungen | Amtliche Warnungen, Bundesland-Ebene | nein | alle 20 Min. |
 | PEGELONLINE (WSV) | Pegelstände Bundeswasserstraßen | nein | alle 15 Min. |
-| Hochwasserzentralen-API (LHP) | Hochwasserlage | nein | alle 20 Min. |
+| Hochwasserzentralen-API (LHP) | Landespegel + Hochwasserlage aller Bundesländer | nein | alle 20 Min. |
 | NASA FIRMS | Satelliten-Hotspots Waldbrand | ja, kostenloser MAP_KEY | alle 45 Min. |
 | DWD Waldbrandgefahrenindex | Flächige Gefahreneinschätzung je Station | nein | 1×/Tag |
 
 Intervalle über die `FETCH_*_CRON`-Variablen in `.env` änderbar. Jeder Fetcher läuft isoliert
 (`src/scheduler.js`): schlägt eine Quelle fehl, laufen die anderen vier normal weiter.
+
+Die Hochwasserzentralen-API liefert **die Pegel aller deutschen Bundesländer** (nicht nur die
+Bundeswasserstraßen von PEGELONLINE) — deckt damit auch die von den Ländern selbst betriebenen
+„weiteren Pegel" ab. Da ein bundesweiter Abruf pro Lauf tausende Einzelanfragen wären, wird die
+Stationsliste auf einen Umkreis (`HOCHWASSERZENTRALEN_RADIUS_KM`, Standard 60 km) um mindestens
+einen Wehr-Kartenmittelpunkt eingegrenzt (analog zu `FIRMS_RADIUS_KM`), maximal 80 Stationen je Lauf.
 
 ### Verifikationsstand der Fetcher
 
@@ -182,11 +188,23 @@ Endpunkte und Feldnamen implementiert, die im Schwesterprojekt
 end-to-end gegen eine echte PostGIS-Datenbank getestet (Parsing → Normalisierung → Upsert →
 Alert-Engine).
 
-**Der fünfte Connector, `hochwasserzentralen.js`, ist NICHT live verifiziert.** Diese Sandbox-Umgebung
-hatte aus Netzwerkrichtlinien-Gründen keinen ausgehenden Zugriff auf `hochwasserzentralen.de`.
-Endpunkt-URL und Feldnamen sind nach bestem Wissen rekonstruiert, aber vor Produktivbetrieb zu
-prüfen (siehe ausführlicher Kommentar am Dateianfang). Der Fetcher scheitert defensiv (Warnung im
-Log, kein Absturz der anderen Jobs), falls die Annahmen nicht zutreffen.
+**Der fünfte Connector, `hochwasserzentralen.js`, ist NICHT live verifiziert** — hochwasserzentralen.de
+ist aus dieser Entwicklungsumgebung nicht erreichbar. Er zielte ursprünglich auf einen erfundenen
+Endpunkt (`pegel_alle.json`) mit geratenen Feldnamen und hätte so nie funktioniert; das wurde
+korrigiert, indem er jetzt gegen die tatsächlichen Endpunkte implementiert ist, dokumentiert im
+inoffiziellen, community-gepflegten OpenAPI-Spec
+[bundesAPI/hochwasserzentralen-api](https://github.com/bundesAPI/hochwasserzentralen-api) (inkl.
+echter Beispiel-Antworten, gegen die die Parsing-Logik mit Fixture-Daten getestet wurde) — eine
+deutlich solidere Basis als zuvor, aber weiterhin nicht live gegen eine echte Antwort geprüft. Vor
+Produktivbetrieb `npm run fetch -- hochwasserzentralen` prüfen (siehe ausführlicher Kommentar am
+Dateianfang). **Einschränkung**: Die Meldestufe (`HW_TXT`) ist nur für den einen dokumentierten Wert
+„Kein Hochwasser" verifiziert — andere Stufen-Texte sind nicht bekannt und werden bewusst nicht
+geraten, `severity` bleibt für diese Fälle `null` (der Rohtext steht weiterhin in
+`payload.statusText`, in der Detail-Ansicht sichtbar). **Praktische Folge**: Schwellenwert-Regeln auf
+`meldestufe >= 1` lösen dadurch aktuell nicht aus — nur „Kein Hochwasser" (Stufe 0) wird erkannt.
+Sobald die Klartext-Varianten für höhere Stufen bekannt sind, ist `hwTextToSeverity()` in
+`hochwasserzentralen.js` um sie zu ergänzen. Der Fetcher scheitert ansonsten defensiv
+(Warnung im Log, kein Absturz der anderen Jobs), falls die Annahmen nicht zutreffen.
 
 **Live-Abruf gegen die echten Behörden-APIs konnte aus derselben Netzwerkrichtlinien-Einschränkung
 in dieser Entwicklungsumgebung generell nicht getestet werden** (auch für die vier verifizierten
@@ -202,7 +220,7 @@ Mini-Karte + Liste, gefiltert auf genau diese Quelle (analog zur Objekt-Übersic
 |---|---|
 | `dwd-unwetter.html` | DWD-Unwetterwarnungen |
 | `pegelonline.html` | Pegelstände (PEGELONLINE) |
-| `hochwasserzentralen.html` | Hochwasserlage |
+| `hochwasserzentralen.html` | Landespegel (Hochwasserzentralen) |
 | `waldbrandindex.html` | Waldbrandgefahrenindex |
 | `firms.html` | Feuer-Hotspots (NASA FIRMS) |
 
@@ -279,7 +297,7 @@ bereits auf das Zuständigkeitsgebiet gefilterten Datenpunkte (siehe oben) je Qu
 - Kopfzeile mit dem eigenen Gebiet („Mein Gebiet: Städteregion Aachen (Heimat) + Nachbarn: Düren,
   Euskirchen, Heinsberg“) bzw. einem Hinweis + Link zur Einrichtung, falls noch kein
   Heimat-Landkreis konfiguriert ist.
-- Je Quelle (DWD-Unwetterwarnung, Waldbrandgefahrenindex, Hochwasserlage, Pegelstand, Feuer-
+- Je Quelle (DWD-Unwetterwarnung, Waldbrandgefahrenindex, Landespegel, Pegelstand, Feuer-
   Hotspot): Anzahl der Meldungen je Dringlichkeitsstufe als farbige Badges, darunter die bis zu
   fünf dringendsten Einzelmeldungen — Klick fokussiert wie in der Lage-Liste die Karte und öffnet
   das Detail-Panel.

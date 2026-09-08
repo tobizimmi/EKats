@@ -31,6 +31,10 @@ const config = {
 
   nasaFirmsMapKey: process.env.NASA_FIRMS_MAP_KEY || '',
   firmsRadiusKm: parseFloat(process.env.FIRMS_RADIUS_KM || '50'),
+  // Radius um den Wehr-Kartenmittelpunkt, in dem hochwasserzentralen.de-Pegel abgefragt werden -
+  // groesserer Default als FIRMS_RADIUS_KM, da das Pegelnetz dichter ist und Hochwasser an einem
+  // Oberlauf auch ausserhalb des engeren Umkreises relevant sein kann.
+  hochwasserzentralenRadiusKm: parseFloat(process.env.HOCHWASSERZENTRALEN_RADIUS_KM || '60'),
 
   smtp: {
     host: process.env.SMTP_HOST || '',

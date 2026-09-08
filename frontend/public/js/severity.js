@@ -6,7 +6,7 @@
 const SOURCE_LABELS = {
   dwd_unwetter: 'DWD Unwetterwarnung',
   pegelonline: 'Pegelstand (PEGELONLINE)',
-  hochwasserzentralen: 'Hochwasserlage',
+  hochwasserzentralen: 'Landespegel (Hochwasserzentralen)',
   firms: 'Feuer-Hotspot (NASA FIRMS)',
   waldbrandindex: 'Waldbrandgefahrenindex',
 };
