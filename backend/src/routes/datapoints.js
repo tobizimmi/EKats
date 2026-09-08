@@ -12,16 +12,17 @@ const VALID_SOURCES = [
   'hochwasserzentralen',
   'firms',
   'waldbrandindex',
+  'bbk_warnung',
 ];
 
 // GET /api/datapoints?source=pegelonline&since=2026-01-01T00:00:00Z
 // Liefert den aktuellen Stand je Quelle fuer Karte + Uebersichtsliste, gefiltert auf das
 // Zustaendigkeitsgebiet der Wehr (Heimat-Landkreis + Nachbarlandkreise, siehe
-// utils/zustaendigkeit.js): Quellen mit Geokoordinate (pegelonline/hochwasserzentralen/firms)
-// muessen innerhalb der Gebiets-Polygone liegen, die beiden Bundesland-Quellen
-// (dwd_unwetter/waldbrandindex) muessen eines der im Gebiet vertretenen Bundeslaender treffen.
-// Ist noch kein Heimat-Landkreis konfiguriert, kann keine Gebietsgrenze bestimmt werden - dann
-// bewusst wie bisher ungefiltert (bundesweit) anzeigen, statt versehentlich alles auszublenden.
+// utils/zustaendigkeit.js). Drei Filterarten je nach Praezision der Quelle, siehe
+// utils/gebietFilter.js: Kreis-genau (bbk_warnung), Bundesland-genau (dwd_unwetter, einzige Quelle
+// wirklich ohne Geokoordinate), sonst per Geokoordinate gegen die Kreis-Polygone. Ist noch kein
+// Heimat-Landkreis konfiguriert, kann keine Gebietsgrenze bestimmt werden - dann bewusst wie
+// bisher ungefiltert (bundesweit) anzeigen, statt versehentlich alles auszublenden.
 router.get('/', requireAuth, async (req, res, next) => {
   try {
     const { source, since } = req.query;
@@ -51,11 +52,12 @@ router.get('/', requireAuth, async (req, res, next) => {
 
     const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
 
-    // LEFT JOIN LATERAL statt fixer Zuordnung: ermittelt je Zeile den (einen) Landkreis, dessen
-    // Polygon die Geokoordinate enthaelt - fuer die Gruppierung "nach Landkreis" im Frontend (siehe
-    // js/list.js). Nur fuer Quellen mit Geokoordinate moeglich; die beiden Bundesland-Quellen
-    // (dwd_unwetter/waldbrandindex) haben kein geom und bleiben entsprechend ohne Landkreis-Zuordnung
-    // - das Frontend gruppiert sie stattdessen unter "ganzes Bundesland" (siehe payload.bundeslandCode).
+    // LEFT JOIN LATERAL statt fixer Zuordnung: ermittelt je Zeile den (einen) Landkreis - entweder
+    // per ST_Contains aus der Geokoordinate, oder (fuer bbk_warnung) direkt aus dem beim Abruf schon
+    // bekannten payload.landkreisAgs. Nur dwd_unwetter (wirklich keine Geokoordinate, kein bekannter
+    // Kreis) bleibt ohne Landkreis-Zuordnung - das Frontend gruppiert diese Zeilen stattdessen unter
+    // "ganzes Bundesland" (siehe payload.bundeslandCode). Grundlage fuer die Gruppierung "nach
+    // Landkreis" im Frontend, siehe js/list.js + js/gebiet-info.js.
     const { rows } = await query(
       `SELECT live_datapoint.id, live_datapoint.source, live_datapoint.external_id, live_datapoint.title,
               live_datapoint.value_numeric, live_datapoint.unit, live_datapoint.severity,
@@ -66,7 +68,9 @@ router.get('/', requireAuth, async (req, res, next) => {
        FROM live_datapoint
        LEFT JOIN LATERAL (
          SELECT l.ags, l.name FROM landkreis l
-         WHERE live_datapoint.geom IS NOT NULL AND ST_Contains(l.geom, live_datapoint.geom)
+         WHERE
+           (live_datapoint.geom IS NOT NULL AND ST_Contains(l.geom, live_datapoint.geom))
+           OR (live_datapoint.geom IS NULL AND l.ags = live_datapoint.payload->>'landkreisAgs')
          LIMIT 1
        ) lk ON true
        ${where}

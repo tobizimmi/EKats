@@ -59,6 +59,7 @@ const config = {
     firms: process.env.FETCH_FIRMS_CRON || '*/45 * * * *',
     waldbrandindex: process.env.FETCH_WALDBRANDINDEX_CRON || '0 6 * * *',
     dwdStationsImport: process.env.FETCH_DWD_STATIONS_IMPORT_CRON || '0 4 * * 1',
+    bbkWarnungen: process.env.FETCH_BBK_WARNUNGEN_CRON || '*/15 * * * *',
     cleanup: process.env.CLEANUP_CRON || '30 3 * * *',
   },
 

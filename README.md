@@ -169,9 +169,22 @@ systemctl restart ekats           # Neustart, z.B. nach manueller .env-Änderung
 | Hochwasserzentralen-API (LHP) | Landespegel + Hochwasserlage aller Bundesländer | nein | alle 20 Min. |
 | NASA FIRMS | Satelliten-Hotspots Waldbrand | ja, kostenloser MAP_KEY | alle 45 Min. |
 | DWD Waldbrandgefahrenindex | Flächige Gefahreneinschätzung je Station | nein | 1×/Tag |
+| warnung.bund.de (BBK/NINA) | Bevölkerungswarnungen (MoWaS/DWD/LHP/BIWAPP/KATWARN/Polizei) | nein | alle 15 Min. |
 
 Intervalle über die `FETCH_*_CRON`-Variablen in `.env` änderbar. Jeder Fetcher läuft isoliert
-(`src/scheduler.js`): schlägt eine Quelle fehl, laufen die anderen vier normal weiter.
+(`src/scheduler.js`): schlägt eine Quelle fehl, laufen die anderen normal weiter.
+
+**warnung.bund.de (BBK)** ist der offizielle Warnaggregator hinter der NINA-App und bündelt sechs
+Warnsysteme in einer einzigen, kostenlosen, unauthentifizierten API — darunter amtliche
+Bevölkerungswarnungen (MoWaS: Chemieunfälle, Evakuierungen, Großschadenslagen) und
+Polizei-Meldungen. Bemerkenswert: **KATWARN-Meldungen sind darüber erreichbar**, obwohl KATWARN
+selbst keine nutzbare öffentliche API hat — der Aggregator löst diese sonst übliche Einschränkung
+indirekt. Abgefragt wird pro Landkreis im Zuständigkeitsgebiet (amtlicher Regionalschlüssel, aus
+dem Kreis-AGS abgeleitet) — jede Meldung ist dadurch bereits beim Abruf exakt einem Kreis
+zugeordnet (`payload.landkreisAgs`), präziser als die Bundesland-Näherung bei DWD-Unwetterwarnungen
+(siehe „Zuständigkeitsgebiet" unten für die drei Filterarten). Detailtexte (Beschreibung/
+Verhaltenshinweise) werden best-effort nachgeladen; schlägt das fehl, bleibt die Meldung trotzdem
+mit Titel/Dringlichkeit/Kreis nutzbar.
 
 Die Hochwasserzentralen-API liefert **die Hochwasser-Klassifizierung aller Pegel-Stationen in
 Deutschland** (nicht nur die Bundeswasserstraßen von PEGELONLINE) — deckt damit auch die von den
@@ -209,15 +222,27 @@ ein `BasicAuth`-Schema, definiert aber kein tatsächliches Auth-Schema und nennt
 Live-Abruf mit `401` scheitert, wären hier Zugangsdaten zu ergänzen. Der Fetcher scheitert ansonsten
 defensiv (Warnung im Log, kein Absturz der anderen Jobs), falls die Annahmen nicht zutreffen.
 
+**Der sechste Connector, `bbkWarnungen.js`, ist ebenfalls NICHT live verifiziert** — warnung.bund.de
+war aus dieser Entwicklungsumgebung nicht erreichbar. Implementiert gegen die inoffizielle, aber
+vom bundesAPI-Projekt gepflegte OpenAPI-Spec
+[bundesAPI/nina-api](https://github.com/bundesAPI/nina-api) (verifiziert erreichbar über
+`raw.githubusercontent.com`). Zwei Annahmen sind dabei nicht letztgültig verifiziert: (1) dass ein
+5-stelliger Kreis-AGS mit sieben angehängten Nullen ("`<ags>0000000`") als Regionalschlüssel den
+gesamten Kreis adressiert (aus der in der Recherche gefundenen Beispiel-URL abgeleitet, nicht aus
+einer offiziellen ARS-Spezifikation), und (2) das genaue Antwortformat des Detail-Endpunkts
+(`/warnings/{id}.json`) für Beschreibung/Verhaltenshinweise — schlägt (2) fehl, bleibt die Meldung
+trotzdem mit Titel/Dringlichkeit/Kreis nutzbar (siehe Kommentar am Dateianfang). Vor
+Produktivbetrieb `npm run fetch -- bbk_warnung` prüfen.
+
 **Live-Abruf gegen die echten Behörden-APIs konnte aus derselben Netzwerkrichtlinien-Einschränkung
-in dieser Entwicklungsumgebung generell nicht getestet werden** (auch für die vier verifizierten
+in dieser Entwicklungsumgebung generell nicht getestet werden** (auch für die verifizierten
 Connectors nicht) — bitte nach dem ersten Deploy einmal `npm run fetch -- <quelle>` pro Quelle
 manuell laufen lassen und die Logs/`live_datapoint`-Tabelle prüfen.
 
 ### Addon-Seiten je Datenquelle
 
-Jede der fünf Datenquellen hat zusätzlich zum kombinierten Dashboard eine eigene Seite mit
-Mini-Karte + Liste, gefiltert auf genau diese Quelle (analog zur Objekt-Übersicht):
+Jede Datenquelle hat zusätzlich zum kombinierten Dashboard eine eigene Seite mit Mini-Karte +
+Liste, gefiltert auf genau diese Quelle (analog zur Objekt-Übersicht):
 
 | Seite | Quelle |
 |---|---|
@@ -226,6 +251,7 @@ Mini-Karte + Liste, gefiltert auf genau diese Quelle (analog zur Objekt-Übersic
 | `hochwasserzentralen.html` | Landespegel (Hochwasserzentralen) |
 | `waldbrandindex.html` | Waldbrandgefahrenindex |
 | `firms.html` | Feuer-Hotspots (NASA FIRMS) |
+| `bbk-warnungen.html` | Bevölkerungswarnungen (BBK/NINA) |
 
 Nur das **Dashboard** (`index.html`) zeigt weiterhin alle Quellen (inkl. kritische Objekte)
 gemeinsam auf einer Karte mit Layer-Toggles. Die Addon-Seiten teilen sich ein gemeinsames Skript
@@ -247,7 +273,9 @@ Konfigurierbar unter „Einstellungen“ (nur Rolle „Stab“). `threshold_key`
 PEGELONLINE liefert keine amtliche Meldestufe (nur eine grobe Einordnung relativ zu langjährigen
 Mittelwerten) — für eine echte Meldestufe die Hochwasserzentralen-Quelle nutzen. Jede
 Regel/Datapoint/Kanal-Kombination löst wegen `alert_log` nur einmal aus (siehe
-`src/notifications/evaluate.js`).
+`src/notifications/evaluate.js`). **`bbk_warnung` hat noch keine Schwellenwert-Regel** — die Quelle
+ist neu (Phase 1 des Einsatzleiter-Portal-Konzepts) und wird bislang nur über die Prioritäts-Leiste
+und die Lage-Liste angezeigt, nicht über Push/E-Mail.
 
 ## Zuständigkeitsgebiet (Landkreis + Nachbarlandkreise)
 
@@ -263,15 +291,20 @@ ebenfalls wehrweit).
 - Als Nebenprodukt desselben Imports werden die 402 Kreis-Polygone zusätzlich je Bundesland zu 16
   Flächen aggregiert (Tabelle `bundesland`) — Grundlage für „Warnungen als Fläche“, siehe unten.
 - **`GET /api/datapoints` filtert automatisch auf dieses Gebiet** (Heimat-Landkreis + Nachbarn,
-  siehe `backend/src/utils/zustaendigkeit.js` + `utils/gebietFilter.js`): Quellen mit
-  Geokoordinate je Meldung (PEGELONLINE, Hochwasserzentralen, NASA FIRMS, Waldbrandgefahrenindex —
-  letzterer hat über die `dwd_station`-Zuordnung eine echte Stationskoordinate) müssen innerhalb der
-  Gebiets-Polygone liegen (`ST_Contains`). Nur DWD-Unwetterwarnungen liefern wirklich keine
-  Geokoordinate (nur den Bundesland-Code) und werden deshalb stattdessen gegen die im Gebiet
-  vertretenen Bundesländer geprüft — präziser als Bundesland-Ebene ist dort nicht möglich (siehe
-  „Warnungen als Fläche“ unten). *Frühere Version hatte den Waldbrandgefahrenindex fälschlich auch
-  nur auf Bundesland-Ebene geprüft — eine Station irgendwo im selben, oft großen Bundesland wurde
-  dadurch angezeigt und einem Nachbarlandkreis zugeordnet, obwohl sie geografisch weit entfernt lag.*
+  siehe `backend/src/utils/zustaendigkeit.js` + `utils/gebietFilter.js`) — drei Filterarten je nach
+  Präzision der Quelle:
+  1. **Kreis-genau** (`bbk_warnung`): wird beim Abruf schon pro Kreis erfragt, trägt den exakten
+     Kreis in `payload.landkreisAgs` — einfacher Gleichheitsvergleich, die präziseste Filterart.
+  2. **Geokoordinate** (PEGELONLINE, Hochwasserzentralen, NASA FIRMS, Waldbrandgefahrenindex —
+     letzterer hat über die `dwd_station`-Zuordnung eine echte Stationskoordinate): muss innerhalb
+     der Gebiets-Polygone liegen (`ST_Contains`). *Frühere Version hatte den Waldbrandgefahrenindex
+     fälschlich wie Bundesland-genau (3.) behandelt — eine Station irgendwo im selben, oft großen
+     Bundesland wurde dadurch angezeigt und einem Nachbarlandkreis zugeordnet, obwohl sie
+     geografisch weit entfernt lag.*
+  3. **Bundesland-genau** (nur DWD-Unwetterwarnungen — einzige Quelle wirklich ohne
+     Geokoordinate): gegen die im Gebiet vertretenen Bundesländer geprüft — präziser ist dort ohne
+     die amtliche Warncell-Zuordnung nicht möglich (siehe „Warnungen als Fläche“ unten).
+
   Ist noch kein Heimat-Landkreis konfiguriert, bleibt die Anzeige bewusst ungefiltert (bundesweit),
   statt versehentlich alles auszublenden — das Dashboard zeigt dann einen Hinweis mit Link zur
   Einrichtung. Karte und Lage-Liste zeigen dadurch ausschließlich Meldungen aus dem eigenen und den
@@ -316,7 +349,23 @@ bereits auf das Zuständigkeitsgebiet gefilterten Datenpunkte (siehe oben) je Qu
 - **Bewusst keine neue Wetterdatenquelle** (z.B. Temperatur-/Windvorhersage): Die dafür nötigen
   DWD-Endpunkte (`opendata.dwd.de`) waren aus der Entwicklungsumgebung dieses Projekts nicht
   erreichbar, siehe „Windrichtung/-geschwindigkeit“ weiter unten — die Übersicht fasst stattdessen
-  die fünf bereits vorhandenen, verifizierten Quellen besser aufbereitet zusammen.
+  die bereits vorhandenen, verifizierten Quellen besser aufbereitet zusammen.
+
+## Prioritäts-Leiste (Einsatzleiter-Portal, Phase 1)
+
+Vier Ampel-Kacheln (Kritisch/Hoch/Mittel/Unauffällig) oberhalb der Karte auf dem Dashboard
+(`js/priority-bar.js`) — verdichten die gesamte Lage auf einen Blick, statt jede Zeile der
+Lage-Liste einzeln durchgehen zu müssen. Umsetzung von Phase 1 des Konzeptpapiers
+„Einsatzleiter-Portal 2.0" (Recherche zu neuen Datenquellen + Dashboard-UX-Konzept).
+
+- Zählt **alle** Datenpunkt-Quellen zusammen (nicht mehr getrennt je Quelle) UND überfällige
+  Objekt-Überprüfungen (`isOverdue()` aus `objects.js`) in der „Kritisch"-Kachel — Objekte und
+  Wetterlage konkurrieren um dieselbe Aufmerksamkeit eines Einsatzleiters, siehe Konzeptpapier
+  „Objekte gehören in dieselbe Prioritätslogik".
+- Klick auf eine Kachel filtert die Lage-Liste auf genau diese Dringlichkeitsstufe (erneuter Klick
+  hebt den Filter wieder auf).
+- Nur auf dem Dashboard, nicht auf den Addon-Einzelseiten (dort gibt es nur eine Quelle und keine
+  Objekte, die Kacheln wären redundant zu den dortigen Dringlichkeits-Badges).
 
 ## Rollen
 

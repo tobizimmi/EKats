@@ -34,6 +34,13 @@ function payloadEntries(dp) {
         ['Satellit', p.satellite],
         ['Tag/Nacht', p.daynight === 'D' ? 'Tag' : p.daynight === 'N' ? 'Nacht' : p.daynight],
       ];
+    case 'bbk_warnung':
+      return [
+        ['Warnsystem', p.provider],
+        ['Ereignis', p.event],
+        ['Beschreibung', p.description],
+        ['Verhaltenshinweise', p.instruction],
+      ];
     default:
       return [];
   }

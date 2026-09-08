@@ -3,14 +3,14 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Pegelstände – EKats</title>
+  <title>Bevölkerungswarnungen – EKats</title>
   <link rel="stylesheet" href="vendor/leaflet/leaflet.css" />
   <link rel="stylesheet" href="css/style.css" />
   <link rel="icon" href="icons/icon.svg" type="image/svg+xml" />
   <link rel="manifest" href="manifest.webmanifest" />
   <meta name="theme-color" content="#14232f" />
 </head>
-<body data-addon-source="pegelonline">
+<body data-addon-source="bbk_warnung">
   <header class="app-header">
     <div class="brand">🚒 EKats Lagedashboard</div>
     <nav>
@@ -31,7 +31,7 @@
     <div class="dashboard-grid">
       <div id="map"></div>
       <div class="card stack">
-        <h2 class="section-title">Pegelstände</h2>
+        <h2 class="section-title">Bevölkerungswarnungen</h2>
         <p class="muted" id="list-updated"></p>
         <ul class="situation-list" id="situation-list"></ul>
         <div class="detail-panel" id="detail-panel" hidden>
@@ -40,7 +40,7 @@
         </div>
       </div>
     </div>
-    <p class="attribution">Quelle: Wasserstraßen- und Schifffahrtsverwaltung des Bundes (PEGELONLINE).</p>
+    <p class="attribution">Quelle: Bundesamt für Bevölkerungsschutz und Katastrophenhilfe (BBK), warnung.bund.de – bündelt MoWaS, DWD, Hochwasserportal, BIWAPP, KATWARN und Polizeimeldungen.</p>
   </main>
   <script src="vendor/leaflet/leaflet.js"></script>
   <script src="js/api.js"></script>

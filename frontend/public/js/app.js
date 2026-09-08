@@ -23,7 +23,7 @@ async function loadAndRenderDatapoints() {
   try {
     const datapoints = await api.get('/datapoints');
     renderMap(datapoints);
-    renderList(datapoints);
+    updatePriorityBar(datapoints); // rendert die Lage-Liste selbst (siehe priority-bar.js)
     renderWeatherOverview(datapoints);
     saveOfflineSnapshot(datapoints);
     updateOfflineBanner();
@@ -33,7 +33,7 @@ async function loadAndRenderDatapoints() {
     const snapshot = await loadOfflineSnapshot();
     if (snapshot) {
       renderMap(snapshot.data);
-      renderList(snapshot.data);
+      updatePriorityBar(snapshot.data);
     }
     updateOfflineBanner(snapshot?.savedAt);
     return null;
@@ -50,8 +50,10 @@ async function loadAndRenderDatapoints() {
   initTabs();
 
   await loadBundeslandFeatures();
+  await loadLandkreisFeatures();
   await loadAndRenderDatapoints();
   await loadObjects();
+  renderPriorityBar(); // Objekte sind jetzt geladen - "Kritisch"-Kachel neu zaehlen (ueberfaellige Objekte)
   api
     .get('/wehr/gebiet-geojson')
     .then(renderGebiet)

@@ -9,6 +9,7 @@ const SOURCE_LABELS = {
   hochwasserzentralen: 'Landespegel (Hochwasserzentralen)',
   firms: 'Feuer-Hotspot (NASA FIRMS)',
   waldbrandindex: 'Waldbrandgefahrenindex',
+  bbk_warnung: 'Bevölkerungswarnung (BBK/NINA)',
 };
 
 // Gemeinsame Farbskala fuer Karten-Marker, genutzt vom Dashboard (map.js) und den
@@ -29,6 +30,7 @@ function meldestufeNumber(severity) {
 function severityScore(dp) {
   switch (dp.source) {
     case 'dwd_unwetter':
+    case 'bbk_warnung':
       return dp.value_numeric ?? 0;
     case 'waldbrandindex':
       return dp.value_numeric ? Math.round((dp.value_numeric / 5) * 4) : 0;

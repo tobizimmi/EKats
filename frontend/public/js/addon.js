@@ -75,6 +75,7 @@ async function loadAndRenderAddonDatapoints() {
   registerServiceWorker();
 
   await loadBundeslandFeatures();
+  await loadLandkreisFeatures();
   await loadAndRenderAddonDatapoints();
   setInterval(loadAndRenderAddonDatapoints, ADDON_REFRESH_INTERVAL_MS);
 })();

@@ -9,6 +9,7 @@ const { fetchHochwasserzentralen } = require('./fetchers/hochwasserzentralen');
 const { fetchNasaFirms } = require('./fetchers/nasaFirms');
 const { fetchDwdWaldbrand } = require('./fetchers/dwdWaldbrand');
 const { importDwdStations } = require('./fetchers/dwdStationsImport');
+const { fetchBbkWarnungen } = require('./fetchers/bbkWarnungen');
 
 // Jeder Job laeuft isoliert: schlaegt ein Fetcher fehl (z.B. Quelle down, Format geaendert),
 // sollen die anderen vier trotzdem normal weiterlaufen.
@@ -48,6 +49,7 @@ function startScheduler() {
   cron.schedule(config.cron.firms, () => runJob('firms', fetchNasaFirms));
   cron.schedule(config.cron.waldbrandindex, () => runJob('waldbrandindex', fetchDwdWaldbrand));
   cron.schedule(config.cron.dwdStationsImport, () => runJob('dwd_stations_import', importDwdStations));
+  cron.schedule(config.cron.bbkWarnungen, () => runJob('bbk_warnung', fetchBbkWarnungen));
   cron.schedule(config.cron.cleanup, () => runJob('cleanup', cleanupOldDatapoints));
 
   console.log('[scheduler] Cron-Jobs registriert:', config.cron);
@@ -64,5 +66,6 @@ module.exports = {
     firms: fetchNasaFirms,
     waldbrandindex: fetchDwdWaldbrand,
     dwd_stations_import: importDwdStations,
+    bbk_warnung: fetchBbkWarnungen,
   },
 };
