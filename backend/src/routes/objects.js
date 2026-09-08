@@ -9,6 +9,7 @@ const { query } = require('../db');
 const { requireAuth, requireRole } = require('../middleware/auth');
 const config = require('../config');
 const { logAudit } = require('../audit');
+const { renderHtmlToPdf } = require('../pdf/renderHtml');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -22,8 +23,62 @@ const SELECT_COLUMNS = `
     THEN COALESCE(last_reviewed_at, created_at) + (review_interval_months || ' months')::interval
     ELSE NULL
   END AS next_review_at,
+  fire_water_supply_type, fire_water_supply_capacity_lpm, fire_water_supply_location,
+  fire_alarm_system, fire_alarm_monitoring_station, occupant_count_max, elevators,
+  smoke_heat_exhaust_system, pv_battery_system, pv_battery_disconnect_location, assembly_point,
+  built_year, custom_fields,
   created_by, created_at, updated_at, ST_Y(geom) AS lat, ST_X(geom) AS lon
 `;
+
+const FIRE_WATER_SUPPLY_TYPES = [
+  'hydrant_unterflur', 'hydrant_ueberflur', 'loeschwasserbrunnen',
+  'zisterne', 'loeschteich', 'offenes_gewaesser', 'keine_angabe',
+];
+
+// Validiert critical_object.custom_fields gegen die je Wehr definierten object_field_definition-
+// Zeilen (Migration 008): unbekannte Keys, falscher Typ oder fehlende Pflichtfelder -> 400 statt
+// stillschweigend falsche/unvollstaendige Daten zu speichern.
+async function validateCustomFields(customFields, wehrId) {
+  if (customFields === undefined) return { ok: true, value: undefined };
+
+  const { rows: definitions } = await query(
+    'SELECT key, label, field_type, options, required FROM object_field_definition WHERE wehr_id = $1',
+    [wehrId]
+  );
+  const byKey = new Map(definitions.map((d) => [d.key, d]));
+
+  for (const key of Object.keys(customFields || {})) {
+    if (!byKey.has(key)) {
+      return { ok: false, error: `Unbekanntes Zusatzfeld: "${key}".` };
+    }
+  }
+
+  for (const def of definitions) {
+    const value = customFields ? customFields[def.key] : undefined;
+    if (def.required && (value === undefined || value === null || value === '')) {
+      return { ok: false, error: `Pflichtfeld "${def.label}" fehlt.` };
+    }
+    if (value === undefined || value === null || value === '') continue;
+
+    if (def.field_type === 'number' && typeof value !== 'number') {
+      return { ok: false, error: `"${def.label}" muss eine Zahl sein.` };
+    }
+    if (def.field_type === 'boolean' && typeof value !== 'boolean') {
+      return { ok: false, error: `"${def.label}" muss ein Wahrheitswert sein.` };
+    }
+    if ((def.field_type === 'text' || def.field_type === 'textarea' || def.field_type === 'date') && typeof value !== 'string') {
+      return { ok: false, error: `"${def.label}" muss Text sein.` };
+    }
+    if (def.field_type === 'select') {
+      const allowed = (def.options || []).map((o) => o.value);
+      if (!allowed.includes(value)) {
+        return { ok: false, error: `"${def.label}": ungueltiger Wert.` };
+      }
+    }
+  }
+
+  return { ok: true, value: customFields || {} };
+}
 
 // Stellt sicher, dass ein Objekt existiert UND der eigenen Wehr gehoert - von allen Unterrouten
 // (Aufgaben/Anhaenge/PDF) genutzt, damit niemand per erratener ID auf fremde Wehr-Objekte zugreift.
@@ -121,6 +176,21 @@ const objectSchema = z.object({
   contactPhone: z.string().trim().max(50).nullable().optional(),
   notes: z.string().trim().max(2000).nullable().optional(),
   reviewIntervalMonths: z.number().int().positive().nullable().optional(),
+  // Standardfelder (Migration 008, recherchiert gegen DIN 14095 "Allgemeine Objektinformationen" -
+  // siehe Kommentar in der Migration fuer die Quellenlage).
+  fireWaterSupplyType: z.enum(FIRE_WATER_SUPPLY_TYPES).nullable().optional(),
+  fireWaterSupplyCapacityLpm: z.number().int().min(0).nullable().optional(),
+  fireWaterSupplyLocation: z.string().trim().max(300).nullable().optional(),
+  fireAlarmSystem: z.boolean().nullable().optional(),
+  fireAlarmMonitoringStation: z.string().trim().max(200).nullable().optional(),
+  occupantCountMax: z.number().int().min(0).nullable().optional(),
+  elevators: z.boolean().nullable().optional(),
+  smokeHeatExhaustSystem: z.boolean().nullable().optional(),
+  pvBatterySystem: z.boolean().nullable().optional(),
+  pvBatteryDisconnectLocation: z.string().trim().max(300).nullable().optional(),
+  assemblyPoint: z.string().trim().max(300).nullable().optional(),
+  builtYear: z.number().int().min(1000).max(2100).nullable().optional(),
+  customFields: z.record(z.string(), z.any()).nullable().optional(),
 });
 
 router.post('/', requireRole('stab', 'admin'), async (req, res, next) => {
@@ -130,11 +200,21 @@ router.post('/', requireRole('stab', 'admin'), async (req, res, next) => {
       return res.status(400).json({ ok: false, error: parsed.error.issues[0].message });
     }
     const d = parsed.data;
+
+    const customFieldsResult = await validateCustomFields(d.customFields, req.user.wehrId);
+    if (!customFieldsResult.ok) {
+      return res.status(400).json({ ok: false, error: customFieldsResult.error });
+    }
+
     const { rows } = await query(
       `INSERT INTO critical_object
          (wehr_id, name, category, address, geom, hazards, access_info, contact_name, contact_phone, notes,
-          review_interval_months, created_by)
-       VALUES ($1, $2, $3, $4, ST_SetSRID(ST_MakePoint($5, $6), 4326), $7, $8, $9, $10, $11, $12, $13)
+          review_interval_months, fire_water_supply_type, fire_water_supply_capacity_lpm,
+          fire_water_supply_location, fire_alarm_system, fire_alarm_monitoring_station,
+          occupant_count_max, elevators, smoke_heat_exhaust_system, pv_battery_system,
+          pv_battery_disconnect_location, assembly_point, built_year, custom_fields, created_by)
+       VALUES ($1, $2, $3, $4, ST_SetSRID(ST_MakePoint($5, $6), 4326), $7, $8, $9, $10, $11, $12,
+               $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26)
        RETURNING ${SELECT_COLUMNS}`,
       [
         req.user.wehrId,
@@ -149,6 +229,19 @@ router.post('/', requireRole('stab', 'admin'), async (req, res, next) => {
         d.contactPhone || null,
         d.notes || null,
         d.reviewIntervalMonths || null,
+        d.fireWaterSupplyType || null,
+        d.fireWaterSupplyCapacityLpm ?? null,
+        d.fireWaterSupplyLocation || null,
+        d.fireAlarmSystem ?? null,
+        d.fireAlarmMonitoringStation || null,
+        d.occupantCountMax ?? null,
+        d.elevators ?? null,
+        d.smokeHeatExhaustSystem ?? null,
+        d.pvBatterySystem ?? null,
+        d.pvBatteryDisconnectLocation || null,
+        d.assemblyPoint || null,
+        d.builtYear ?? null,
+        JSON.stringify(customFieldsResult.value ?? {}),
         req.user.id,
       ]
     );
@@ -180,12 +273,35 @@ router.patch('/:id', requireRole('stab', 'admin'), async (req, res, next) => {
       contactPhone: 'contact_phone',
       notes: 'notes',
       reviewIntervalMonths: 'review_interval_months',
+      fireWaterSupplyType: 'fire_water_supply_type',
+      fireWaterSupplyCapacityLpm: 'fire_water_supply_capacity_lpm',
+      fireWaterSupplyLocation: 'fire_water_supply_location',
+      fireAlarmSystem: 'fire_alarm_system',
+      fireAlarmMonitoringStation: 'fire_alarm_monitoring_station',
+      occupantCountMax: 'occupant_count_max',
+      elevators: 'elevators',
+      smokeHeatExhaustSystem: 'smoke_heat_exhaust_system',
+      pvBatterySystem: 'pv_battery_system',
+      pvBatteryDisconnectLocation: 'pv_battery_disconnect_location',
+      assemblyPoint: 'assembly_point',
+      builtYear: 'built_year',
     };
+    // Boolean-Felder duerfen explizit auf "false" gesetzt werden - "d[key] || null" wuerde false
+    // faelschlich zu null verwerfen, daher hier nur echtes undefined/null rausfiltern.
+    const booleanKeys = new Set(['fireAlarmSystem', 'elevators', 'smokeHeatExhaustSystem', 'pvBatterySystem']);
     for (const [key, column] of Object.entries(simpleColumns)) {
       if (d[key] !== undefined) {
-        params.push(d[key] || null);
+        params.push(booleanKeys.has(key) ? d[key] : (d[key] || null));
         setClauses.push(`${column} = $${params.length}`);
       }
+    }
+    if (d.customFields !== undefined) {
+      const customFieldsResult = await validateCustomFields(d.customFields, req.user.wehrId);
+      if (!customFieldsResult.ok) {
+        return res.status(400).json({ ok: false, error: customFieldsResult.error });
+      }
+      params.push(JSON.stringify(customFieldsResult.value ?? {}));
+      setClauses.push(`custom_fields = $${params.length}`);
     }
     if (d.lat !== undefined && d.lon !== undefined) {
       params.push(d.lon, d.lat);
@@ -434,6 +550,37 @@ function renderTasksPdf(res, { objectName, objectAddress, targetLabel, tasks }) 
   doc.end();
 }
 
+// Rendert den Aufgabenzettel entweder ueber eine hinterlegte 'task_sheet'-HTML-Vorlage (Konzept
+// Teil 3) oder, falls keine existiert, wie bisher ueber pdfkit (renderTasksPdf) - keine
+// Breaking-Change fuer Wehren, die (noch) keine Vorlage angelegt haben.
+async function respondWithTaskSheetPdf(req, res, { objectName, objectAddress, targetTypeLabel, targetName, tasks }) {
+  const { rows: templateRows } = await query(
+    'SELECT html_template FROM pdf_template WHERE wehr_id = $1 AND document_type = $2',
+    [req.user.wehrId, 'task_sheet']
+  );
+
+  const filenameSafe = `einsatzplan-${objectName.replace(/[^a-z0-9]+/gi, '_')}-${targetName.replace(/[^a-z0-9]+/gi, '_')}.pdf`;
+
+  if (templateRows.length === 0) {
+    return renderTasksPdf(res, {
+      objectName,
+      objectAddress,
+      targetLabel: `${targetTypeLabel} ${targetName}`,
+      tasks,
+    });
+  }
+
+  const pdf = await renderHtmlToPdf(templateRows[0].html_template, {
+    objekt: { name: objectName, adresse: objectAddress },
+    ziel: { typ: targetTypeLabel, name: targetName },
+    aufgaben: tasks.map((t, i) => ({ nr: i + 1, titel: t.title, beschreibung: t.description || '' })),
+    erstellt: new Date().toLocaleString('de-DE'),
+  });
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `attachment; filename="${filenameSafe}"`);
+  return res.send(pdf);
+}
+
 router.get('/:id/tasks/vehicle/:vehicleId/pdf', async (req, res, next) => {
   try {
     const object = await loadOwnedObject(req.params.id, req.user.wehrId);
@@ -450,10 +597,11 @@ router.get('/:id/tasks/vehicle/:vehicleId/pdf', async (req, res, next) => {
       [req.params.id, req.params.vehicleId]
     );
 
-    return renderTasksPdf(res, {
+    return await respondWithTaskSheetPdf(req, res, {
       objectName: object.name,
       objectAddress: object.address,
-      targetLabel: `Fahrzeug ${vehicleRows[0].name}`,
+      targetTypeLabel: 'Fahrzeug',
+      targetName: vehicleRows[0].name,
       tasks,
     });
   } catch (err) {
@@ -477,12 +625,89 @@ router.get('/:id/tasks/station/:stationId/pdf', async (req, res, next) => {
       [req.params.id, req.params.stationId]
     );
 
-    return renderTasksPdf(res, {
+    return await respondWithTaskSheetPdf(req, res, {
       objectName: object.name,
       objectAddress: object.address,
-      targetLabel: `Wache ${stationRows[0].name}`,
+      targetTypeLabel: 'Wache',
+      targetName: stationRows[0].name,
       tasks,
     });
+  } catch (err) {
+    return next(err);
+  }
+});
+
+// Neu (Konzept Teil 3): druckbares Objekt-Datenblatt mit allen Standard-/Zusatzfeldern. Existiert
+// ohne Vorlage nicht (kein pdfkit-Fallback, da es das vorher gar nicht gab) - klare Fehlermeldung
+// statt eines leeren/falschen PDFs.
+const FIRE_WATER_SUPPLY_LABELS = {
+  hydrant_unterflur: 'Hydrant (Unterflur)',
+  hydrant_ueberflur: 'Hydrant (Überflur)',
+  loeschwasserbrunnen: 'Löschwasserbrunnen',
+  zisterne: 'Zisterne',
+  loeschteich: 'Löschteich',
+  offenes_gewaesser: 'Offenes Gewässer',
+  keine_angabe: 'Keine Angabe',
+};
+const CATEGORY_LABELS = {
+  schule_kita: 'Schule/Kita',
+  krankenhaus_pflege: 'Krankenhaus/Pflegeeinrichtung',
+  industrie_gefahrstoff: 'Industrie/Gefahrstoffbetrieb',
+  versammlungsstaette: 'Versammlungsstätte',
+  sonstiges: 'Sonstiges',
+};
+function boolLabel(v) {
+  if (v === null || v === undefined) return '';
+  return v ? 'ja' : 'nein';
+}
+
+router.get('/:id/datasheet/pdf', async (req, res, next) => {
+  try {
+    const { rows: templateRows } = await query(
+      'SELECT html_template FROM pdf_template WHERE wehr_id = $1 AND document_type = $2',
+      [req.user.wehrId, 'object_datasheet']
+    );
+    if (templateRows.length === 0) {
+      return res.status(404).json({
+        ok: false,
+        error: 'Keine Objekt-Datenblatt-Vorlage hinterlegt (Admin-Bereich > PDF-Vorlagen).',
+      });
+    }
+
+    const { rows } = await query(`SELECT ${SELECT_COLUMNS} FROM critical_object WHERE id = $1 AND wehr_id = $2`, [
+      req.params.id,
+      req.user.wehrId,
+    ]);
+    if (rows.length === 0) return res.status(404).json({ ok: false, error: 'Objekt nicht gefunden.' });
+    const o = rows[0];
+
+    const pdf = await renderHtmlToPdf(templateRows[0].html_template, {
+      objekt: {
+        name: o.name,
+        adresse: o.address || '',
+        kategorie: CATEGORY_LABELS[o.category] || o.category,
+        hazards: o.hazards || '',
+        accessInfo: o.access_info || '',
+        contactName: o.contact_name || '',
+        contactPhone: o.contact_phone || '',
+        fireWaterSupplyType: FIRE_WATER_SUPPLY_LABELS[o.fire_water_supply_type] || '',
+        fireWaterSupplyCapacityLpm: o.fire_water_supply_capacity_lpm ?? '',
+        fireWaterSupplyLocation: o.fire_water_supply_location || '',
+        fireAlarmSystem: boolLabel(o.fire_alarm_system),
+        fireAlarmMonitoringStation: o.fire_alarm_monitoring_station || '',
+        occupantCountMax: o.occupant_count_max ?? '',
+        elevators: boolLabel(o.elevators),
+        smokeHeatExhaustSystem: boolLabel(o.smoke_heat_exhaust_system),
+        pvBatterySystem: boolLabel(o.pv_battery_system),
+        pvBatteryDisconnectLocation: o.pv_battery_disconnect_location || '',
+        assemblyPoint: o.assembly_point || '',
+        builtYear: o.built_year ?? '',
+      },
+      erstellt: new Date().toLocaleString('de-DE'),
+    });
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="objektdatenblatt-${o.name.replace(/[^a-z0-9]+/gi, '_')}.pdf"`);
+    return res.send(pdf);
   } catch (err) {
     return next(err);
   }

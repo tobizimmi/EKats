@@ -147,7 +147,77 @@
         Jetzt als überprüft markieren
       </button>
 
+      <hr />
+      <h4 class="section-title">Standardfelder (Einsatzplan, DIN 14095)</h4>
+      <label>
+        <span>Löschwasserversorgung: Art</span>
+        <select id="object-fire-water-supply-type">
+          <option value="">Keine Angabe</option>
+          <option value="hydrant_unterflur">Hydrant (Unterflur)</option>
+          <option value="hydrant_ueberflur">Hydrant (Überflur)</option>
+          <option value="loeschwasserbrunnen">Löschwasserbrunnen</option>
+          <option value="zisterne">Zisterne</option>
+          <option value="loeschteich">Löschteich</option>
+          <option value="offenes_gewaesser">Offenes Gewässer</option>
+          <option value="keine_angabe">Keine Angabe</option>
+        </select>
+      </label>
+      <label>
+        <span>Löschwasserversorgung: Ergiebigkeit (l/min)</span>
+        <input id="object-fire-water-supply-capacity" type="number" min="0" step="1" />
+      </label>
+      <label>
+        <span>Löschwasserversorgung: Lage/Standort</span>
+        <input id="object-fire-water-supply-location" type="text" maxlength="300" />
+      </label>
+      <label class="checkbox-inline">
+        <input id="object-fire-alarm-system" type="checkbox" />
+        <span>Brandmeldeanlage vorhanden</span>
+      </label>
+      <label>
+        <span>Aufschaltstelle der Brandmeldeanlage</span>
+        <input id="object-fire-alarm-monitoring-station" type="text" maxlength="200" />
+      </label>
+      <label>
+        <span>Max. Personenzahl</span>
+        <input id="object-occupant-count-max" type="number" min="0" step="1" />
+      </label>
+      <label class="checkbox-inline">
+        <input id="object-elevators" type="checkbox" />
+        <span>Aufzüge vorhanden</span>
+      </label>
+      <label class="checkbox-inline">
+        <input id="object-smoke-heat-exhaust-system" type="checkbox" />
+        <span>Rauch-/Wärmeabzugsanlage vorhanden</span>
+      </label>
+      <label class="checkbox-inline">
+        <input id="object-pv-battery-system" type="checkbox" />
+        <span>PV-/Batteriespeicheranlage vorhanden</span>
+      </label>
+      <label>
+        <span>PV-/Batterie: Lage der Notabschaltung</span>
+        <input id="object-pv-battery-disconnect-location" type="text" maxlength="300" />
+      </label>
+      <label>
+        <span>Sammelplatz</span>
+        <input id="object-assembly-point" type="text" maxlength="300" />
+      </label>
+      <label>
+        <span>Baujahr</span>
+        <input id="object-built-year" type="number" min="1000" max="2100" step="1" />
+      </label>
+
+      <div id="object-custom-fields-section" hidden>
+        <hr />
+        <h4 class="section-title">Zusatzfelder</h4>
+        <div id="object-custom-fields"></div>
+      </div>
+
       <div id="object-extra-sections" hidden>
+        <hr />
+        <h4 class="section-title">Objekt-Datenblatt (PDF)</h4>
+        <div id="object-datasheet-pdf-link" class="muted"></div>
+
         <hr />
         <h4 class="section-title">Aufgaben (Fahrzeuge/Wachen)</h4>
         <ul class="plain-list" id="object-task-list"></ul>

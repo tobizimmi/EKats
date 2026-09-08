@@ -36,6 +36,13 @@ const config = {
   // Oberlauf auch ausserhalb des engeren Umkreises relevant sein kann.
   hochwasserzentralenRadiusKm: parseFloat(process.env.HOCHWASSERZENTRALEN_RADIUS_KM || '60'),
 
+  // Kachelmannwetter/Meteologix (optional, kostenpflichtig - siehe fetchers/kachelmann.js fuer den
+  // Verifikationsstand). V1-Vereinfachung wie bei NASA_FIRMS_MAP_KEY: EIN globaler Key, nicht pro
+  // Wehr - WER den Datenpunkt sehen darf, steuert separat die Feature-Zugriffssteuerung
+  // (Migration 009), nicht der Key selbst.
+  kachelmannApiKey: process.env.KACHELMANN_API_KEY || '',
+  kachelmannRadiusKm: parseFloat(process.env.KACHELMANN_RADIUS_KM || '50'),
+
   smtp: {
     host: process.env.SMTP_HOST || '',
     port: parseInt(process.env.SMTP_PORT || '587', 10),
@@ -60,6 +67,7 @@ const config = {
     waldbrandindex: process.env.FETCH_WALDBRANDINDEX_CRON || '0 6 * * *',
     dwdStationsImport: process.env.FETCH_DWD_STATIONS_IMPORT_CRON || '0 4 * * 1',
     bbkWarnungen: process.env.FETCH_BBK_WARNUNGEN_CRON || '*/15 * * * *',
+    kachelmann: process.env.FETCH_KACHELMANN_CRON || '*/30 * * * *',
     cleanup: process.env.CLEANUP_CRON || '30 3 * * *',
   },
 

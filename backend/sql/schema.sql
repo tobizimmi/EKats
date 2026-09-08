@@ -238,3 +238,82 @@ CREATE TABLE IF NOT EXISTS critical_object_attachment (
 );
 
 CREATE INDEX IF NOT EXISTS idx_object_attachment_object ON critical_object_attachment(critical_object_id);
+
+-- Objektverwaltung 2.0 (Migration 008): recherchierte DIN-14095-Standardfelder + freie
+-- Zusatzfelder je Wehr. Siehe Migration 008 fuer die Recherchequellen im Kommentar.
+ALTER TABLE critical_object ADD COLUMN IF NOT EXISTS fire_water_supply_type TEXT CHECK (
+    fire_water_supply_type IS NULL OR fire_water_supply_type IN (
+        'hydrant_unterflur', 'hydrant_ueberflur', 'loeschwasserbrunnen',
+        'zisterne', 'loeschteich', 'offenes_gewaesser', 'keine_angabe'
+    )
+);
+ALTER TABLE critical_object ADD COLUMN IF NOT EXISTS fire_water_supply_capacity_lpm INTEGER CHECK (
+    fire_water_supply_capacity_lpm IS NULL OR fire_water_supply_capacity_lpm >= 0
+);
+ALTER TABLE critical_object ADD COLUMN IF NOT EXISTS fire_water_supply_location TEXT;
+ALTER TABLE critical_object ADD COLUMN IF NOT EXISTS fire_alarm_system BOOLEAN;
+ALTER TABLE critical_object ADD COLUMN IF NOT EXISTS fire_alarm_monitoring_station TEXT;
+ALTER TABLE critical_object ADD COLUMN IF NOT EXISTS occupant_count_max INTEGER CHECK (
+    occupant_count_max IS NULL OR occupant_count_max >= 0
+);
+ALTER TABLE critical_object ADD COLUMN IF NOT EXISTS elevators BOOLEAN;
+ALTER TABLE critical_object ADD COLUMN IF NOT EXISTS smoke_heat_exhaust_system BOOLEAN;
+ALTER TABLE critical_object ADD COLUMN IF NOT EXISTS pv_battery_system BOOLEAN;
+ALTER TABLE critical_object ADD COLUMN IF NOT EXISTS pv_battery_disconnect_location TEXT;
+ALTER TABLE critical_object ADD COLUMN IF NOT EXISTS assembly_point TEXT;
+ALTER TABLE critical_object ADD COLUMN IF NOT EXISTS built_year INTEGER CHECK (
+    built_year IS NULL OR (built_year >= 1000 AND built_year <= 2100)
+);
+ALTER TABLE critical_object ADD COLUMN IF NOT EXISTS custom_fields JSONB NOT NULL DEFAULT '{}'::jsonb;
+
+CREATE TABLE IF NOT EXISTS object_field_definition (
+    id SERIAL PRIMARY KEY,
+    wehr_id INTEGER NOT NULL REFERENCES wehr(id) ON DELETE CASCADE,
+    key TEXT NOT NULL,
+    label TEXT NOT NULL,
+    field_type TEXT NOT NULL DEFAULT 'text' CHECK (
+        field_type IN ('text', 'textarea', 'number', 'boolean', 'date', 'select')
+    ),
+    options JSONB,
+    required BOOLEAN NOT NULL DEFAULT false,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE(wehr_id, key)
+);
+
+CREATE INDEX IF NOT EXISTS idx_object_field_definition_wehr ON object_field_definition(wehr_id);
+
+-- Feature-Zugriffssteuerung (Migration 009): optionale/kostenpflichtige Quellen (Kachelmann) je
+-- Rolle und je Einzelnutzer freischaltbar. Siehe Migration 009 fuer die Zugriffslogik im Kommentar.
+CREATE TABLE IF NOT EXISTS wehr_feature_role_access (
+    id SERIAL PRIMARY KEY,
+    wehr_id INTEGER NOT NULL REFERENCES wehr(id) ON DELETE CASCADE,
+    feature_key TEXT NOT NULL,
+    role TEXT NOT NULL CHECK (role IN ('admin', 'stab', 'mitglied')),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE(wehr_id, feature_key, role)
+);
+
+CREATE TABLE IF NOT EXISTS user_feature_access (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES app_user(id) ON DELETE CASCADE,
+    feature_key TEXT NOT NULL,
+    enabled BOOLEAN NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE(user_id, feature_key)
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_feature_access_user ON user_feature_access(user_id);
+
+-- PDF-Vorlagen-Editor (Migration 010): siehe Migration 010 fuer Details im Kommentar.
+CREATE TABLE IF NOT EXISTS pdf_template (
+    id SERIAL PRIMARY KEY,
+    wehr_id INTEGER NOT NULL REFERENCES wehr(id) ON DELETE CASCADE,
+    document_type TEXT NOT NULL CHECK (document_type IN ('task_sheet', 'object_datasheet')),
+    html_template TEXT NOT NULL,
+    updated_by INTEGER REFERENCES app_user(id) ON DELETE SET NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE(wehr_id, document_type)
+);

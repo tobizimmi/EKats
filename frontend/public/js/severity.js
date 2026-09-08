@@ -10,6 +10,7 @@ const SOURCE_LABELS = {
   firms: 'Feuer-Hotspot (NASA FIRMS)',
   waldbrandindex: 'Waldbrandgefahrenindex',
   bbk_warnung: 'Bevölkerungswarnung (BBK/NINA)',
+  kachelmann: 'Kachelmann-Warnung (Meteologix)',
 };
 
 // Gemeinsame Farbskala fuer Karten-Marker, genutzt vom Dashboard (map.js) und den
@@ -31,6 +32,7 @@ function severityScore(dp) {
   switch (dp.source) {
     case 'dwd_unwetter':
     case 'bbk_warnung':
+    case 'kachelmann':
       return dp.value_numeric ?? 0;
     case 'waldbrandindex':
       return dp.value_numeric ? Math.round((dp.value_numeric / 5) * 4) : 0;

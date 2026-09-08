@@ -3,6 +3,7 @@ const { query } = require('../db');
 const { requireAuth } = require('../middleware/auth');
 const { loadZustaendigkeitsgebiet } = require('../utils/zustaendigkeit');
 const { buildGebietCondition } = require('../utils/gebietFilter');
+const { hasFeatureAccess } = require('../utils/featureAccess');
 
 const router = express.Router();
 
@@ -13,6 +14,7 @@ const VALID_SOURCES = [
   'firms',
   'waldbrandindex',
   'bbk_warnung',
+  'kachelmann',
 ];
 
 // GET /api/datapoints?source=pegelonline&since=2026-01-01T00:00:00Z
@@ -33,9 +35,18 @@ router.get('/', requireAuth, async (req, res, next) => {
     const conditions = [];
     const params = [];
 
+    // Kachelmann ist eine optionale/kostenpflichtige Quelle (Migration 009) - ohne Freigabe weder
+    // gezielt abrufbar (403) noch stillschweigend in einer ungefilterten Abfrage sichtbar.
+    const kachelmannAllowed = await hasFeatureAccess(req.user.id, req.user.role, req.user.wehrId, 'kachelmann');
+    if (source === 'kachelmann' && !kachelmannAllowed) {
+      return res.status(403).json({ ok: false, error: 'Kein Zugriff auf Kachelmann-Daten.' });
+    }
+
     if (source) {
       params.push(source);
       conditions.push(`source = $${params.length}`);
+    } else if (!kachelmannAllowed) {
+      conditions.push(`source != 'kachelmann'`);
     }
     if (since) {
       params.push(since);

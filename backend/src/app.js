@@ -20,6 +20,9 @@ const stationsRoutes = require('./routes/stations');
 const auditLogRoutes = require('./routes/auditLog');
 const landkreiseRoutes = require('./routes/landkreise');
 const bundeslaenderRoutes = require('./routes/bundeslaender');
+const objectFieldsRoutes = require('./routes/objectFields');
+const featureAccessRoutes = require('./routes/featureAccess');
+const pdfTemplatesRoutes = require('./routes/pdfTemplates');
 
 function createApp() {
   const app = express();
@@ -41,6 +44,10 @@ function createApp() {
           connectSrc: ["'self'"],
           workerSrc: ["'self'"],
           manifestSrc: ["'self'"],
+          // blob: fuer die PDF-Vorlagen-Live-Vorschau im Admin-Bereich (Konzept Teil 3): das Blob
+          // wird client-seitig aus der eigenen (same-origin) Fetch-Antwort erzeugt, kein
+          // Drittanbieter-Inhalt - trotzdem ohne diese Direktive von default-src blockiert.
+          frameSrc: ["'self'", 'blob:'],
           // Verstoesse werden serverseitig geloggt (siehe /api/csp-report unten) statt nur in der
           // Browser-Konsole eines einzelnen Nutzers zu verschwinden - genau ein solcher, nur durch
           // manuelles Einfuegen der Konsolenausgabe entdeckter Verstoss (Service Worker blockierte
@@ -97,6 +104,9 @@ function createApp() {
   app.use('/api/audit-log', auditLogRoutes);
   app.use('/api/landkreise', landkreiseRoutes);
   app.use('/api/bundeslaender', bundeslaenderRoutes);
+  app.use('/api/object-fields', objectFieldsRoutes);
+  app.use('/api/feature-access', featureAccessRoutes);
+  app.use('/api/pdf-templates', pdfTemplatesRoutes);
 
   app.use('/api', notFoundHandler);
 

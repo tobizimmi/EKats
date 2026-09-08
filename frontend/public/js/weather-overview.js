@@ -23,7 +23,11 @@ function renderGebietInfoLine(wehrInfo) {
     : `Mein Gebiet: ${wehrInfo.home_landkreis_name} (Heimat, keine Nachbarlandkreise ermittelt)`;
 }
 
-const WEATHER_SOURCE_ORDER = ['dwd_unwetter', 'waldbrandindex', 'hochwasserzentralen', 'pegelonline', 'firms'];
+// kachelmann bewusst direkt neben dwd_unwetter: gleiche Art Meldung (Unwetterwarnung), nur eine
+// optionale/kostenpflichtige Zusatzquelle (siehe Konzept Teil 3, Migration 009) - kein eigener
+// Abschnitt noetig. bbk_warnung ist keine Wetterwarnung und bleibt hier bewusst aussen vor (siehe
+// eigene Behandlung in priority-bar.js/list.js).
+const WEATHER_SOURCE_ORDER = ['dwd_unwetter', 'kachelmann', 'waldbrandindex', 'hochwasserzentralen', 'pegelonline', 'firms'];
 
 function groupBySource(datapoints) {
   const groups = new Map();

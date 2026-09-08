@@ -178,6 +178,101 @@
       </div>
 
       <div class="card">
+        <h2 class="section-title">Objekt-Zusatzfelder</h2>
+        <p class="muted">
+          Freie Felder je Wehr, die im Objekt-Dialog neben den Standardfeldern erscheinen (Konzept
+          „Objektverwaltung 2.0“). Löschen entfernt ein Feld nur aus künftigen Formularen - bereits
+          gespeicherte Werte bleiben erhalten.
+        </p>
+        <form id="field-def-form" class="form-row">
+          <label>
+            <span>Key (intern, z.B. "denkmalschutz")</span>
+            <input id="field-def-key" type="text" pattern="[a-z][a-z0-9_]{0,49}" required />
+          </label>
+          <label>
+            <span>Bezeichnung</span>
+            <input id="field-def-label" type="text" required />
+          </label>
+          <label>
+            <span>Typ</span>
+            <select id="field-def-type">
+              <option value="text">Text</option>
+              <option value="textarea">Mehrzeiliger Text</option>
+              <option value="number">Zahl</option>
+              <option value="boolean">Ja/Nein</option>
+              <option value="date">Datum</option>
+              <option value="select">Auswahlliste</option>
+            </select>
+          </label>
+          <label id="field-def-options-row" hidden>
+            <span>Optionen (kommagetrennt, Wert=Label)</span>
+            <input id="field-def-options" type="text" placeholder="F=Feuer, H=Hilfeleistung" />
+          </label>
+          <label class="checkbox-inline">
+            <input id="field-def-required" type="checkbox" />
+            <span>Pflichtfeld</span>
+          </label>
+          <button type="submit" class="primary">Feld anlegen</button>
+        </form>
+        <p class="error-message" id="field-def-error" role="alert"></p>
+        <table class="data-table">
+          <thead>
+            <tr><th>Key</th><th>Bezeichnung</th><th>Typ</th><th>Pflicht</th><th></th></tr>
+          </thead>
+          <tbody id="field-def-table-body"></tbody>
+        </table>
+      </div>
+
+      <div class="card">
+        <h2 class="section-title">Kachelmann-Zugriff</h2>
+        <p class="muted">
+          Kachelmannwetter/Meteologix ist eine optionale, kostenpflichtige Zusatzquelle. Freischaltung
+          erfolgt rollenweit und/oder je Einzelnutzer (Einzelnutzer-Override hat Vorrang vor der
+          Rollenfreigabe, in beide Richtungen).
+        </p>
+        <fieldset>
+          <legend>Für Rollen freigeben</legend>
+          <label class="checkbox-inline"><input type="checkbox" class="kachelmann-role" value="admin" /> <span>Admin</span></label>
+          <label class="checkbox-inline"><input type="checkbox" class="kachelmann-role" value="stab" /> <span>Stab</span></label>
+          <label class="checkbox-inline"><input type="checkbox" class="kachelmann-role" value="mitglied" /> <span>Mitglied</span></label>
+          <button id="kachelmann-roles-save" type="button" class="primary">Rollenfreigabe speichern</button>
+        </fieldset>
+        <p class="error-message" id="kachelmann-error" role="alert"></p>
+        <table class="data-table">
+          <thead><tr><th>Nutzer</th><th>Rolle</th><th>Individueller Zugriff</th></tr></thead>
+          <tbody id="kachelmann-user-table-body"></tbody>
+        </table>
+      </div>
+
+      <div class="card">
+        <h2 class="section-title">PDF-Vorlagen</h2>
+        <p class="muted">
+          HTML-Vorlagen mit <code>{{platzhalter}}</code>-Ersetzung (inkl. <code>{{#each liste}}</code>
+          und <code>{{#if feld}}</code> für Listen/optionale Abschnitte) - keine Skriptsprache, siehe
+          <code>backend/src/pdf/renderHtml.js</code>. Ohne Vorlage nutzt der Aufgabenzettel weiter das
+          bisherige feste Layout; das Objekt-Datenblatt ist ganz neu und erfordert eine Vorlage.
+        </p>
+        <label>
+          <span>Dokumenttyp</span>
+          <select id="pdf-template-type">
+            <option value="task_sheet">Aufgabenzettel (Fahrzeug/Wache)</option>
+            <option value="object_datasheet">Objekt-Datenblatt</option>
+          </select>
+        </label>
+        <label>
+          <span>HTML-Vorlage</span>
+          <textarea id="pdf-template-html" rows="12" style="font-family:monospace;width:100%"></textarea>
+        </label>
+        <div class="form-row">
+          <button id="pdf-template-preview" type="button" class="secondary">Vorschau (Beispieldaten)</button>
+          <button id="pdf-template-save" type="button" class="primary">Speichern</button>
+          <button id="pdf-template-delete" type="button" class="secondary">Vorlage löschen</button>
+        </div>
+        <p class="error-message" id="pdf-template-error" role="alert"></p>
+        <iframe id="pdf-template-preview-frame" style="width:100%;height:500px;border:1px solid var(--border-color, #ccc);margin-top:10px" hidden></iframe>
+      </div>
+
+      <div class="card">
         <h2 class="section-title">Lizenz</h2>
         <p class="muted">
           Lizenzverwaltung ist für eine spätere Ausbaustufe vorgesehen (u.a. für den Betrieb

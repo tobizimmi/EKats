@@ -18,6 +18,7 @@ let pendingLatLon = null;
 let vehiclesCache = [];
 let stationsCache = [];
 let allObjectsCache = [];
+let objectFieldDefinitionsCache = [];
 
 function objectFormFields() {
   return {
@@ -30,6 +31,18 @@ function objectFormFields() {
     contactPhone: document.getElementById('object-contact-phone'),
     notes: document.getElementById('object-notes'),
     reviewInterval: document.getElementById('object-review-interval'),
+    fireWaterSupplyType: document.getElementById('object-fire-water-supply-type'),
+    fireWaterSupplyCapacity: document.getElementById('object-fire-water-supply-capacity'),
+    fireWaterSupplyLocation: document.getElementById('object-fire-water-supply-location'),
+    fireAlarmSystem: document.getElementById('object-fire-alarm-system'),
+    fireAlarmMonitoringStation: document.getElementById('object-fire-alarm-monitoring-station'),
+    occupantCountMax: document.getElementById('object-occupant-count-max'),
+    elevators: document.getElementById('object-elevators'),
+    smokeHeatExhaustSystem: document.getElementById('object-smoke-heat-exhaust-system'),
+    pvBatterySystem: document.getElementById('object-pv-battery-system'),
+    pvBatteryDisconnectLocation: document.getElementById('object-pv-battery-disconnect-location'),
+    assemblyPoint: document.getElementById('object-assembly-point'),
+    builtYear: document.getElementById('object-built-year'),
   };
 }
 
@@ -90,16 +103,130 @@ async function openObjectDialog(mode, object) {
   fields.contactPhone.value = object?.contact_phone || '';
   fields.notes.value = object?.notes || '';
   fields.reviewInterval.value = object?.review_interval_months || '';
+  fields.fireWaterSupplyType.value = object?.fire_water_supply_type || '';
+  fields.fireWaterSupplyCapacity.value = object?.fire_water_supply_capacity_lpm ?? '';
+  fields.fireWaterSupplyLocation.value = object?.fire_water_supply_location || '';
+  fields.fireAlarmSystem.checked = !!object?.fire_alarm_system;
+  fields.fireAlarmMonitoringStation.value = object?.fire_alarm_monitoring_station || '';
+  fields.occupantCountMax.value = object?.occupant_count_max ?? '';
+  fields.elevators.checked = !!object?.elevators;
+  fields.smokeHeatExhaustSystem.checked = !!object?.smoke_heat_exhaust_system;
+  fields.pvBatterySystem.checked = !!object?.pv_battery_system;
+  fields.pvBatteryDisconnectLocation.value = object?.pv_battery_disconnect_location || '';
+  fields.assemblyPoint.value = object?.assembly_point || '';
+  fields.builtYear.value = object?.built_year ?? '';
   document.getElementById('object-review-status').textContent = object ? reviewStatusText(object) : '';
 
   setDialogMode(mode);
   document.getElementById('object-dialog').showModal();
 
+  await loadCustomFieldsForDialog(object?.custom_fields, mode);
+
   if (mode !== 'create' && object) {
+    document.getElementById('object-datasheet-pdf-link').innerHTML =
+      `<a class="button-link" href="api/objects/${object.id}/datasheet/pdf">PDF: Objekt-Datenblatt</a>`;
     await loadVehiclesAndStations();
     updateTaskTargetOptions();
     await Promise.all([loadTasksForDialog(object.id), loadAttachmentsForDialog(object.id)]);
   }
+}
+
+// ---------------------------------------------------------------------------
+// Zusatzfelder (je Wehr frei definierbar, siehe Admin-Bereich > Objekt-Zusatzfelder)
+// ---------------------------------------------------------------------------
+
+async function loadCustomFieldsForDialog(existingValues, mode) {
+  const container = document.getElementById('object-custom-fields');
+  const section = document.getElementById('object-custom-fields-section');
+  container.innerHTML = '';
+
+  try {
+    objectFieldDefinitionsCache = await api.get('/object-fields');
+  } catch (err) {
+    objectFieldDefinitionsCache = [];
+  }
+
+  if (objectFieldDefinitionsCache.length === 0) {
+    section.hidden = true;
+    return;
+  }
+  section.hidden = false;
+
+  const readOnly = mode === 'view';
+  objectFieldDefinitionsCache.forEach((def) => {
+    const label = document.createElement('label');
+    const isCheckbox = def.field_type === 'boolean';
+    if (isCheckbox) label.className = 'checkbox-inline';
+
+    const span = document.createElement('span');
+    span.textContent = def.label + (def.required ? ' *' : '');
+
+    let input;
+    if (def.field_type === 'textarea') {
+      input = document.createElement('textarea');
+      input.rows = 2;
+      input.maxLength = 2000;
+    } else if (def.field_type === 'select') {
+      input = document.createElement('select');
+      const emptyOpt = document.createElement('option');
+      emptyOpt.value = '';
+      emptyOpt.textContent = def.required ? 'Bitte wählen' : 'Keine Angabe';
+      input.appendChild(emptyOpt);
+      (def.options || []).forEach((opt) => {
+        const o = document.createElement('option');
+        o.value = opt.value;
+        o.textContent = opt.label;
+        input.appendChild(o);
+      });
+    } else {
+      input = document.createElement('input');
+      input.type =
+        def.field_type === 'boolean' ? 'checkbox' : def.field_type === 'number' ? 'number' : def.field_type === 'date' ? 'date' : 'text';
+      if (def.field_type === 'text') input.maxLength = 300;
+    }
+    input.id = `object-custom-field-${def.key}`;
+    input.dataset.fieldKey = def.key;
+    input.dataset.fieldType = def.field_type;
+    input.disabled = readOnly;
+
+    const value = existingValues ? existingValues[def.key] : undefined;
+    if (isCheckbox) {
+      input.checked = !!value;
+    } else if (value !== undefined && value !== null) {
+      input.value = value;
+    }
+
+    if (isCheckbox) {
+      label.appendChild(input);
+      label.appendChild(span);
+    } else {
+      label.appendChild(span);
+      label.appendChild(input);
+    }
+    container.appendChild(label);
+  });
+}
+
+// Nur tatsaechlich ausgefuellte Werte senden - ein geleertes optionales Feld verschwindet dadurch
+// aus custom_fields, statt als "null" fuer ein evtl. inzwischen umbenanntes/geloeschtes Feld
+// mitgeschickt zu werden (die Feld-Definition entscheidet ohnehin serverseitig, was gueltig ist).
+function collectCustomFieldValues() {
+  const values = {};
+  document.querySelectorAll('#object-custom-fields [data-field-key]').forEach((input) => {
+    const key = input.dataset.fieldKey;
+    const type = input.dataset.fieldType;
+    if (type === 'boolean') {
+      values[key] = input.checked;
+    } else if (type === 'number') {
+      values[key] = input.value === '' ? null : Number(input.value);
+    } else {
+      values[key] = input.value.trim() === '' ? null : input.value.trim();
+    }
+  });
+  Object.keys(values).forEach((key) => {
+    if (values[key] === null) delete values[key];
+  });
+  return values;
 }
 
 window.selectObject = function selectObject(obj) {
@@ -122,6 +249,19 @@ async function submitObjectForm(event) {
     contactPhone: fields.contactPhone.value.trim() || null,
     notes: fields.notes.value.trim() || null,
     reviewIntervalMonths: fields.reviewInterval.value ? Number(fields.reviewInterval.value) : null,
+    fireWaterSupplyType: fields.fireWaterSupplyType.value || null,
+    fireWaterSupplyCapacityLpm: fields.fireWaterSupplyCapacity.value ? Number(fields.fireWaterSupplyCapacity.value) : null,
+    fireWaterSupplyLocation: fields.fireWaterSupplyLocation.value.trim() || null,
+    fireAlarmSystem: fields.fireAlarmSystem.checked,
+    fireAlarmMonitoringStation: fields.fireAlarmMonitoringStation.value.trim() || null,
+    occupantCountMax: fields.occupantCountMax.value ? Number(fields.occupantCountMax.value) : null,
+    elevators: fields.elevators.checked,
+    smokeHeatExhaustSystem: fields.smokeHeatExhaustSystem.checked,
+    pvBatterySystem: fields.pvBatterySystem.checked,
+    pvBatteryDisconnectLocation: fields.pvBatteryDisconnectLocation.value.trim() || null,
+    assemblyPoint: fields.assemblyPoint.value.trim() || null,
+    builtYear: fields.builtYear.value ? Number(fields.builtYear.value) : null,
+    customFields: collectCustomFieldValues(),
   };
 
   try {

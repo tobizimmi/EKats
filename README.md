@@ -170,6 +170,7 @@ systemctl restart ekats           # Neustart, z.B. nach manueller .env-Änderung
 | NASA FIRMS | Satelliten-Hotspots Waldbrand | ja, kostenloser MAP_KEY | alle 45 Min. |
 | DWD Waldbrandgefahrenindex | Flächige Gefahreneinschätzung je Station | nein | 1×/Tag |
 | warnung.bund.de (BBK/NINA) | Bevölkerungswarnungen (MoWaS/DWD/LHP/BIWAPP/KATWARN/Polizei) | nein | alle 15 Min. |
+| Kachelmannwetter/Meteologix | Zusätzliche, optionale Wetterwarnungen (kostenpflichtig, siehe unten) | ja, `KACHELMANN_API_KEY` | alle 30 Min. |
 
 Intervalle über die `FETCH_*_CRON`-Variablen in `.env` änderbar. Jeder Fetcher läuft isoliert
 (`src/scheduler.js`): schlägt eine Quelle fehl, laufen die anderen normal weiter.
@@ -451,6 +452,113 @@ Im Admin-Bereich („Objektdaten-Export“) lassen sich alle Objekte der eigenen
 Aufgaben und Anhangs-**Metadaten** (Dateiname/Typ/Größe, nicht die Binärdateien selbst) als
 JSON-Datei herunterladen (`GET /api/objects/export`, Stab/Admin). Die eigentlichen Anhangsdateien
 müssen einzeln über den Datei-Download-Endpunkt geholt werden.
+
+### Standardfelder (Einsatzplan, DIN 14095)
+
+Zusätzlich zu den Kernfeldern trägt jedes Objekt zwölf recherchierte Standardfelder, angelehnt an
+die in DIN 14095 „Feuerwehrpläne für bauliche Anlagen" für den Abschnitt „Allgemeine
+Objektinformationen" üblichen Angaben: Löschwasserversorgung (Art/Ergiebigkeit in l/min/Lage —
+Unterflur-/Überflur-Hydrant, Löschwasserbrunnen, Zisterne, Löschteich, offenes Gewässer),
+Brandmeldeanlage (vorhanden + Aufschaltstelle), maximale Personenzahl, Aufzüge, Rauch-/
+Wärmeabzugsanlage, PV-/Batteriespeicheranlage (vorhanden + Lage der Notabschaltung — ein in der
+Praxis zunehmend relevantes Gefahrenmerkmal für die Einsatztaktik), Sammelplatz und Baujahr. Diese
+Recherche stützt sich auf öffentlich zugängliche Zusammenfassungen der Norm (die DIN-Norm selbst ist
+kostenpflichtig und aus dieser Entwicklungsumgebung nicht abrufbar) sowie gängige
+Löschwasserversorgungs-Konventionen (Durchmesser × 10 l/min für Unterflur-, × 15 l/min für
+Überflur-Hydranten) — **kein verbindliches Normzitat**, sondern eine begründete Näherung an die in
+der Praxis für Feuerwehrpläne relevanten Angaben. Alle Felder sind optional und ohne Vorbelegung.
+
+Schema: zwölf Spalten auf `critical_object`
+(`backend/sql/migrations/008_add_object_custom_fields.sql`).
+
+### Zusatzfelder (frei definierbar je Wehr)
+
+Reichen die Standardfelder nicht aus, kann jede Wehr im Admin-Bereich („Objekt-Zusatzfelder")
+beliebige weitere Felder je Objekt definieren: Schlüssel (technischer Name), Label, Typ (Text,
+mehrzeiliger Text, Zahl, Ja/Nein, Datum, Auswahlliste mit selbst definierten Optionen) und ob das
+Feld Pflicht ist. Der Objekt-Dialog rendert daraus automatisch die passenden Eingabeelemente; die
+Werte liegen gesammelt als JSON in `critical_object.custom_fields` und werden bei jedem
+Speichern serverseitig gegen die aktuellen Definitionen geprüft (unbekannter Schlüssel, falscher
+Typ oder fehlendes Pflichtfeld → 400). Lesen dürfen alle Rollen, Definitionen anlegen/ändern/löschen
+ist Admin vorbehalten; Schlüssel und Typ sind nach dem Anlegen nicht mehr änderbar (bereits
+gespeicherte Werte referenzieren den Schlüssel direkt).
+
+Schema: `object_field_definition` (`backend/sql/migrations/008_add_object_custom_fields.sql`).
+
+### Objekt-Datenblatt (PDF)
+
+Zusätzlich zu den Aufgabenzetteln lässt sich für jedes Objekt ein vollständiges Datenblatt mit allen
+Kern-, Standard- und Zusatzfeldern als PDF exportieren (Link „PDF: Objekt-Datenblatt" im
+Objekt-Dialog) — sofern im Admin-Bereich eine Vorlage für den Dokumenttyp „Objekt-Datenblatt"
+hinterlegt ist (siehe „PDF-Vorlagen" unten). Ohne Vorlage liefert der Endpunkt bewusst einen klaren
+Fehler statt eines leeren PDFs.
+
+## Kachelmann/Meteologix (optionale Zusatz-Wetterquelle)
+
+Als siebte Datenquelle ist ein Connector für die kommerzielle Kachelmannwetter/Meteologix-API
+vorbereitet (`backend/src/fetchers/kachelmann.js`) — vom Nutzer als optionales, später
+abonnementpflichtiges Feature gewünscht. Anders als die sechs übrigen Quellen ist sie **nicht für
+jede Wehr automatisch aktiv**, sondern über eine eigene Zugriffssteuerung frei- bzw. sperrbar:
+
+- Im Admin-Bereich (Abschnitt „Kachelmann-Zugriff") legt ein Admin fest, welche **Rollen**
+  standardmäßig Zugriff haben (`wehr_feature_role_access`), und kann zusätzlich **einzelne
+  Nutzer** individuell freischalten oder sperren (`user_feature_access`) — ein Einzel-Override
+  gewinnt in beide Richtungen gegen die Rollen-Voreinstellung.
+- `GET /api/datapoints` blendet Kachelmann-Datenpunkte für Nutzer ohne Zugriff bei ungefilterter
+  Abfrage still aus; eine gezielte Abfrage (`?source=kachelmann`) ohne Zugriff liefert `403`.
+- Der Fetcher selbst läuft nur, wenn zusätzlich ein `KACHELMANN_API_KEY` gesetzt ist **und**
+  mindestens eine Rolle/ein Nutzer Zugriff hat — sonst überspringt er den Lauf mit einer klaren
+  Log-Meldung statt unnötig eine kostenpflichtige API anzufragen.
+- Sind Zugriff und API-Key vorhanden, erscheinen Kachelmann-Meldungen automatisch überall dort,
+  wo auch die anderen sechs Quellen erscheinen (Karte, Lage-Liste, Prioritäts-Leiste,
+  Wetter-Übersicht) — die gesamte Anzeige-Pipeline ist quellen-generisch (`SOURCE_LABELS`,
+  `severityScore()` in `js/severity.js`), es war dafür **keine eigene Widget-Komponente** nötig,
+  nur ein Eintrag in der bestehenden Quellen-Zuordnung plus die Aufnahme in
+  `WEATHER_SOURCE_ORDER` (`js/weather-overview.js`), analog zu `dwd_unwetter`.
+
+**Wichtiger Verifikationshinweis:** Die genaue Endpunkt-URL, das Antwortformat und das
+Authentifizierungsschema der Kachelmann-Business-API sind **nicht verifiziert** — Meteologix/
+Kachelmannwetter veröffentlicht seine kommerzielle API-Dokumentation nicht öffentlich zugänglich,
+und ein Test-Zugang war aus dieser Entwicklungsumgebung nicht erreichbar. Der Connector ist nach
+dem gleichen Muster wie `hochwasserzentralen.js` gebaut: die komplette Infrastruktur (Zugriffs-
+prüfung, Scheduler-Integration, Datenmodell, Severity-Einordnung, Anzeige) ist real und getestet,
+aber der eigentliche HTTP-Request/das Parsing (`fetchJson(...${BASE_URL}/warnings/live...`) beruht
+auf einer plausiblen, aber nicht bestätigten Annahme über die API-Form — vor Produktivbetrieb mit
+einem echten API-Key gegen `npm run fetch -- kachelmann` prüfen und ggf. anpassen.
+
+Schema: `wehr_feature_role_access`, `user_feature_access`
+(`backend/sql/migrations/009_add_feature_access.sql`).
+
+## PDF-Vorlagen (HTML-Templates, Chromium-Rendering)
+
+Die bisher fest im Code (`pdfkit`) erzeugten Aufgabenzettel lassen sich jetzt wehrweit über eigene,
+im Admin-Bereich bearbeitbare HTML-Vorlagen ersetzen (Abschnitt „PDF-Vorlagen"), getrennt nach
+Dokumenttyp (Aufgabenzettel / Objekt-Datenblatt) — inkl. Live-Vorschau mit Beispieldaten direkt im
+Browser. Ohne hinterlegte Vorlage nutzt der Aufgabenzettel weiterhin den bisherigen
+`pdfkit`-Fallback; das Objekt-Datenblatt existiert dagegen ausschließlich über die Vorlage (siehe
+oben).
+
+**Sicherheitsentscheidung „Platzhalter statt Skriptsprache":** Vorlagen kennen ausschließlich
+`{{pfad.zu.feld}}` (Werteinsetzung), `{{#each pfad}}...{{/each}}` (Wiederholung über eine Liste,
+z.B. die Aufgabenliste) und `{{#if pfad}}...{{/if}}` (Ein-/Ausblenden je Wahrheitswert) — bewusst
+im Mustache-Stil „logic-less" ohne `eval()`, Ausdrücke, Vergleiche oder Funktionsaufrufe. Ein
+kompromittierter Admin-Account kann damit keinen beliebigen Code auf dem Server ausführen, nur
+vordefinierte Datenfelder einsetzen. Gerendert wird serverseitig per headless Chromium
+(`page.setContent()`, kein Navigations-/Netzwerkzugriff — `page.route()` blockt zusätzlich jeden
+Request als SSRF-Schutz, Bilder müssen daher als Data-URI eingebettet sein).
+
+**Verifikationsstand/Performance (gemessen in dieser Entwicklungsumgebung):** Chromium wurde
+probeweise installiert und gegen echte Vorlagen getestet (Playwright, `chromium.launch()` je
+Export statt einer Dauerinstanz — ein PDF-Export ist eine seltene, admin-ausgelöste Aktion, kein
+Hochlast-Pfad). Gemessene Werte: **~390 ms durchschnittliche Renderzeit** pro PDF und **~700 MB
+transienter Spitzen-RSS** über den gesamten Chromium-Prozessbaum während des Renderns (danach sofort
+wieder freigegeben, da der Browser-Prozess je Export beendet wird) — auf einem kleinen Plesk-VPS mit
+wenig freiem RAM ist das im Blick zu behalten, aber für eine seltene, manuelle Aktion vertretbar. In
+Produktion installiert `npm run postinstall`/`npx playwright install chromium` sein eigenes
+Chromium; ein `PLAYWRIGHT_CHROMIUM_PATH` in `.env` ist nur für diese Sandbox nötig, in der ein
+vorinstalliertes Chromium an einem abweichenden Pfad liegt.
+
+Schema: `pdf_template` (`backend/sql/migrations/010_add_pdf_templates.sql`).
 
 ## Sicherheit & Datenschutz
 

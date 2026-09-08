@@ -198,6 +198,134 @@ async function loadVehicles() {
   });
 }
 
+// ---------------------------------------------------------------------------
+// Objekt-Zusatzfelder (Konzept "Objektverwaltung 2.0")
+// ---------------------------------------------------------------------------
+
+const FIELD_TYPE_LABELS = {
+  text: 'Text', textarea: 'Mehrzeiliger Text', number: 'Zahl',
+  boolean: 'Ja/Nein', date: 'Datum', select: 'Auswahlliste',
+};
+
+function parseFieldOptions(raw) {
+  return raw
+    .split(',')
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .map((part) => {
+      const [value, label] = part.split('=').map((s) => s.trim());
+      return { value: value || part, label: label || value || part };
+    });
+}
+
+async function loadFieldDefinitions() {
+  const tbody = document.getElementById('field-def-table-body');
+  tbody.innerHTML = '';
+  const defs = await api.get('/object-fields');
+
+  if (defs.length === 0) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = '<td colspan="5" class="muted">Keine Zusatzfelder definiert.</td>';
+    tbody.appendChild(tr);
+    return defs;
+  }
+
+  defs.forEach((def) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><code>${def.key}</code></td>
+      <td>${def.label}</td>
+      <td>${FIELD_TYPE_LABELS[def.field_type] || def.field_type}</td>
+      <td>${def.required ? 'ja' : 'nein'}</td>
+      <td></td>`;
+    const deleteBtn = document.createElement('button');
+    deleteBtn.className = 'secondary';
+    deleteBtn.type = 'button';
+    deleteBtn.textContent = 'Löschen';
+    deleteBtn.addEventListener('click', async () => {
+      if (!confirm(`Zusatzfeld "${def.label}" wirklich löschen? (Bereits gespeicherte Werte bleiben erhalten.)`)) return;
+      try {
+        await api.delete(`/object-fields/${def.id}`);
+        await loadFieldDefinitions();
+      } catch (err) {
+        alert(err.message);
+      }
+    });
+    tr.querySelector('td:last-child').appendChild(deleteBtn);
+    tbody.appendChild(tr);
+  });
+  return defs;
+}
+
+// ---------------------------------------------------------------------------
+// Kachelmann-Zugriff (Feature-Zugriffssteuerung)
+// ---------------------------------------------------------------------------
+
+async function loadKachelmannAccess() {
+  const errorEl = document.getElementById('kachelmann-error');
+  errorEl.textContent = '';
+  let data;
+  try {
+    data = await api.get('/feature-access/kachelmann');
+  } catch (err) {
+    errorEl.textContent = err.message;
+    return;
+  }
+
+  document.querySelectorAll('.kachelmann-role').forEach((cb) => {
+    cb.checked = data.roles.includes(cb.value);
+  });
+
+  const overrideByUser = new Map(data.userOverrides.map((o) => [o.user_id, o.enabled]));
+  const tbody = document.getElementById('kachelmann-user-table-body');
+  tbody.innerHTML = '';
+  data.users.forEach((u) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${u.email}</td><td>${ROLE_LABELS[u.role] || u.role}</td><td></td>`;
+    const select = document.createElement('select');
+    [
+      { value: '', label: 'Nach Rolle (Standard)' },
+      { value: 'true', label: 'Immer erlauben' },
+      { value: 'false', label: 'Immer sperren' },
+    ].forEach((opt) => {
+      const o = document.createElement('option');
+      o.value = opt.value;
+      o.textContent = opt.label;
+      select.appendChild(o);
+    });
+    const current = overrideByUser.get(u.id);
+    select.value = current === undefined ? '' : String(current);
+    select.addEventListener('change', async () => {
+      try {
+        const enabled = select.value === '' ? null : select.value === 'true';
+        await api.put(`/feature-access/kachelmann/user-override`, { userId: u.id, enabled });
+      } catch (err) {
+        errorEl.textContent = err.message;
+        await loadKachelmannAccess();
+      }
+    });
+    tr.querySelector('td:last-child').appendChild(select);
+    tbody.appendChild(tr);
+  });
+}
+
+// ---------------------------------------------------------------------------
+// PDF-Vorlagen
+// ---------------------------------------------------------------------------
+
+async function loadPdfTemplate() {
+  const type = document.getElementById('pdf-template-type').value;
+  const errorEl = document.getElementById('pdf-template-error');
+  errorEl.textContent = '';
+  document.getElementById('pdf-template-preview-frame').hidden = true;
+  try {
+    const data = await api.get(`/pdf-templates/${type}`);
+    document.getElementById('pdf-template-html').value = data ? data.html_template : '';
+  } catch (err) {
+    errorEl.textContent = err.message;
+  }
+}
+
 (async function bootstrapAdmin() {
   const user = await initHeader();
   if (!user) return;
@@ -280,6 +408,98 @@ async function loadVehicles() {
       event.target.reset();
       await loadUsers(user.id);
       await loadAuditLog();
+    } catch (err) {
+      errorEl.textContent = err.message;
+    }
+  });
+
+  await loadFieldDefinitions();
+  await loadKachelmannAccess();
+  await loadPdfTemplate();
+
+  document.getElementById('field-def-type').addEventListener('change', (event) => {
+    document.getElementById('field-def-options-row').hidden = event.target.value !== 'select';
+  });
+
+  document.getElementById('field-def-form').addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const errorEl = document.getElementById('field-def-error');
+    errorEl.textContent = '';
+    const fieldType = document.getElementById('field-def-type').value;
+    try {
+      await api.post('/object-fields', {
+        key: document.getElementById('field-def-key').value.trim(),
+        label: document.getElementById('field-def-label').value.trim(),
+        fieldType,
+        options: fieldType === 'select' ? parseFieldOptions(document.getElementById('field-def-options').value) : null,
+        required: document.getElementById('field-def-required').checked,
+      });
+      event.target.reset();
+      document.getElementById('field-def-options-row').hidden = true;
+      await loadFieldDefinitions();
+    } catch (err) {
+      errorEl.textContent = err.message;
+    }
+  });
+
+  document.getElementById('kachelmann-roles-save').addEventListener('click', async () => {
+    const errorEl = document.getElementById('kachelmann-error');
+    errorEl.textContent = '';
+    const roles = Array.from(document.querySelectorAll('.kachelmann-role:checked')).map((cb) => cb.value);
+    try {
+      await api.put('/feature-access/kachelmann/roles', { roles });
+    } catch (err) {
+      errorEl.textContent = err.message;
+    }
+  });
+
+  document.getElementById('pdf-template-type').addEventListener('change', loadPdfTemplate);
+
+  document.getElementById('pdf-template-save').addEventListener('click', async () => {
+    const errorEl = document.getElementById('pdf-template-error');
+    errorEl.textContent = '';
+    const type = document.getElementById('pdf-template-type').value;
+    const htmlTemplate = document.getElementById('pdf-template-html').value;
+    try {
+      await api.put(`/pdf-templates/${type}`, { htmlTemplate });
+      alert('Vorlage gespeichert.');
+    } catch (err) {
+      errorEl.textContent = err.message;
+    }
+  });
+
+  document.getElementById('pdf-template-delete').addEventListener('click', async () => {
+    const type = document.getElementById('pdf-template-type').value;
+    if (!confirm('Vorlage wirklich löschen? Der Export nutzt danach wieder das Standardformat (nur Aufgabenzettel) bzw. ist bis zur nächsten Vorlage nicht verfügbar (Objekt-Datenblatt).')) return;
+    try {
+      await api.delete(`/pdf-templates/${type}`);
+      document.getElementById('pdf-template-html').value = '';
+    } catch (err) {
+      document.getElementById('pdf-template-error').textContent = err.message;
+    }
+  });
+
+  document.getElementById('pdf-template-preview').addEventListener('click', async () => {
+    const errorEl = document.getElementById('pdf-template-error');
+    errorEl.textContent = '';
+    const type = document.getElementById('pdf-template-type').value;
+    const htmlTemplate = document.getElementById('pdf-template-html').value;
+    try {
+      const res = await fetch(`api/pdf-templates/${type}/preview`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ htmlTemplate }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || `Vorschau fehlgeschlagen (Status ${res.status}).`);
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const frame = document.getElementById('pdf-template-preview-frame');
+      frame.src = url;
+      frame.hidden = false;
     } catch (err) {
       errorEl.textContent = err.message;
     }
