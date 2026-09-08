@@ -26,6 +26,8 @@ function payloadEntries(dp) {
       return [
         ['Gewässer', p.gewaesser],
         ['Bundesland', p.land],
+        ['Status', p.statusText],
+        ['Weitere Infos', p.stationLink],
       ];
     case 'firms':
       return [

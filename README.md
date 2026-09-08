@@ -173,11 +173,14 @@ systemctl restart ekats           # Neustart, z.B. nach manueller .env-Änderung
 Intervalle über die `FETCH_*_CRON`-Variablen in `.env` änderbar. Jeder Fetcher läuft isoliert
 (`src/scheduler.js`): schlägt eine Quelle fehl, laufen die anderen vier normal weiter.
 
-Die Hochwasserzentralen-API liefert **die Pegel aller deutschen Bundesländer** (nicht nur die
-Bundeswasserstraßen von PEGELONLINE) — deckt damit auch die von den Ländern selbst betriebenen
-„weiteren Pegel" ab. Da ein bundesweiter Abruf pro Lauf tausende Einzelanfragen wären, wird die
-Stationsliste auf einen Umkreis (`HOCHWASSERZENTRALEN_RADIUS_KM`, Standard 60 km) um mindestens
-einen Wehr-Kartenmittelpunkt eingegrenzt (analog zu `FIRMS_RADIUS_KM`), maximal 80 Stationen je Lauf.
+Die Hochwasserzentralen-API liefert **die Hochwasser-Klassifizierung aller Pegel-Stationen in
+Deutschland** (nicht nur die Bundeswasserstraßen von PEGELONLINE) — deckt damit auch die von den
+Ländern selbst betriebenen „weiteren Pegel" ab. Ein einziger Abruf liefert bundesweit alle Stationen
+als GeoJSON; die Ergebnisliste wird danach auf einen Umkreis (`HOCHWASSERZENTRALEN_RADIUS_KM`,
+Standard 60 km) um mindestens einen Wehr-Kartenmittelpunkt eingegrenzt (analog zu `FIRMS_RADIUS_KM`).
+**Die API liefert laut eigener Dokumentation keinen numerischen Wasserstand-Messwert**, nur eine
+5-stufige Klassifizierung (Kein Hochwasser / Klein / Mittel / Groß / Sehr groß) — `value_numeric`
+bleibt deshalb bei dieser Quelle immer leer, `severity` trägt die Klassifizierung.
 
 ### Verifikationsstand der Fetcher
 
@@ -189,22 +192,22 @@ end-to-end gegen eine echte PostGIS-Datenbank getestet (Parsing → Normalisieru
 Alert-Engine).
 
 **Der fünfte Connector, `hochwasserzentralen.js`, ist NICHT live verifiziert** — hochwasserzentralen.de
-ist aus dieser Entwicklungsumgebung nicht erreichbar. Er zielte ursprünglich auf einen erfundenen
-Endpunkt (`pegel_alle.json`) mit geratenen Feldnamen und hätte so nie funktioniert; das wurde
-korrigiert, indem er jetzt gegen die tatsächlichen Endpunkte implementiert ist, dokumentiert im
-inoffiziellen, community-gepflegten OpenAPI-Spec
-[bundesAPI/hochwasserzentralen-api](https://github.com/bundesAPI/hochwasserzentralen-api) (inkl.
-echter Beispiel-Antworten, gegen die die Parsing-Logik mit Fixture-Daten getestet wurde) — eine
-deutlich solidere Basis als zuvor, aber weiterhin nicht live gegen eine echte Antwort geprüft. Vor
-Produktivbetrieb `npm run fetch -- hochwasserzentralen` prüfen (siehe ausführlicher Kommentar am
-Dateianfang). **Einschränkung**: Die Meldestufe (`HW_TXT`) ist nur für den einen dokumentierten Wert
-„Kein Hochwasser" verifiziert — andere Stufen-Texte sind nicht bekannt und werden bewusst nicht
-geraten, `severity` bleibt für diese Fälle `null` (der Rohtext steht weiterhin in
-`payload.statusText`, in der Detail-Ansicht sichtbar). **Praktische Folge**: Schwellenwert-Regeln auf
-`meldestufe >= 1` lösen dadurch aktuell nicht aus — nur „Kein Hochwasser" (Stufe 0) wird erkannt.
-Sobald die Klartext-Varianten für höhere Stufen bekannt sind, ist `hwTextToSeverity()` in
-`hochwasserzentralen.js` um sie zu ergänzen. Der Fetcher scheitert ansonsten defensiv
-(Warnung im Log, kein Absturz der anderen Jobs), falls die Annahmen nicht zutreffen.
+ist aus dieser Entwicklungsumgebung nicht erreichbar (weder `www.hochwasserzentralen.de` noch die
+API-Subdomain `api.hochwasserzentralen.de`). Er wurde zweimal korrigiert: zuerst zielte er auf einen
+erfundenen Endpunkt (`pegel_alle.json`), dann auf eine inoffizielle, aber ebenfalls veraltete
+Community-OpenAPI-Spec (die zugehörigen `www.hochwasserzentralen.de/webservices/*.php`-Endpunkte
+existieren nicht mehr — live per `curl -sv` auf dem Produktivserver bestätigt: HTTP 200 mit
+`Content-Length: 0`). Die aktuelle Version basiert auf der **offiziellen, vom Anbieter selbst
+veröffentlichten OpenAPI-3.0-Spezifikation** („LHP-PublicAPI", von
+[hochwasserzentralen.de/developers/api-docs](https://www.hochwasserzentralen.de/developers/api-docs)),
+inkl. echter Beispiel-Antworten, gegen die die Parsing-Logik mit Fixture-Daten getestet wurde — die
+bestmögliche verfügbare Basis (Erstanbieter-Dokumentation statt Reverse-Engineering), aber weiterhin
+nicht live gegen eine echte Antwort geprüft. Vor Produktivbetrieb `npm run fetch --
+hochwasserzentralen` prüfen (siehe ausführlicher Kommentar am Dateianfang). Die Spec verlangt formal
+ein `BasicAuth`-Schema, definiert aber kein tatsächliches Auth-Schema und nennt sich selbst
+„PublicAPI" mit offener CC-BY-4.0-Lizenz — vermutlich ein Doku-Artefakt der Beta-Version; falls der
+Live-Abruf mit `401` scheitert, wären hier Zugangsdaten zu ergänzen. Der Fetcher scheitert ansonsten
+defensiv (Warnung im Log, kein Absturz der anderen Jobs), falls die Annahmen nicht zutreffen.
 
 **Live-Abruf gegen die echten Behörden-APIs konnte aus derselben Netzwerkrichtlinien-Einschränkung
 in dieser Entwicklungsumgebung generell nicht getestet werden** (auch für die vier verifizierten
