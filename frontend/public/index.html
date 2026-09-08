@@ -36,15 +36,21 @@
       <div id="map"></div>
       <div class="card stack">
         <div class="tab-bar">
-          <button type="button" class="tab-button active" id="tab-button-lage">Lage</button>
-          <button type="button" class="tab-button" id="tab-button-objekte">Objekte</button>
+          <button type="button" class="tab-button active" id="tab-button-lage" data-tab="lage">Lage</button>
+          <button type="button" class="tab-button" id="tab-button-wetter" data-tab="wetter">Wetter</button>
+          <button type="button" class="tab-button" id="tab-button-objekte" data-tab="objekte">Objekte</button>
         </div>
-        <div id="tab-panel-lage">
+        <div id="tab-panel-lage" data-tab-panel="lage">
           <h2 class="section-title">Lage-Übersicht</h2>
           <p class="muted" id="list-updated"></p>
           <ul class="situation-list" id="situation-list"></ul>
         </div>
-        <div id="tab-panel-objekte" hidden>
+        <div id="tab-panel-wetter" data-tab-panel="wetter" hidden>
+          <h2 class="section-title">Wetter- &amp; Lageübersicht für mein Gebiet</h2>
+          <p class="muted" id="wetter-gebiet-info"></p>
+          <div id="wetter-overview"></div>
+        </div>
+        <div id="tab-panel-objekte" data-tab-panel="objekte" hidden>
           <h2 class="section-title">Objekt-Übersicht</h2>
           <div class="form-row">
             <label>
@@ -198,6 +204,7 @@
   <script src="js/map.js"></script>
   <script src="js/list.js"></script>
   <script src="js/detail.js"></script>
+  <script src="js/weather-overview.js"></script>
   <script src="js/objects.js"></script>
   <script src="js/app.js"></script>
 </body>

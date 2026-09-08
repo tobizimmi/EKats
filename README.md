@@ -241,12 +241,19 @@ ebenfalls wehrweit).
   Landkreis hervorgehoben, Nachbarn gestrichelt), ein-/ausblendbar wie die anderen Layer.
 - Als Nebenprodukt desselben Imports werden die 402 Kreis-Polygone zusätzlich je Bundesland zu 16
   Flächen aggregiert (Tabelle `bundesland`) — Grundlage für „Warnungen als Fläche“, siehe unten.
-- **Bewusste Einschränkung**: Die Auswahl filtert aktuell **nicht** automatisch die angezeigten
-  DWD-Unwetterwarnungen nach Landkreis — die DWD-Warnungen liefern nur Bundesland-Ebene (siehe
-  `dwd_unwetter`-Connector-Kommentar), eine zuverlässige Zuordnung zu Kreis-Warnzellen würde die
-  offizielle DWD-Warncell-ID-Zuordnungstabelle erfordern, die aus der Entwicklungsumgebung dieses
-  Projekts nicht erreichbar war (siehe „Verifikationsstand der Fetcher“). Diese Funktion ist die
-  Grundlage/Vorbereitung dafür, filtert aber noch nicht automatisch.
+- **`GET /api/datapoints` filtert automatisch auf dieses Gebiet** (Heimat-Landkreis + Nachbarn,
+  siehe `backend/src/utils/zustaendigkeit.js` + `utils/gebietFilter.js`): Quellen mit
+  Geokoordinate je Meldung (PEGELONLINE, Hochwasserzentralen, NASA FIRMS) müssen innerhalb der
+  Gebiets-Polygone liegen (`ST_Contains`); die beiden Bundesland-Quellen (DWD-Unwetterwarnungen,
+  Waldbrandgefahrenindex) müssen eines der im Gebiet vertretenen Bundesländer treffen — präziser
+  als Bundesland-Ebene ist auch hier nicht möglich (siehe „Warnungen als Fläche“ unten). Ist noch
+  kein Heimat-Landkreis konfiguriert, bleibt die Anzeige bewusst ungefiltert (bundesweit), statt
+  versehentlich alles auszublenden — das Dashboard zeigt dann einen Hinweis mit Link zur
+  Einrichtung. Karte und Lage-Liste zeigen dadurch ausschließlich Meldungen aus dem eigenen und den
+  angrenzenden Landkreisen, nicht mehr bundesweit.
+- Ein neuer Dashboard-Tab **„Wetter“** fasst dieselben (bereits gebietsgefilterten) Datenpunkte je
+  Quelle kompakt zusammen (Anzahl je Dringlichkeitsstufe als Badges, wichtigste Einzelmeldungen) —
+  siehe „Wetter- & Lageübersicht“ unten.
 
 ### Datenquelle & Lizenzhinweis
 
@@ -257,6 +264,28 @@ src/importLandkreise.js`, einmaliger Import, kein Cron). Die Geometrie ist urspr
 werden deshalb **bewusst nicht im EKats-Repository vorgehalten**, sondern bei jedem Import-Lauf
 live von der Quelle geladen (wie bei den DWD-Datenquellen auch). Bei Bedarf `npm run
 import-landkreise` erneut ausführen (idempotent).
+
+## Wetter- & Lageübersicht für das eigene Gebiet
+
+Dritter Tab neben „Lage“ und „Objekte“ auf dem Dashboard (`js/weather-overview.js`). Gruppiert die
+bereits auf das Zuständigkeitsgebiet gefilterten Datenpunkte (siehe oben) je Quelle:
+
+- Kopfzeile mit dem eigenen Gebiet („Mein Gebiet: Städteregion Aachen (Heimat) + Nachbarn: Düren,
+  Euskirchen, Heinsberg“) bzw. einem Hinweis + Link zur Einrichtung, falls noch kein
+  Heimat-Landkreis konfiguriert ist.
+- Je Quelle (DWD-Unwetterwarnung, Waldbrandgefahrenindex, Hochwasserlage, Pegelstand, Feuer-
+  Hotspot): Anzahl der Meldungen je Dringlichkeitsstufe als farbige Badges, darunter die bis zu
+  fünf dringendsten Einzelmeldungen — Klick fokussiert wie in der Lage-Liste die Karte und öffnet
+  das Detail-Panel.
+- Das Detail-Panel zeigt seit dieser Erweiterung zusätzlich quellenspezifische Informationen aus
+  den Rohdaten, die zuvor nirgends in der App auftauchten: bei DWD-Unwetterwarnungen insbesondere
+  **Beschreibung und amtliche Verhaltenshinweise** (`payload.description`/`payload.instruction`,
+  von der DWD-API mitgeliefert) — die eigentlich wichtige Information für Einsatzkräfte, nicht nur
+  die Warnstufe. Bei den übrigen Quellen z.B. Gewässername, zuständige Behörde, Satellit.
+- **Bewusst keine neue Wetterdatenquelle** (z.B. Temperatur-/Windvorhersage): Die dafür nötigen
+  DWD-Endpunkte (`opendata.dwd.de`) waren aus der Entwicklungsumgebung dieses Projekts nicht
+  erreichbar, siehe „Windrichtung/-geschwindigkeit“ weiter unten — die Übersicht fasst stattdessen
+  die fünf bereits vorhandenen, verifizierten Quellen besser aufbereitet zusammen.
 
 ## Rollen
 

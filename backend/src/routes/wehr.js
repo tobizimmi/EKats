@@ -7,7 +7,8 @@ const router = express.Router();
 router.use(requireAuth);
 
 // Nachbarlandkreise werden nicht gespeichert, sondern per ST_Touches() aus den Grenzpolygonen
-// berechnet (siehe Migration 006) - bleibt dadurch automatisch korrekt.
+// berechnet (siehe Migration 006) - bleibt dadurch automatisch korrekt. Dieselbe Grundidee nutzt
+// auch utils/zustaendigkeit.js fuer die Gebiets-Filterung in routes/datapoints.js.
 async function loadNeighborLandkreise(homeAgs) {
   if (!homeAgs) return [];
   const { rows } = await query(

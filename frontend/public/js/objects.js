@@ -444,20 +444,9 @@ function renderObjectList(objects) {
   });
 }
 
+// Tab-Umschaltung ist generisch fuer eine beliebige Anzahl Tabs (siehe app.js initTabs()) - hier
+// nur noch die Objekt-Listenfilter verdrahten.
 function initObjectListTab() {
-  document.getElementById('tab-button-lage').addEventListener('click', () => {
-    document.getElementById('tab-button-lage').classList.add('active');
-    document.getElementById('tab-button-objekte').classList.remove('active');
-    document.getElementById('tab-panel-lage').hidden = false;
-    document.getElementById('tab-panel-objekte').hidden = true;
-  });
-  document.getElementById('tab-button-objekte').addEventListener('click', () => {
-    document.getElementById('tab-button-objekte').classList.add('active');
-    document.getElementById('tab-button-lage').classList.remove('active');
-    document.getElementById('tab-panel-objekte').hidden = false;
-    document.getElementById('tab-panel-lage').hidden = true;
-  });
-
   ['object-list-search', 'object-list-category-filter', 'object-list-overdue-filter', 'object-list-sort'].forEach(
     (id) => {
       const el = document.getElementById(id);

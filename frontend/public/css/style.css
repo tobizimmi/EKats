@@ -320,6 +320,40 @@ button.secondary {
   margin-top: 1rem;
 }
 
+.weather-section {
+  margin-bottom: 1.1rem;
+}
+
+.weather-section:last-child {
+  margin-bottom: 0;
+}
+
+.weather-section-title {
+  font-size: 0.95rem;
+  margin: 0 0 0.4rem;
+}
+
+.weather-badge-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: 0.5rem;
+}
+
+.badge.severity-1,
+.badge.severity-3,
+.badge.severity-4 {
+  color: #fff;
+}
+
+.badge.severity-2 {
+  color: #1a1f24;
+}
+
+.weather-item-list li {
+  cursor: pointer;
+}
+
 .detail-panel dt {
   color: var(--text-muted);
   font-size: 0.8rem;

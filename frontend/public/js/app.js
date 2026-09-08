@@ -5,11 +5,26 @@ window.selectDatapoint = function selectDatapoint(dp) {
   focusDatapointOnMap(dp);
 };
 
+// Generische Tab-Umschaltung ueber data-tab/data-tab-panel (siehe index.html) - beliebig viele Tabs,
+// kein Spezialfall mehr fuer genau zwei wie zuvor fest in objects.js verdrahtet.
+function initTabs() {
+  const buttons = [...document.querySelectorAll('.tab-button[data-tab]')];
+  buttons.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      buttons.forEach((b) => b.classList.toggle('active', b === btn));
+      document.querySelectorAll('[data-tab-panel]').forEach((panel) => {
+        panel.hidden = panel.dataset.tabPanel !== btn.dataset.tab;
+      });
+    });
+  });
+}
+
 async function loadAndRenderDatapoints() {
   try {
     const datapoints = await api.get('/datapoints');
     renderMap(datapoints);
     renderList(datapoints);
+    renderWeatherOverview(datapoints);
     saveOfflineSnapshot(datapoints);
     updateOfflineBanner();
     return datapoints;
@@ -32,6 +47,7 @@ async function loadAndRenderDatapoints() {
   initMap(user.wehrCenter);
   registerServiceWorker();
   initObjectsUi(user);
+  initTabs();
 
   await loadBundeslandFeatures();
   await loadAndRenderDatapoints();
