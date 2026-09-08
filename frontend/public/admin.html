@@ -46,9 +46,16 @@
             <span>Kartenmittelpunkt – Längengrad</span>
             <input id="wehr-lon" type="number" step="0.0001" min="-180" max="180" />
           </label>
+          <label>
+            <span>Zuständigkeitsgebiet (Heimat-Landkreis)</span>
+            <select id="wehr-landkreis">
+              <option value="">– keiner ausgewählt –</option>
+            </select>
+          </label>
           <button type="submit" class="primary">Speichern</button>
         </form>
         <p class="error-message" id="wehr-error" role="alert"></p>
+        <p class="muted" id="wehr-neighbors"></p>
         <p class="muted">
           Der Kartenmittelpunkt bestimmt den Startausschnitt der Kartenansicht und den Bezugspunkt
           für den NASA-FIRMS-Suchradius (<code>FIRMS_RADIUS_KM</code> in <code>.env</code>).

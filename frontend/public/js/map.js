@@ -2,6 +2,7 @@
 // Tile-Quelle: OpenStreetMap-Standardkacheln (keine Drittanbieter-Tracking-Skripte, nur Kachelbilder).
 
 const OBJECT_LAYER_KEY = 'objects';
+const GEBIET_LAYER_KEY = 'gebiet';
 
 let map;
 let layerGroups = {};
@@ -24,6 +25,7 @@ function initMap(center) {
     layerGroups[source] = L.layerGroup().addTo(map);
   });
   layerGroups[OBJECT_LAYER_KEY] = L.layerGroup().addTo(map);
+  layerGroups[GEBIET_LAYER_KEY] = L.layerGroup().addTo(map);
 
   map.on('click', (event) => {
     if (!placementCallback) return;
@@ -49,7 +51,11 @@ function disarmObjectPlacement() {
 function buildLayerToggles() {
   const container = document.getElementById('layer-toggles');
   container.innerHTML = '';
-  const allLayers = { ...SOURCE_LABELS, [OBJECT_LAYER_KEY]: 'Kritische Objekte' };
+  const allLayers = {
+    ...SOURCE_LABELS,
+    [OBJECT_LAYER_KEY]: 'Kritische Objekte',
+    [GEBIET_LAYER_KEY]: 'Zuständigkeitsgebiet',
+  };
   Object.entries(allLayers).forEach(([source, label]) => {
     const id = `layer-toggle-${source}`;
     const wrapper = document.createElement('label');
@@ -110,6 +116,22 @@ const objectIcon = L.divIcon({
   iconSize: [16, 16],
   iconAnchor: [8, 8],
 });
+
+// Zeigt den Heimat-Landkreis (kraeftig) und die angrenzenden Landkreise (dezent) als Umriss-Layer,
+// damit die Wehr ihr Zustaendigkeitsgebiet auf einen Blick sieht (siehe admin.html "Wehr-
+// Einstellungen" fuer die Auswahl). Rein informativ, keine Klick-Interaktion noetig.
+function renderGebiet(geojson) {
+  layerGroups[GEBIET_LAYER_KEY].clearLayers();
+  if (!geojson || !geojson.features || geojson.features.length === 0) return;
+
+  L.geoJSON(geojson, {
+    style: (feature) =>
+      feature.properties.isHome
+        ? { color: '#6d28d9', weight: 3, fillOpacity: 0.08, fillColor: '#6d28d9' }
+        : { color: '#6d28d9', weight: 1.5, dashArray: '4 4', fillOpacity: 0 },
+    onEachFeature: (feature, layer) => layer.bindTooltip(feature.properties.name),
+  }).addTo(layerGroups[GEBIET_LAYER_KEY]);
+}
 
 function renderObjects(objects) {
   layerGroups[OBJECT_LAYER_KEY].clearLayers();

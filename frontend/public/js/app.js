@@ -35,5 +35,9 @@ async function loadAndRenderDatapoints() {
 
   await loadAndRenderDatapoints();
   await loadObjects();
+  api
+    .get('/wehr/gebiet-geojson')
+    .then(renderGebiet)
+    .catch((err) => console.warn('[app] Zustaendigkeitsgebiet konnte nicht geladen werden:', err));
   setInterval(loadAndRenderDatapoints, REFRESH_INTERVAL_MS);
 })();

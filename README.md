@@ -228,6 +228,34 @@ Mittelwerten) — für eine echte Meldestufe die Hochwasserzentralen-Quelle nutz
 Regel/Datapoint/Kanal-Kombination löst wegen `alert_log` nur einmal aus (siehe
 `src/notifications/evaluate.js`).
 
+## Zuständigkeitsgebiet (Landkreis + Nachbarlandkreise)
+
+Im Admin-Bereich („Wehr-Einstellungen“) legt der Admin den **Heimat-Landkreis** der Wehr fest
+(Auswahl aus allen 402 deutschen Kreisen/kreisfreien Städten mit amtlichem Gemeindeschlüssel).
+Wehrweite Einstellung, nicht pro Nutzer — passend zum bestehenden Modell (Kartenmittelpunkt ist
+ebenfalls wehrweit).
+
+- **Nachbarlandkreise** werden nicht manuell gepflegt, sondern automatisch aus den echten
+  Kreisgrenzen berechnet (`ST_Touches` in PostGIS) — bleibt dadurch immer korrekt.
+- Auf dem Dashboard erscheint das Zuständigkeitsgebiet als eigener Karten-Layer (Umriss, Heimat-
+  Landkreis hervorgehoben, Nachbarn gestrichelt), ein-/ausblendbar wie die anderen Layer.
+- **Bewusste Einschränkung**: Die Auswahl filtert aktuell **nicht** automatisch die angezeigten
+  DWD-Unwetterwarnungen nach Landkreis — die DWD-Warnungen liefern nur Bundesland-Ebene (siehe
+  `dwd_unwetter`-Connector-Kommentar), eine zuverlässige Zuordnung zu Kreis-Warnzellen würde die
+  offizielle DWD-Warncell-ID-Zuordnungstabelle erfordern, die aus der Entwicklungsumgebung dieses
+  Projekts nicht erreichbar war (siehe „Verifikationsstand der Fetcher“). Diese Funktion ist die
+  Grundlage/Vorbereitung dafür, filtert aber noch nicht automatisch.
+
+### Datenquelle & Lizenzhinweis
+
+Kreisgrenzen + amtliche Gemeindeschlüssel (AGS) stammen von
+[m-ad/geofeatures-ags-germany](https://github.com/m-ad/geofeatures-ags-germany) (`node
+src/importLandkreise.js`, einmaliger Import, kein Cron). Die Geometrie ist ursprünglich aus der
+**GADM**-Datenbank abgeleitet, deren Lizenz Weiterverbreitung ohne Erlaubnis untersagt — die Daten
+werden deshalb **bewusst nicht im EKats-Repository vorgehalten**, sondern bei jedem Import-Lauf
+live von der Quelle geladen (wie bei den DWD-Datenquellen auch). Bei Bedarf `npm run
+import-landkreise` erneut ausführen (idempotent).
+
 ## Rollen
 
 Drei Stufen, jede höhere umfasst die Rechte der niedrigeren:
@@ -392,10 +420,24 @@ mit Zeitstempel des letzten Standes. Kein voller Offline-Betrieb mit Sync (das i
 Fahrzeugeinsatz) — API-Aufrufe gehen immer live ans Netz, Kartenkacheln werden nicht vorab
 zwischengespeichert.
 
-## Geplant: Wetter-Entwicklung (Windrichtung/-geschwindigkeit, Gewitterzug)
+## Geplant: Wetter-Entwicklung (Windrichtung/-geschwindigkeit, Gewitterzug, Warnungen als Fläche)
 
 Recherche-Ergebnis zur Anforderung „Windrichtung und wie sie sich entwickelt/ändert, ziehende
-Gewitter“ — **bewusst noch nicht implementiert**, siehe Begründung unten.
+Gewitter, Warnungen als Fläche statt Punkt wie beim DWD“ — **bewusst noch nicht implementiert**,
+siehe Begründung unten.
+
+### Warnungen als Fläche statt Punkt (aktuell nicht sicher umsetzbar)
+
+Mit dem neuen Zuständigkeitsgebiet-Feature (siehe oben) liegen jetzt echte Kreisgrenzen-Polygone
+im System vor — die fehlende Zutat für „Warnung als Fläche“ ist die Zuordnung DWD-Warncell-ID →
+Landkreis-AGS. Diese offizielle Zuordnungstabelle (`cap_warncellids_csv`) liegt auf `dwd.de`,
+einer aus dieser Entwicklungsumgebung nicht erreichbaren Domain, und es fand sich keine
+verlässliche Ersatzquelle. **Eine geratene/falsche Zuordnung würde eine Warnung auf der falschen
+Fläche anzeigen — bei einem Katastrophenschutz-Tool ein echtes Sicherheitsrisiko, kein
+kosmetisches Problem.** Deshalb bewusst nicht blind umgesetzt. Sobald die offizielle CSV von
+`dwd.de/DE/leistungen/opendata/help/warnungen/cap_warncellids_csv.html` verifiziert werden kann,
+ist die Umsetzung ein überschaubarer nächster Schritt (Join-Tabelle + Polygon-Rendering wie beim
+neuen Zuständigkeitsgebiet-Layer).
 
 ### Windrichtung/-geschwindigkeit (Empfehlung: MOSMIX-S, machbar)
 
@@ -488,8 +530,9 @@ umsetzen ließ vs. was echte Infrastruktur oder Live-Tests braucht:
   gegen bekannte kompromittierte Passwörter (z.B. HaveIBeenPwned-Prefix-API, datensparsam da nur
   ein SHA1-Präfix übertragen wird) oder eine höhere Mindestlänge für Admin-Konten.
 - **2FA/TOTP** für Admin-Konten (siehe „Bekannte V1-Vereinfachungen“).
-- **Gebietsdefinition (Nachbar-Landkreise) und Verkehrsdaten**: beide bereits in früheren
-  Planungsrunden dieses Projekts als eigene Phasen vorgesehen, aber noch nicht begonnen.
+- **Verkehrsdaten**: bereits in früheren Planungsrunden dieses Projekts als eigene Phase
+  vorgesehen, aber noch nicht begonnen. (Gebietsdefinition/Zuständigkeitsgebiet ist inzwischen
+  umgesetzt, siehe eigener Abschnitt oben.)
 - **Mandantenfähigkeit (mehrere Wehren auf einer Installation)**: Schema ist vorbereitet
   (`wehr`-Tabelle), aber bewusst als letzte, größere Ausbaustufe zurückgestellt (siehe frühere
   Planung zu Platform-Admin vs. Wehr-Admin).

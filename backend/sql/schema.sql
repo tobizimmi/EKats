@@ -13,6 +13,22 @@ CREATE TABLE IF NOT EXISTS wehr (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- Landkreise mit amtlichem Gemeindeschluessel (AGS) + Grenzpolygon. Nachbarlandkreise werden NICHT
+-- gespeichert, sondern per ST_Touches() aus den Polygonen berechnet (siehe routes/wehr.js).
+-- Befuellung: node src/importLandkreise.js (einmalig, laedt die Daten live, siehe dort).
+CREATE TABLE IF NOT EXISTS landkreis (
+    ags CHAR(5) PRIMARY KEY,
+    name TEXT NOT NULL,
+    district_type TEXT,
+    state TEXT,
+    kfz TEXT,
+    geom GEOMETRY(MultiPolygon, 4326) NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_landkreis_geom ON landkreis USING GIST(geom);
+
+ALTER TABLE wehr ADD COLUMN IF NOT EXISTS home_landkreis_ags CHAR(5) REFERENCES landkreis(ags);
+
 -- Benutzer, drei Rollenstufen:
 --   'admin'    - voller Zugriff + Nutzerverwaltung/Wehr-Einstellungen (Admin-Bereich)
 --   'stab'     - voller Lage-Zugriff + Schwellenwerte konfigurieren, aber keine Nutzerverwaltung

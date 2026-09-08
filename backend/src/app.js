@@ -18,6 +18,7 @@ const objectsRoutes = require('./routes/objects');
 const vehiclesRoutes = require('./routes/vehicles');
 const stationsRoutes = require('./routes/stations');
 const auditLogRoutes = require('./routes/auditLog');
+const landkreiseRoutes = require('./routes/landkreise');
 
 function createApp() {
   const app = express();
@@ -93,6 +94,7 @@ function createApp() {
   app.use('/api/vehicles', vehiclesRoutes);
   app.use('/api/stations', stationsRoutes);
   app.use('/api/audit-log', auditLogRoutes);
+  app.use('/api/landkreise', landkreiseRoutes);
 
   app.use('/api', notFoundHandler);
 

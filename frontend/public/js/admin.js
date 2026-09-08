@@ -1,8 +1,35 @@
+function renderNeighborLandkreise(wehr) {
+  const el = document.getElementById('wehr-neighbors');
+  if (!wehr.home_landkreis_ags) {
+    el.textContent = '';
+    return;
+  }
+  const names = (wehr.neighborLandkreise || []).map((k) => k.name);
+  el.textContent = names.length
+    ? `Angrenzende Landkreise: ${names.join(', ')}`
+    : 'Keine angrenzenden Landkreise gefunden (Grenzgebiet zum Ausland o.ä.).';
+}
+
+async function loadLandkreisOptions(selectedAgs) {
+  const select = document.getElementById('wehr-landkreis');
+  const landkreise = await api.get('/landkreise');
+  select.innerHTML = '<option value="">– keiner ausgewählt –</option>';
+  landkreise.forEach((lk) => {
+    const opt = document.createElement('option');
+    opt.value = lk.ags;
+    opt.textContent = `${lk.name} (${lk.state})`;
+    opt.selected = lk.ags === selectedAgs;
+    select.appendChild(opt);
+  });
+}
+
 async function loadWehr() {
   const wehr = await api.get('/wehr');
   document.getElementById('wehr-name').value = wehr.name || '';
   document.getElementById('wehr-lat').value = wehr.center_lat ?? '';
   document.getElementById('wehr-lon').value = wehr.center_lon ?? '';
+  await loadLandkreisOptions(wehr.home_landkreis_ags);
+  renderNeighborLandkreise(wehr);
 }
 
 async function loadUsers(currentUserId) {
@@ -226,12 +253,15 @@ async function loadVehicles() {
     errorEl.textContent = '';
     const lat = document.getElementById('wehr-lat').value;
     const lon = document.getElementById('wehr-lon').value;
+    const landkreisAgs = document.getElementById('wehr-landkreis').value;
     try {
-      await api.patch('/wehr', {
+      const updated = await api.patch('/wehr', {
         name: document.getElementById('wehr-name').value.trim(),
         centerLat: lat === '' ? null : Number(lat),
         centerLon: lon === '' ? null : Number(lon),
+        homeLandkreisAgs: landkreisAgs || null,
       });
+      renderNeighborLandkreise(updated);
     } catch (err) {
       errorEl.textContent = err.message;
     }
