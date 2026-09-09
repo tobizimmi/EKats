@@ -83,30 +83,37 @@ function createDatapointLayer(dp) {
 
 // DWD-Niederschlagsradar als optionaler WMS-Overlay - macht die Zugrichtung von Niederschlag/Gewitter
 // direkt auf der Karte sichtbar, nicht nur als Einzel-Warnung. Von map.js (Dashboard) und addon.js
-// (Themenseiten) genutzt.
+// (Themenseiten) genutzt. Layer-Name, EPSG:3857-Unterstuetzung und die time-Dimension (Default
+// "current") sind per GetCapabilities auf dem Produktivserver verifiziert (siehe README, Abschnitt
+// "Gewitterzug/Niederschlagsbewegung" - dort auch die Historie der beiden vorherigen falschen
+// Layer-Namen, falls das nochmal auftaucht). Bewusst als zuschaltbarer Overlay (Standard AUS):
+// schlaegt eine Kachel fehl, bleibt nur die Kartenschicht leer, kein Fehler und keine
+// Beeintraechtigung der eigentlichen Lage-Daten (siehe tileerror-Handler unten als Absicherung).
 //
-// DRITTER UND (jetzt echt) VERIFIZIERTER VERSUCH: der Nutzer hat GetCapabilities live gegen
-// maps.dwd.de geprueft (per curl auf dem Produktivserver, siehe README) und den vollstaendigen
-// Layer-Katalog geliefert. Die vorherigen zwei Versuche waren aus zwei verschiedenen Gruenden falsch:
-// "dwd:Niederschlagsradar" hatte den RICHTIGEN Basisnamen, aber einen ueberfluessigen "dwd:"-Praefix
-// - der Endpunkt "https://maps.dwd.de/geoserver/dwd/wms" ist bereits auf den Workspace "dwd"
-// eingeschraenkt, ein zusaetzliches "dwd:" im layers-Parameter sucht dann faelschlich nach einem
-// Layer, der woertlich "dwd:Niederschlagsradar" heisst (gibt es nicht). "dwd:RX-Produkt" war schlicht
-// kein existierender Layer auf diesem GeoServer (stammte aus einem anderen Kontext). Laut
-// GetCapabilities-XML heisst der Layer exakt "Niederschlagsradar" (ohne Praefix), unterstuetzt
-// EPSG:3857 (Leaflets Standard-Projektion) und hat eine time-Dimension mit Default "current" - ohne
-// TIME-Parameter zeigt er also automatisch den aktuellsten Stand, kein Zusatzparameter noetig. Laut
-// Abstract sogar noch besser als erhofft: "Niederschlagsradar und -vorhersage, Alias fuer RV-Produkt
-// (Aufloesung 1km), 5 minuetig" - enthaelt bereits eine kurzfristige Vorhersage-Komponente.
-// Bewusst als zuschaltbarer Overlay (Standard AUS): schlaegt der Layer-Name doch fehl, bleiben nur
-// Kacheln aus, kein Fehler und keine Beeintraechtigung der eigentlichen Lage-Daten (siehe tileerror-
-// Handler unten als Absicherung).
+// RADAR_COVERAGE_BOUNDS (Leaflet-Option "bounds"): die reale Abdeckung laut GetCapabilities
+// (EPSG:4326-BoundingBox, WMS-1.3.0-Achsreihenfolge lat/lon: minx=lat, miny=lon), plus etwas Rand.
+// Verhindert Anfragen weit ausserhalb der Abdeckung (z.B. ueber dem Atlantik), wenn stark
+// herausgezoomt wird - reicht fuer sich allein aber NICHT: bei sehr niedrigem Zoom ist eine einzelne
+// 256px-Kachel geografisch groesser als ganz Deutschland, jede Kachel am Rand der Abdeckung ragt dann
+// unweigerlich etwas darueber hinaus (Leaflets "bounds" schliesst nur Kacheln OHNE jede Ueberschneidung
+// aus, nicht teilweise ueberlappende). Live bestaetigt: DWDs GeoServer antwortet auf eine solche, nur
+// teilweise ueberlappende Kachel nicht mit einer leeren Flaeche, sondern mit HTTP 500 - und die dabei
+// entstehenden vielen, langsam fehlschlagenden Anfragen sind der wahrscheinlichste Grund, warum in
+// genau diesem Zustand auch die normale Kartenkachel-Anzeige (OpenStreetMap) leer blieb. Deshalb
+// zusaetzlich MIN_RADAR_ZOOM (Leaflet-Option "minZoom" der Layer, nicht der Karte): unterhalb dieses
+// Zooms wird der Layer erst gar nicht mehr gerendert/angefragt - bei Zoom 7 deckt eine Kachel nur noch
+// einen Bruchteil des Landes ab, Randkacheln bleiben die Ausnahme statt die Regel.
+const RADAR_COVERAGE_BOUNDS = L.latLngBounds([45.2, 0.9], [56.7, 19.2]);
+const MIN_RADAR_ZOOM = 7;
+
 function createNiederschlagsradarLayer() {
   return L.tileLayer.wms('https://maps.dwd.de/geoserver/dwd/wms', {
     layers: 'Niederschlagsradar',
     format: 'image/png',
     transparent: true,
     opacity: 0.6,
+    bounds: RADAR_COVERAGE_BOUNDS,
+    minZoom: MIN_RADAR_ZOOM,
     attribution: 'Radardaten: Deutscher Wetterdienst (DWD)',
   });
 }
