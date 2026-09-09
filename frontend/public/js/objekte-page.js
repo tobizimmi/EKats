@@ -183,110 +183,11 @@ function toggleObjekteMap() {
   renderObjekteMapMarkers();
 }
 
-// Baut einen Themenblock wie im Objekt-Formular (js/objects.js) - Label/Wert-Raster mit
-// Abschnitts-Ueberschrift, aber read-only. Felder mit Wert "–" werden trotzdem angezeigt (Konsistenz
-// mit dem Formular, das dieselben Felder zeigt), damit das Fehlen einer Angabe sichtbar ist statt der
-// Block bei einem leeren Pflichtfeld einfach zu verschwinden.
-function detailSection(title, fields) {
-  const section = document.createElement('div');
-  section.className = 'dialog-section';
-  const heading = document.createElement('h4');
-  heading.className = 'dialog-section-title';
-  heading.textContent = title;
-  section.appendChild(heading);
-  const grid = document.createElement('div');
-  grid.className = 'detail-grid';
-  fields.forEach(([label, value]) => {
-    const field = document.createElement('div');
-    const labelEl = document.createElement('div');
-    labelEl.className = 'detail-field-label';
-    labelEl.textContent = label;
-    const valueEl = document.createElement('div');
-    valueEl.className = 'detail-field-value';
-    if (value instanceof Node) {
-      valueEl.appendChild(value);
-    } else {
-      valueEl.textContent = value ?? '–';
-    }
-    field.appendChild(labelEl);
-    field.appendChild(valueEl);
-    grid.appendChild(field);
-  });
-  section.appendChild(grid);
-  return section;
-}
-
-function yesNoBadge(value) {
-  const span = document.createElement('span');
-  span.className = `badge ${value ? 'badge-yes' : 'badge-no'}`;
-  span.textContent = value ? 'Ja' : 'Nein';
-  return span;
-}
-
+// Detailansicht ist eine eigene Seite (objekt-detail.html, Nutzerwunsch - Vorbild ist die
+// Detailansicht des urspruenglichen lokalen Feuerwehr-Objektverwaltungstools) statt eines Dialogs
+// hier - Tabellenzeile/Kartenmarker-Klick navigiert einfach dorthin.
 function openDetailDialog(obj) {
-  const dialog = document.getElementById('objekte-detail-dialog');
-  document.getElementById('objekte-detail-title').textContent = `#${obj.id} · ${obj.name}`;
-  const container = document.getElementById('objekte-detail-content');
-  container.innerHTML = '';
-
-  const addressLine = [obj.street, obj.house_number].filter(Boolean).join(' ');
-  const cityLine = [obj.postal_code, obj.city].filter(Boolean).join(' ');
-
-  container.appendChild(
-    detailSection('Stammdaten', [
-      ['Anschrift', [addressLine, cityLine].filter(Boolean).join(', ') || obj.address],
-      ['Ortsteil', obj.district],
-      ['Objekttyp', OBJECT_CATEGORY_LABELS[obj.category] || obj.category],
-    ])
-  );
-
-  container.appendChild(
-    detailSection('Ansprechpartner', [
-      ['Name', obj.contact_name],
-      ['Telefon', obj.contact_phone],
-      ['E-Mail', obj.contact_email],
-      ['Notfalltelefon', obj.emergency_phone],
-    ])
-  );
-
-  container.appendChild(
-    detailSection('Planstatus', [
-      ['Offizieller Einsatzplan', yesNoBadge(obj.has_official_plan)],
-      ['FW-eigener Plan', yesNoBadge(obj.has_fw_plan)],
-      ['Plandatum', obj.plan_date ? new Date(obj.plan_date).toLocaleDateString('de-DE') : null],
-      ['Planersteller', obj.plan_creator],
-    ])
-  );
-
-  container.appendChild(
-    detailSection('Gebäudedaten', [
-      ['Baujahr', obj.built_year],
-      ['Etagen/Stockwerke', obj.floors],
-      ['Fläche', obj.area],
-    ])
-  );
-
-  container.appendChild(
-    detailSection('Besonderheiten & Gefahren', [
-      ['Besonderheiten', obj.special_features],
-      ['Besondere Gefahren', obj.hazards],
-      ['Löschwasserversorgung', FIRE_WATER_SUPPLY_LABELS[obj.fire_water_supply_type]],
-      ['Zufahrt/Schlüsseldepot', obj.access_info],
-      ['Sammelplatz', obj.assembly_point],
-    ])
-  );
-
-  container.appendChild(
-    detailSection('Überprüfung', [
-      [
-        'Fälligkeit',
-        obj.next_review_at ? `${formatTimestamp(obj.next_review_at)}${isOverdue(obj) ? ' (ÜBERFÄLLIG)' : ''}` : null,
-      ],
-    ])
-  );
-
-  document.getElementById('objekte-detail-map-link').href = `./?object=${obj.id}`;
-  dialog.showModal();
+  window.location.href = `objekt-detail.html?id=${obj.id}`;
 }
 
 function updateBulkBar(selectedRows) {
@@ -388,9 +289,6 @@ async function exportSelectedOrFilteredPdfs() {
     objektePage.table.selectedKeys.clear();
     objektePage.table.renderTable();
     updateBulkBar([]);
-  });
-  document.getElementById('objekte-detail-close').addEventListener('click', () => {
-    document.getElementById('objekte-detail-dialog').close();
   });
 
   await loadObjects();

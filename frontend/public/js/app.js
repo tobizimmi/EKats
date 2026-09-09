@@ -52,8 +52,17 @@ async function loadAndRenderDatapoints() {
   await loadBundeslandFeatures();
   await loadLandkreisFeatures();
   await loadAndRenderDatapoints();
-  await loadObjects();
+  const objects = await loadObjects();
   renderPriorityBar(); // Objekte sind jetzt geladen - "Kritisch"-Kachel neu zaehlen (ueberfaellige Objekte)
+
+  // Direktsprung von der Objekt-Detailseite (objekt-detail.html "Bearbeiten") bzw. der
+  // Objekt-Uebersicht ("Auf der Karte oeffnen") - oeffnet den Dialog fuer das per ?object=<id>
+  // referenzierte Objekt direkt, statt es erst manuell auf der Karte suchen zu muessen.
+  const requestedObjectId = Number(new URLSearchParams(window.location.search).get('object'));
+  if (requestedObjectId) {
+    const requestedObject = objects.find((o) => o.id === requestedObjectId);
+    if (requestedObject) window.selectObject(requestedObject);
+  }
   api
     .get('/wehr/gebiet-geojson')
     .then(renderGebiet)

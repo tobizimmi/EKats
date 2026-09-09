@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Objekt – EKats</title>
+  <link rel="stylesheet" href="vendor/leaflet/leaflet.css" />
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <meta name="theme-color" content="#14232f" />
+</head>
+<body>
+  <div id="app-sidebar-root"></div>
+  <main class="stack">
+    <div class="card">
+      <a href="objekte.html" class="back-link">← Objekt-Übersicht</a>
+      <div class="detail-page-header">
+        <div>
+          <h2 class="detail-page-title" id="objekt-detail-title">Objekt</h2>
+          <div class="detail-page-subtitle" id="objekt-detail-subtitle"></div>
+        </div>
+        <div class="detail-page-actions">
+          <a id="objekt-detail-pdf-link" class="button-link" href="#">PDF exportieren</a>
+          <a id="objekt-detail-edit-link" class="button-link" data-role="stab-only" hidden href="#">Bearbeiten</a>
+          <button type="button" id="objekt-detail-delete-button" class="secondary" data-role="stab-only" hidden>
+            Löschen
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <p class="error-message" id="objekt-detail-error" role="alert"></p>
+
+    <div class="dashboard-grid" id="objekt-detail-body" hidden>
+      <div id="objekt-detail-sections"></div>
+      <div class="stack">
+        <div class="card">
+          <h2 class="section-title">Karte</h2>
+          <div id="objekt-detail-map"></div>
+          <p class="muted" id="objekt-detail-coords"></p>
+        </div>
+        <div class="card">
+          <h2 class="section-title">Metadaten</h2>
+          <div class="detail-grid" id="objekt-detail-meta"></div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script src="vendor/leaflet/leaflet.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/header.js"></script>
+  <script src="js/severity.js"></script>
+  <script src="js/sw-register.js"></script>
+  <script src="js/objekt-detail-page.js"></script>
+</body>
+</html>

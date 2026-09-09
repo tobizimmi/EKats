@@ -390,6 +390,49 @@ button.secondary {
   margin-bottom: 1rem;
 }
 
+/* Objekt-Detailseite (objekt-detail.html) - eigenstaendige Seite statt Dialog, Vorbild ist auch hier
+   das lokale Referenz-Tool (Kopfbereich mit Aktions-Buttons, zweispaltig: Themenbloecke links,
+   Karte+Metadaten rechts). */
+.detail-page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-top: 0.5rem;
+}
+
+.back-link {
+  display: inline-block;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  text-decoration: none;
+  margin-bottom: 0.3rem;
+}
+
+.detail-page-title {
+  margin: 0;
+  font-size: 1.4rem;
+}
+
+.detail-page-subtitle {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  margin-top: 0.2rem;
+}
+
+.detail-page-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+#objekt-detail-map {
+  height: 280px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+}
+
 /* Permanentes Pegelstand-Label an Pegel-Messstellen (js/bundesland.js createDatapointLayer) - eigene
    Regel statt Leaflets Default-Tooltip-Optik, damit es sich an Karte + Theme (hell/dunkel) einfuegt. */
 .leaflet-tooltip.pegel-value-label {

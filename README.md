@@ -546,6 +546,19 @@ mit Volltextsuche (Name/Adresse), Kategorie-Filter, Sortierung (Name/Kategorie/F
 einem Schnellfilter „Nur überfällige“. Ein Klick auf einen Listeneintrag öffnet denselben
 Objekt-Dialog wie ein Klick auf den Kartenmarker.
 
+### Objekt-Einzelseite (`objekt-detail.html`)
+
+Eigenständige Seite je Objekt (`objekt-detail.html?id=<id>`, erreichbar per Klick auf eine Tabellenzeile
+oder einen Kartenmarker auf `objekte.html`) statt eines Dialogs — Vorbild ist auch hier das
+ursprüngliche lokale Feuerwehr-Objektverwaltungstool des Nutzers: Kopfbereich mit Zurück-Link, Titel,
+„#id · Kategorie · Ort"-Unterzeile und Aktions-Buttons (PDF exportieren/Bearbeiten/Löschen), darunter
+zweispaltig links die gruppierten Themenblöcke (dieselben wie zuvor im Dialog), rechts eine
+interaktive Mini-Karte mit Marker sowie eine Metadaten-Karte (erstellt/zuletzt geändert). „Bearbeiten"
+verlinkt auf `index.html?object=<id>` — die Hauptkarte öffnet dieses Objekt beim Laden automatisch im
+Formular-Dialog (für Mitglied schreibgeschützt, sonst bearbeitbar), da Anlegen/Bearbeiten mit
+Kartenposition weiterhin dort verankert bleibt. Es gibt keinen Einzelobjekt-GET-Endpunkt — die
+(ohnehin kleine) Wehr-weite Objektliste wird geladen und das Objekt clientseitig herausgefiltert.
+
 ### Objekt-Detailseite (`objekte.html`)
 
 Eigenständige, tiefere Ansicht zusätzlich zur Karte (die für Anlegen/Bearbeiten mit Kartenposition
