@@ -571,24 +571,40 @@ Objekt-Dialog) — sofern im Admin-Bereich eine Vorlage für den Dokumenttyp „
 hinterlegt ist (siehe „PDF-Vorlagen" unten). Ohne Vorlage liefert der Endpunkt bewusst einen klaren
 Fehler statt eines leeren PDFs.
 
+## Zugriffssteuerung je Datenquelle
+
+Seit Phase 5 ist die Zugriffssteuerung, die ursprünglich nur für Kachelmann galt (siehe unten),
+auf **alle acht Datenquellen** generalisiert (`backend/src/utils/featureAccess.js`,
+`backend/src/routes/featureAccess.js`, Migration 009). Im Admin-Bereich (Abschnitt
+„Zugriffssteuerung je Datenquelle") legt ein Admin für jede Quelle einzeln fest, welche **Rollen**
+standardmäßig Zugriff haben (`wehr_feature_role_access`, Matrix-Ansicht mit einer Zeile je
+Quelle), und kann zusätzlich über die Einzelnutzer-Freigabe **einzelne Nutzer** individuell
+freischalten oder sperren (`user_feature_access`) — ein Einzel-Override gewinnt in beide
+Richtungen gegen die Rollen-Voreinstellung.
+
+`GET /api/datapoints` prüft den Zugriff quellen-generisch: eine gezielte Abfrage
+(`?source=...`) ohne Zugriff liefert `403`; die ungefilterte Abfrage (kombinierte Lage-Übersicht)
+blendet Quellen ohne Zugriff still aus, statt einen Fehler zu werfen. Eine Quelle **ohne
+konfigurierte Regel bleibt offen für alle** (Rückwärtskompatibilität — die Zugriffssteuerung war
+vor Phase 5 nicht vorhanden, ihr bloßes Ausrollen darf keine bisher freie Quelle versehentlich
+sperren). Die einzige Ausnahme ist **Kachelmann/Meteologix**: als einzige kostenpflichtige Quelle
+bleibt sie ohne konfigurierte Regel gesperrt (`DEFAULT_CLOSED_FEATURES` in `featureAccess.js`), um
+keinen versehentlichen API-Kostenanfall zu riskieren. Die Matrix-Ansicht im Admin-Bereich markiert
+diese Quelle entsprechend mit einem Hinweis-Badge „ohne Regel gesperrt".
+
 ## Kachelmann/Meteologix (optionale Zusatz-Wetterquelle)
 
 Als siebte Datenquelle ist ein Connector für die kommerzielle Kachelmannwetter/Meteologix-API
 vorbereitet (`backend/src/fetchers/kachelmann.js`) — vom Nutzer als optionales, später
-abonnementpflichtiges Feature gewünscht. Anders als die sechs übrigen Quellen ist sie **nicht für
-jede Wehr automatisch aktiv**, sondern über eine eigene Zugriffssteuerung frei- bzw. sperrbar:
+abonnementpflichtiges Feature gewünscht. Anders als die übrigen Quellen ist sie **nicht für jede
+Wehr automatisch aktiv**, sondern über die oben beschriebene Zugriffssteuerung frei- bzw.
+sperrbar (und dort die einzige Quelle, die ohne aktive Freigabe geschlossen bleibt):
 
-- Im Admin-Bereich (Abschnitt „Kachelmann-Zugriff") legt ein Admin fest, welche **Rollen**
-  standardmäßig Zugriff haben (`wehr_feature_role_access`), und kann zusätzlich **einzelne
-  Nutzer** individuell freischalten oder sperren (`user_feature_access`) — ein Einzel-Override
-  gewinnt in beide Richtungen gegen die Rollen-Voreinstellung.
-- `GET /api/datapoints` blendet Kachelmann-Datenpunkte für Nutzer ohne Zugriff bei ungefilterter
-  Abfrage still aus; eine gezielte Abfrage (`?source=kachelmann`) ohne Zugriff liefert `403`.
 - Der Fetcher selbst läuft nur, wenn zusätzlich ein `KACHELMANN_API_KEY` gesetzt ist **und**
   mindestens eine Rolle/ein Nutzer Zugriff hat — sonst überspringt er den Lauf mit einer klaren
   Log-Meldung statt unnötig eine kostenpflichtige API anzufragen.
 - Sind Zugriff und API-Key vorhanden, erscheinen Kachelmann-Meldungen automatisch überall dort,
-  wo auch die anderen sechs Quellen erscheinen (Karte, Lage-Liste, Prioritäts-Leiste,
+  wo auch die anderen Quellen erscheinen (Karte, Lage-Liste, Prioritäts-Leiste,
   Wetter-Übersicht) — die gesamte Anzeige-Pipeline ist quellen-generisch (`SOURCE_LABELS`,
   `severityScore()` in `js/severity.js`), es war dafür **keine eigene Widget-Komponente** nötig,
   nur ein Eintrag in der bestehenden Quellen-Zuordnung plus die Aufnahme in

@@ -258,26 +258,103 @@ async function loadFieldDefinitions() {
 }
 
 // ---------------------------------------------------------------------------
-// Kachelmann-Zugriff (Feature-Zugriffssteuerung)
+// Zugriffssteuerung je Datenquelle (Feature-Zugriffssteuerung, ab Phase 5 auf alle Addons
+// generalisiert statt nur Kachelmann - siehe Konzept Teil 2, Baustein C)
 // ---------------------------------------------------------------------------
 
-async function loadKachelmannAccess() {
-  const errorEl = document.getElementById('kachelmann-error');
+const FEATURE_LABELS = {
+  dwd_unwetter: 'DWD-Unwetterwarnungen',
+  pegelonline: 'Pegelstände (PEGELONLINE)',
+  hochwasserzentralen: 'Hochwasser (Hochwasserzentralen)',
+  waldbrandindex: 'Waldbrandgefahrenindex',
+  firms: 'Feuer-Hotspots (NASA FIRMS)',
+  bbk_warnung: 'Bevölkerungswarnungen (BBK/NINA)',
+  kachelmann: 'Kachelmann/Meteologix',
+  wetter_vorhersage: 'Wetter-Vorhersage (Bright Sky)',
+};
+const FEATURE_ROLES = ['admin', 'stab', 'mitglied'];
+
+async function loadFeatureMatrix() {
+  const errorEl = document.getElementById('feature-matrix-error');
   errorEl.textContent = '';
-  let data;
+  let features;
   try {
-    data = await api.get('/feature-access/kachelmann');
+    features = await api.get('/feature-access');
   } catch (err) {
     errorEl.textContent = err.message;
     return;
   }
 
-  document.querySelectorAll('.kachelmann-role').forEach((cb) => {
-    cb.checked = data.roles.includes(cb.value);
+  const tbody = document.getElementById('feature-matrix-body');
+  tbody.innerHTML = '';
+  features.forEach((feature) => {
+    const tr = document.createElement('tr');
+    const nameTd = document.createElement('td');
+    nameTd.textContent = FEATURE_LABELS[feature.featureKey] || feature.featureKey;
+    if (!feature.defaultOpen) {
+      const badge = document.createElement('span');
+      badge.className = 'badge';
+      badge.textContent = 'ohne Regel gesperrt';
+      badge.style.marginLeft = '0.5rem';
+      nameTd.appendChild(badge);
+    }
+    tr.appendChild(nameTd);
+
+    const checkboxes = {};
+    FEATURE_ROLES.forEach((role) => {
+      const td = document.createElement('td');
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.checked = feature.roles.includes(role);
+      checkboxes[role] = checkbox;
+      td.appendChild(checkbox);
+      tr.appendChild(td);
+    });
+
+    const actionTd = document.createElement('td');
+    const saveBtn = document.createElement('button');
+    saveBtn.type = 'button';
+    saveBtn.className = 'secondary';
+    saveBtn.textContent = 'Speichern';
+    saveBtn.addEventListener('click', async () => {
+      errorEl.textContent = '';
+      const roles = FEATURE_ROLES.filter((role) => checkboxes[role].checked);
+      try {
+        await api.put(`/feature-access/${feature.featureKey}/roles`, { roles });
+      } catch (err) {
+        errorEl.textContent = err.message;
+      }
+    });
+    actionTd.appendChild(saveBtn);
+    tr.appendChild(actionTd);
+    tbody.appendChild(tr);
   });
 
+  const select = document.getElementById('feature-user-select');
+  if (select.options.length === 0) {
+    features.forEach((feature) => {
+      const opt = document.createElement('option');
+      opt.value = feature.featureKey;
+      opt.textContent = FEATURE_LABELS[feature.featureKey] || feature.featureKey;
+      select.appendChild(opt);
+    });
+    select.addEventListener('change', () => loadFeatureUserOverrides(select.value));
+  }
+  await loadFeatureUserOverrides(select.value);
+}
+
+async function loadFeatureUserOverrides(featureKey) {
+  const errorEl = document.getElementById('feature-matrix-error');
+  let data;
+  try {
+    data = await api.get(`/feature-access/${featureKey}`);
+  } catch (err) {
+    errorEl.textContent = err.message;
+    return;
+  }
+
   const overrideByUser = new Map(data.userOverrides.map((o) => [o.user_id, o.enabled]));
-  const tbody = document.getElementById('kachelmann-user-table-body');
+  const tbody = document.getElementById('feature-user-table-body');
   tbody.innerHTML = '';
   data.users.forEach((u) => {
     const tr = document.createElement('tr');
@@ -298,10 +375,10 @@ async function loadKachelmannAccess() {
     select.addEventListener('change', async () => {
       try {
         const enabled = select.value === '' ? null : select.value === 'true';
-        await api.put(`/feature-access/kachelmann/user-override`, { userId: u.id, enabled });
+        await api.put(`/feature-access/${featureKey}/user-override`, { userId: u.id, enabled });
       } catch (err) {
         errorEl.textContent = err.message;
-        await loadKachelmannAccess();
+        await loadFeatureUserOverrides(featureKey);
       }
     });
     tr.querySelector('td:last-child').appendChild(select);
@@ -414,7 +491,7 @@ async function loadPdfTemplate() {
   });
 
   await loadFieldDefinitions();
-  await loadKachelmannAccess();
+  await loadFeatureMatrix();
   await loadPdfTemplate();
 
   document.getElementById('field-def-type').addEventListener('change', (event) => {
@@ -437,17 +514,6 @@ async function loadPdfTemplate() {
       event.target.reset();
       document.getElementById('field-def-options-row').hidden = true;
       await loadFieldDefinitions();
-    } catch (err) {
-      errorEl.textContent = err.message;
-    }
-  });
-
-  document.getElementById('kachelmann-roles-save').addEventListener('click', async () => {
-    const errorEl = document.getElementById('kachelmann-error');
-    errorEl.textContent = '';
-    const roles = Array.from(document.querySelectorAll('.kachelmann-role:checked')).map((cb) => cb.value);
-    try {
-      await api.put('/feature-access/kachelmann/roles', { roles });
     } catch (err) {
       errorEl.textContent = err.message;
     }

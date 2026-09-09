@@ -36,26 +36,31 @@ router.get('/', requireAuth, async (req, res, next) => {
     const conditions = [];
     const params = [];
 
-    // Kachelmann ist eine optionale/kostenpflichtige Quelle (Migration 009) - ohne Freigabe weder
-    // gezielt abrufbar (403) noch stillschweigend in einer ungefilterten Abfrage sichtbar.
-    const kachelmannAllowed = await hasFeatureAccess(req.user.id, req.user.role, req.user.wehrId, 'kachelmann');
-    if (source === 'kachelmann' && !kachelmannAllowed) {
-      return res.status(403).json({ ok: false, error: 'Kein Zugriff auf Kachelmann-Daten.' });
-    }
-
+    // Ab Phase 5 ist jede Quelle einzeln je Rolle/Nutzer rechtbar (Migration 009, siehe
+    // utils/featureAccess.js) - nicht mehr nur Kachelmann. Eine Quelle ohne konfigurierte Regel
+    // bleibt offen fuer alle (Rueckwaertskompatibilitaet); Kachelmann ist die einzige Ausnahme, die
+    // ohne Regel geschlossen bleibt (DEFAULT_CLOSED_FEATURES).
     if (source) {
+      const allowed = await hasFeatureAccess(req.user.id, req.user.role, req.user.wehrId, source);
+      if (!allowed) {
+        return res.status(403).json({ ok: false, error: 'Kein Zugriff auf diese Datenquelle.' });
+      }
       params.push(source);
       conditions.push(`source = $${params.length}`);
     } else {
       // Ungefilterte Abfrage speist die kombinierte Lage-Uebersicht (Karte, Lage-Liste, Prioritaets-
-      // Leiste) - wetter_vorhersage liefert dutzende stuendliche Werte je Wehr (Zeitreihe, kein
-      // Einzelereignis wie die uebrigen Quellen) und wuerde diese Ansicht nur zumuellen. Bewusst
-      // ausschliesslich ueber die eigene Themenseite (?source=wetter_vorhersage) und spaeter
-      // Dashboard-Widgets (Phase 6) abrufbar, nie Teil der Kombi-Ansicht.
-      conditions.push(`source != 'wetter_vorhersage'`);
-      if (!kachelmannAllowed) {
-        conditions.push(`source != 'kachelmann'`);
+      // Leiste). wetter_vorhersage liefert dutzende stuendliche Werte je Wehr (Zeitreihe, kein
+      // Einzelereignis wie die uebrigen Quellen) und wuerde diese Ansicht nur zumuellen - bleibt
+      // unabhaengig von der Zugriffssteuerung ausgeschlossen, ausschliesslich ueber die eigene
+      // Themenseite (?source=wetter_vorhersage) und spaeter Dashboard-Widgets (Phase 6) abrufbar.
+      const excludedSources = ['wetter_vorhersage'];
+      for (const candidate of VALID_SOURCES) {
+        if (candidate === 'wetter_vorhersage') continue;
+        const allowed = await hasFeatureAccess(req.user.id, req.user.role, req.user.wehrId, candidate);
+        if (!allowed) excludedSources.push(candidate);
       }
+      params.push(excludedSources);
+      conditions.push(`source != ALL($${params.length}::text[])`);
     }
     if (since) {
       params.push(since);

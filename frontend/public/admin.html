@@ -209,23 +209,29 @@
       </div>
 
       <div class="card">
-        <h2 class="section-title">Kachelmann-Zugriff</h2>
+        <h2 class="section-title">Zugriffssteuerung je Datenquelle</h2>
         <p class="muted">
-          Kachelmannwetter/Meteologix ist eine optionale, kostenpflichtige Zusatzquelle. Freischaltung
-          erfolgt rollenweit und/oder je Einzelnutzer (Einzelnutzer-Override hat Vorrang vor der
-          Rollenfreigabe, in beide Richtungen).
+          Jede Datenquelle lässt sich einzeln je Rolle und je Einzelnutzer freischalten/sperren
+          (Einzelnutzer-Override hat Vorrang vor der Rollenfreigabe, in beide Richtungen). Eine
+          Quelle ohne gesetzte Regel bleibt offen für alle — außer Kachelmann/Meteologix, das als
+          einzige kostenpflichtige Quelle ohne Regel gesperrt bleibt.
         </p>
-        <fieldset>
-          <legend>Für Rollen freigeben</legend>
-          <label class="checkbox-inline"><input type="checkbox" class="kachelmann-role" value="admin" /> <span>Admin</span></label>
-          <label class="checkbox-inline"><input type="checkbox" class="kachelmann-role" value="stab" /> <span>Stab</span></label>
-          <label class="checkbox-inline"><input type="checkbox" class="kachelmann-role" value="mitglied" /> <span>Mitglied</span></label>
-          <button id="kachelmann-roles-save" type="button" class="primary">Rollenfreigabe speichern</button>
-        </fieldset>
-        <p class="error-message" id="kachelmann-error" role="alert"></p>
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead><tr><th>Datenquelle</th><th>Admin</th><th>Stab</th><th>Mitglied</th><th></th></tr></thead>
+            <tbody id="feature-matrix-body"></tbody>
+          </table>
+        </div>
+        <p class="error-message" id="feature-matrix-error" role="alert"></p>
+
+        <h3 class="section-title">Einzelnutzer-Freigabe</h3>
+        <label>
+          <span>Datenquelle</span>
+          <select id="feature-user-select"></select>
+        </label>
         <table class="data-table">
           <thead><tr><th>Nutzer</th><th>Rolle</th><th>Individueller Zugriff</th></tr></thead>
-          <tbody id="kachelmann-user-table-body"></tbody>
+          <tbody id="feature-user-table-body"></tbody>
         </table>
       </div>
 

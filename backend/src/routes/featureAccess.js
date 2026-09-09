@@ -1,18 +1,32 @@
-// Admin-Verwaltung der Feature-Zugriffssteuerung (Migration 009). Aktuell einziges Feature:
-// 'kachelmann'. GET liefert den kompletten Zugriffsstatus (Rollenfreigaben + Einzelnutzer-Overrides
-// + alle Nutzer der Wehr zur Auswahl im Admin-UI) in einer Antwort, da beides zusammen im selben
-// Formular verwaltet wird.
+// Admin-Verwaltung der Feature-Zugriffssteuerung (Migration 009, ab Phase 5 auf alle Addons
+// generalisiert statt nur Kachelmann - siehe Konzept Teil 2, Baustein C). GET je Feature liefert
+// den kompletten Zugriffsstatus (Rollenfreigaben + Einzelnutzer-Overrides + alle Nutzer der Wehr
+// zur Auswahl im Admin-UI) in einer Antwort, da beides zusammen im selben Formular verwaltet wird.
+// GET / liefert alle Features auf einmal (nur Rollenfreigaben) fuer die Matrix-Uebersicht im
+// Admin-Bereich, ohne acht Einzelabfragen vom Frontend aus.
 const express = require('express');
 const { z } = require('zod');
 const { query } = require('../db');
 const { requireAuth, requireRole } = require('../middleware/auth');
 const { logAudit } = require('../audit');
+const { DEFAULT_CLOSED_FEATURES } = require('../utils/featureAccess');
 
 const router = express.Router();
 router.use(requireAuth, requireRole('admin'));
 
 const ROLES = ['admin', 'stab', 'mitglied'];
-const FEATURE_KEYS = ['kachelmann'];
+// Deckungsgleich mit VALID_SOURCES in routes/datapoints.js - jede Datenquelle ist ab Phase 5
+// einzeln je Rolle/Nutzer rechtbar, nicht mehr nur Kachelmann.
+const FEATURE_KEYS = [
+  'dwd_unwetter',
+  'pegelonline',
+  'hochwasserzentralen',
+  'waldbrandindex',
+  'firms',
+  'bbk_warnung',
+  'kachelmann',
+  'wetter_vorhersage',
+];
 
 function assertKnownFeature(key, res) {
   if (!FEATURE_KEYS.includes(key)) {
@@ -21,6 +35,30 @@ function assertKnownFeature(key, res) {
   }
   return true;
 }
+
+// Uebersicht aller Features auf einmal - nur die Rollenfreigaben (fuer die Matrix-Ansicht), keine
+// Einzelnutzer-Overrides (die bleiben Detailansicht je Feature ueber GET /:featureKey).
+router.get('/', async (req, res, next) => {
+  try {
+    const { rows } = await query('SELECT feature_key, role FROM wehr_feature_role_access WHERE wehr_id = $1', [
+      req.user.wehrId,
+    ]);
+    const rolesByFeature = Object.fromEntries(FEATURE_KEYS.map((key) => [key, []]));
+    rows.forEach((r) => {
+      if (rolesByFeature[r.feature_key]) rolesByFeature[r.feature_key].push(r.role);
+    });
+    return res.json({
+      ok: true,
+      data: FEATURE_KEYS.map((key) => ({
+        featureKey: key,
+        roles: rolesByFeature[key],
+        defaultOpen: !DEFAULT_CLOSED_FEATURES.has(key),
+      })),
+    });
+  } catch (err) {
+    return next(err);
+  }
+});
 
 router.get('/:featureKey', async (req, res, next) => {
   try {
