@@ -61,6 +61,66 @@ async function loadRules() {
   });
 }
 
+// --- 2FA (TOTP, Migration 018) ------------------------------------------------------------------
+
+function showTotpView(enabled) {
+  document.getElementById('totp-disabled-view').hidden = enabled;
+  document.getElementById('totp-setup-view').hidden = true;
+  document.getElementById('totp-enabled-view').hidden = !enabled;
+  document.getElementById('totp-status-text').textContent = enabled
+    ? 'Zwei-Faktor-Authentifizierung ist für dieses Konto aktiv.'
+    : 'Zwei-Faktor-Authentifizierung ist für dieses Konto nicht aktiv.';
+}
+
+function initTotpUi(initiallyEnabled) {
+  showTotpView(initiallyEnabled);
+
+  document.getElementById('totp-setup-button').addEventListener('click', async () => {
+    try {
+      const { secret, otpauthUri } = await api.post('/users/me/totp/setup', {});
+      document.getElementById('totp-secret-display').textContent = secret;
+      document.getElementById('totp-uri-display').textContent = otpauthUri;
+      document.getElementById('totp-enable-form').dataset.secret = secret;
+      document.getElementById('totp-enable-error').textContent = '';
+      document.getElementById('totp-disabled-view').hidden = true;
+      document.getElementById('totp-setup-view').hidden = false;
+    } catch (err) {
+      alert(err.message);
+    }
+  });
+
+  document.getElementById('totp-setup-cancel').addEventListener('click', () => showTotpView(false));
+
+  document.getElementById('totp-enable-form').addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const errorEl = document.getElementById('totp-enable-error');
+    errorEl.textContent = '';
+    const secret = event.target.dataset.secret;
+    const code = document.getElementById('totp-enable-code').value.trim();
+    try {
+      await api.post('/users/me/totp/enable', { secret, code });
+      document.getElementById('totp-enable-code').value = '';
+      showTotpView(true);
+    } catch (err) {
+      errorEl.textContent = err.message;
+    }
+  });
+
+  document.getElementById('totp-disable-form').addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const errorEl = document.getElementById('totp-disable-error');
+    errorEl.textContent = '';
+    const password = document.getElementById('totp-disable-password').value;
+    try {
+      await api.post('/users/me/totp/disable', { password });
+      document.getElementById('totp-disable-password').value = '';
+      showTotpView(false);
+    } catch (err) {
+      errorEl.textContent = err.message;
+    }
+  });
+}
+
 (async function bootstrapSettings() {
   const user = await initHeader();
   if (!user) return;
@@ -101,6 +161,7 @@ async function loadRules() {
   });
 
   if (user.role !== 'mitglied') {
+    initTotpUi(user.totpEnabled);
     await loadRules();
 
     document.getElementById('rule-form').addEventListener('submit', async (event) => {

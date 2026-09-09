@@ -26,6 +26,17 @@
         <p class="error-message" id="login-error" role="alert"></p>
         <button type="submit" class="primary">Anmelden</button>
       </form>
+
+      <form id="login-2fa-form" novalidate hidden>
+        <p class="muted">Zwei-Faktor-Authentifizierung aktiv - bitte den 6-stelligen Code aus der Authenticator-App eingeben.</p>
+        <label>
+          <span>Code</span>
+          <input type="text" id="totp-code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" required />
+        </label>
+        <p class="error-message" id="login-2fa-error" role="alert"></p>
+        <button type="submit" class="primary">Bestätigen</button>
+        <button type="button" class="secondary" id="login-2fa-cancel">Abbrechen</button>
+      </form>
       <p class="muted">
         <a href="forgot-password.html">Passwort vergessen?</a>
       </p>

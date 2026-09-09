@@ -1,6 +1,7 @@
 const crypto = require('crypto');
 const express = require('express');
 const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
 const rateLimit = require('express-rate-limit');
 const { z } = require('zod');
 const config = require('../config');
@@ -8,6 +9,8 @@ const { query } = require('../db');
 const { signToken, setAuthCookie, clearAuthCookie, requireAuth } = require('../middleware/auth');
 const { logAudit } = require('../audit');
 const { sendMail } = require('../notifications/mailer');
+const { decrypt } = require('../utils/crypto');
+const totp = require('../utils/totp');
 
 const router = express.Router();
 
@@ -40,7 +43,7 @@ router.post('/login', loginLimiter, async (req, res, next) => {
 
     const { rows } = await query(
       `SELECT u.id, u.email, u.password_hash, u.role, u.wehr_id, u.token_version,
-              u.failed_login_count, u.locked_until, w.name AS wehr_name
+              u.failed_login_count, u.locked_until, u.totp_enabled, w.name AS wehr_name
        FROM app_user u JOIN wehr w ON w.id = u.wehr_id
        WHERE u.email = $1`,
       [email]
@@ -81,13 +84,84 @@ router.post('/login', loginLimiter, async (req, res, next) => {
     }
 
     if (user.failed_login_count > 0 || user.locked_until) {
-      await query('UPDATE app_user SET failed_login_count = 0, locked_until = NULL, last_login_at = now() WHERE id = $1', [
-        user.id,
-      ]);
-    } else {
-      await query('UPDATE app_user SET last_login_at = now() WHERE id = $1', [user.id]);
+      await query('UPDATE app_user SET failed_login_count = 0, locked_until = NULL WHERE id = $1', [user.id]);
     }
 
+    // Passwort korrekt, aber 2FA aktiv: noch keine Sitzung ausstellen, sondern nur einen kurzlebigen
+    // Pending-Token (eigener Claim "p2fa", 5 Min. gueltig) - der eigentliche Login-Cookie kommt erst
+    // nach erfolgreicher Code-Pruefung in POST /login-2fa. last_login_at wird bewusst erst dort
+    // gesetzt (sonst würde ein falsches Passwort+richtiges 2FA nie zaehlen, aber ein richtiges
+    // Passwort OHNE gueltigen zweiten Faktor faelschlich schon als "Login" durchgehen).
+    if (user.totp_enabled) {
+      const pendingToken = jwt.sign({ p2fa: true, sub: user.id }, config.jwtSecret, { expiresIn: '5m' });
+      return res.json({ ok: true, data: { totpRequired: true, pendingToken } });
+    }
+
+    await query('UPDATE app_user SET last_login_at = now() WHERE id = $1', [user.id]);
+
+    const token = signToken(user);
+    setAuthCookie(res, token);
+
+    return res.json({
+      ok: true,
+      data: {
+        id: user.id,
+        email: user.email,
+        role: user.role,
+        wehrId: user.wehr_id,
+        wehrName: user.wehr_name,
+      },
+    });
+  } catch (err) {
+    return next(err);
+  }
+});
+
+const login2faSchema = z.object({
+  pendingToken: z.string().min(1),
+  code: z.string().min(1),
+});
+
+// Zweiter Schritt fuer Konten mit aktivem TOTP: wandelt den kurzlebigen Pending-Token aus /login in
+// einen echten Auth-Cookie um, sobald der 6-stellige Code stimmt. Dasselbe Rate-Limit wie /login -
+// ein 6-stelliger Code hat nur 1 Million Moeglichkeiten, verdient also denselben Schutz gegen
+// Bruteforce.
+router.post('/login-2fa', loginLimiter, async (req, res, next) => {
+  try {
+    const parsed = login2faSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ ok: false, error: 'Pending-Token und Code erforderlich.' });
+    }
+    const { pendingToken, code } = parsed.data;
+
+    let payload;
+    try {
+      payload = jwt.verify(pendingToken, config.jwtSecret);
+    } catch (err) {
+      return res.status(401).json({ ok: false, error: 'Anmeldevorgang abgelaufen. Bitte erneut anmelden.' });
+    }
+    if (!payload.p2fa) {
+      return res.status(401).json({ ok: false, error: 'Ungueltiger Pending-Token.' });
+    }
+
+    const { rows } = await query(
+      `SELECT u.id, u.email, u.role, u.wehr_id, u.token_version, u.totp_enabled, u.totp_secret_encrypted,
+              w.name AS wehr_name
+       FROM app_user u JOIN wehr w ON w.id = u.wehr_id
+       WHERE u.id = $1`,
+      [payload.sub]
+    );
+    const user = rows[0];
+    if (!user || !user.totp_enabled || !user.totp_secret_encrypted) {
+      return res.status(401).json({ ok: false, error: 'E-Mail oder Passwort falsch.' });
+    }
+
+    const secret = decrypt(user.totp_secret_encrypted);
+    if (!totp.verifyToken(secret, code)) {
+      return res.status(401).json({ ok: false, error: 'Code ungueltig oder abgelaufen.' });
+    }
+
+    await query('UPDATE app_user SET last_login_at = now() WHERE id = $1', [user.id]);
     const token = signToken(user);
     setAuthCookie(res, token);
 
@@ -232,7 +306,7 @@ router.post('/logout', (req, res) => {
 router.get('/me', requireAuth, async (req, res, next) => {
   try {
     const { rows } = await query(
-      `SELECT u.id, u.email, u.role, u.wehr_id, w.name AS wehr_name, w.center_lat, w.center_lon
+      `SELECT u.id, u.email, u.role, u.wehr_id, u.totp_enabled, w.name AS wehr_name, w.center_lat, w.center_lon
        FROM app_user u JOIN wehr w ON w.id = u.wehr_id
        WHERE u.id = $1`,
       [req.user.id]
@@ -249,6 +323,7 @@ router.get('/me', requireAuth, async (req, res, next) => {
         role: user.role,
         wehrId: user.wehr_id,
         wehrName: user.wehr_name,
+        totpEnabled: user.totp_enabled,
         wehrCenter:
           user.center_lat !== null && user.center_lon !== null
             ? { lat: user.center_lat, lon: user.center_lon }

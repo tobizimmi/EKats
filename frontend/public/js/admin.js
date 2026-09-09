@@ -101,6 +101,26 @@ async function loadUsers(currentUserId) {
       }
     });
     actionCell.appendChild(resetBtn);
+
+    if (user.totp_enabled) {
+      const totpResetBtn = document.createElement('button');
+      totpResetBtn.className = 'secondary';
+      totpResetBtn.type = 'button';
+      totpResetBtn.textContent = '2FA zurücksetzen';
+      totpResetBtn.style.marginLeft = '0.4rem';
+      totpResetBtn.addEventListener('click', async () => {
+        if (!confirm(`2FA für ${user.email} wirklich zurücksetzen? Der Nutzer muss es danach neu einrichten.`)) return;
+        try {
+          await api.post(`/users/${user.id}/totp/reset`, {});
+          await loadUsers(currentUserId);
+          await loadAuditLog();
+        } catch (err) {
+          alert(err.message);
+        }
+      });
+      actionCell.appendChild(totpResetBtn);
+    }
+
     actionCell.appendChild(deleteBtn);
 
     tr.appendChild(emailCell);

@@ -607,6 +607,9 @@ const AUDIT_ACTION_LABELS = {
   'user.password_reset_by_admin': 'Passwort durch Admin zurückgesetzt',
   'user.role_change': 'Rolle geändert',
   'user.self_delete': 'Eigenes Konto gelöscht',
+  'user.totp_enable': '2FA aktiviert',
+  'user.totp_disable': '2FA deaktiviert',
+  'user.totp_reset_by_admin': '2FA durch Admin zurückgesetzt',
 };
 
 function formatAuditEntry(entry) {

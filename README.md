@@ -993,6 +993,23 @@ Schema: `datapoint_history` (`backend/sql/migrations/013_add_datapoint_history.s
 - **Login-Schutz**: IP-basiertes Rate-Limit (10 Versuche/15 Min. über alle Konten) **plus**
   Konto-Lockout (5 Fehlversuche sperren ein einzelnes Konto 15 Minuten, unabhängig von der IP) —
   schützt sowohl vor Angriffen von einer IP als auch vor verteilten Versuchen auf ein Konto.
+- **Zwei-Faktor-Authentifizierung (2FA/TOTP)**: optional, nur für `stab`/`admin` anbietbar (Migration
+  018), unter „Einstellungen“ selbst einrichtbar — Secret + `otpauth://`-URI zum Eintragen in eine
+  Authenticator-App (Google Authenticator, Aegis, FreeOTP, …), Aktivierung erst nach korrektem
+  Bestätigungscode. `backend/src/utils/totp.js` implementiert RFC 6238 (TOTP) auf RFC 4226 (HOTP) mit
+  Bordmitteln (nur `crypto`) statt einer npm-Bibliothek — derselbe Grundsatz wie beim Web-Push/VAPID
+  im Schwesterprojekt FKatInfo; die HOTP-Kernfunktion ist gegen die öffentlichen Testvektoren aus
+  RFC 4226 Anhang D verifiziert (alle 10 Vektoren exakt getroffen). Login mit aktivem 2FA läuft
+  zweistufig: `POST /api/auth/login` liefert bei korrektem Passwort einen kurzlebigen
+  Pending-Token (5 Min.) statt direkt des Auth-Cookies, `POST /api/auth/login-2fa` tauscht Token +
+  6-stelligen Code gegen den echten Auth-Cookie — beide Endpunkte teilen sich dasselbe Rate-Limit wie
+  der normale Login. Das TOTP-Secret liegt AES-256-GCM-verschlüsselt in der DB (`utils/crypto.js`,
+  derselbe Mechanismus wie das SMTP-Passwort) und wird nach der Einrichtung nie wieder im Klartext
+  angezeigt. Kein QR-Code-Bild (bewusst: eine Bibliothek nur für eine darstellbare Zeichenkette wäre
+  unnötiges Gewicht, jede Authenticator-App akzeptiert auch manuelle Eingabe). Verloren gegangenes
+  Gerät/gesperrtes Konto: Admin kann das 2FA eines Nutzers der eigenen Wehr in der Nutzerverwaltung
+  zurücksetzen (`POST /api/users/:id/totp/reset`, protokolliert im Audit-Log) — keine Backup-Codes in
+  dieser ersten Ausbaustufe.
 - **Passwort ändern**: Self-Service unter „Einstellungen“ (erfordert aktuelles Passwort, meldet alle
   *anderen* Sitzungen ab), Admin-Reset in der Nutzerverwaltung (setzt ein neues Passwort direkt,
   meldet alle Sitzungen des Zielkontos ab) sowie **Passwort-vergessen per E-Mail-Link**

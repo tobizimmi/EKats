@@ -69,6 +69,46 @@
       </table>
     </div>
 
+    <div class="card" data-role="stab-only" hidden>
+      <h2 class="section-title">Zwei-Faktor-Authentifizierung (2FA)</h2>
+      <p class="muted" id="totp-status-text">Status wird geladen …</p>
+
+      <div id="totp-disabled-view" hidden>
+        <button type="button" class="secondary" id="totp-setup-button">2FA einrichten</button>
+      </div>
+
+      <div id="totp-setup-view" hidden>
+        <p class="muted">
+          Diesen Schlüssel in einer Authenticator-App (z.B. Google Authenticator, Aegis, FreeOTP)
+          manuell eintragen oder die otpauth-Adresse verwenden, dann den ersten angezeigten Code hier
+          eingeben, um 2FA zu aktivieren.
+        </p>
+        <p><strong>Schlüssel:</strong> <code id="totp-secret-display"></code></p>
+        <p class="muted" style="word-break: break-all;"><span id="totp-uri-display"></span></p>
+        <form id="totp-enable-form" class="form-row">
+          <label>
+            <span>Code aus der App</span>
+            <input type="text" id="totp-enable-code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required />
+          </label>
+          <button type="submit" class="primary">2FA aktivieren</button>
+          <button type="button" class="secondary" id="totp-setup-cancel">Abbrechen</button>
+        </form>
+        <p class="error-message" id="totp-enable-error" role="alert"></p>
+      </div>
+
+      <div id="totp-enabled-view" hidden>
+        <p><span class="badge badge-yes">2FA aktiv</span></p>
+        <form id="totp-disable-form" class="form-row">
+          <label>
+            <span>Passwort zur Bestätigung</span>
+            <input type="password" id="totp-disable-password" autocomplete="current-password" required />
+          </label>
+          <button type="submit" class="secondary">2FA deaktivieren</button>
+        </form>
+        <p class="error-message" id="totp-disable-error" role="alert"></p>
+      </div>
+    </div>
+
     <div class="card">
       <h2 class="section-title">Passwort ändern</h2>
       <form id="password-form" class="form-row">

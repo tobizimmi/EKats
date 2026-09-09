@@ -4,6 +4,8 @@ const { z } = require('zod');
 const { query } = require('../db');
 const { requireAuth, requireRole, signToken, setAuthCookie } = require('../middleware/auth');
 const { logAudit } = require('../audit');
+const { encrypt } = require('../utils/crypto');
+const totp = require('../utils/totp');
 
 const router = express.Router();
 
@@ -21,7 +23,7 @@ async function countAdmins(wehrId) {
 router.get('/', requireRole('admin'), async (req, res, next) => {
   try {
     const { rows } = await query(
-      'SELECT id, email, role, created_at FROM app_user WHERE wehr_id = $1 ORDER BY created_at',
+      'SELECT id, email, role, totp_enabled, created_at FROM app_user WHERE wehr_id = $1 ORDER BY created_at',
       [req.user.wehrId]
     );
     res.json({ ok: true, data: rows });
@@ -162,6 +164,120 @@ router.patch('/me/password', async (req, res, next) => {
 
     const token = signToken({ ...user, token_version: updated[0].token_version });
     setAuthCookie(res, token);
+    return res.json({ ok: true, data: null });
+  } catch (err) {
+    return next(err);
+  }
+});
+
+// --- TOTP-Zweitfaktor (Migration 018, siehe backend/src/utils/totp.js) ------------------------
+// Opt-in, nur fuer stab/admin anbietbar (siehe Kommentar in der Migration). Zweistufiger Setup-Ablauf
+// ohne serverseitigen Zwischenspeicher: /setup generiert ein Secret und gibt es im Klartext an den
+// Client zurueck (zusammen mit der otpauth-URI zum Scannen/manuellen Eintragen); der Client haelt es
+// nur kurz im Speicher, bis der Nutzer den ersten Code eingibt - /enable bekommt Secret + Code erneut
+// und persistiert (verschluesselt) nur, wenn der Code dagegen passt. Kein "pending secret" in der DB
+// noetig, ein abgebrochener Setup-Versuch hinterlaesst also nichts.
+router.post('/me/totp/setup', requireRole('stab', 'admin'), async (req, res, next) => {
+  try {
+    const secret = totp.generateSecret();
+    const otpauthUri = totp.generateOtpAuthUri(secret, req.user.email);
+    return res.json({ ok: true, data: { secret, otpauthUri } });
+  } catch (err) {
+    return next(err);
+  }
+});
+
+const totpEnableSchema = z.object({
+  secret: z.string().min(1),
+  code: z.string().min(1),
+});
+
+router.post('/me/totp/enable', requireRole('stab', 'admin'), async (req, res, next) => {
+  try {
+    const parsed = totpEnableSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ ok: false, error: 'Secret und Code erforderlich.' });
+    }
+    const { secret, code } = parsed.data;
+    if (!totp.verifyToken(secret, code)) {
+      return res.status(400).json({ ok: false, error: 'Code stimmt nicht. Bitte erneut versuchen.' });
+    }
+
+    await query('UPDATE app_user SET totp_secret_encrypted = $1, totp_enabled = true WHERE id = $2', [
+      encrypt(secret),
+      req.user.id,
+    ]);
+    await logAudit({
+      wehrId: req.user.wehrId,
+      actorUserId: req.user.id,
+      actorEmail: req.user.email,
+      action: 'user.totp_enable',
+      targetType: 'app_user',
+      targetId: req.user.id,
+      ip: req.ip,
+    });
+    return res.json({ ok: true, data: null });
+  } catch (err) {
+    return next(err);
+  }
+});
+
+const totpDisableSchema = z.object({ password: z.string().min(1) });
+
+router.post('/me/totp/disable', requireRole('stab', 'admin'), async (req, res, next) => {
+  try {
+    const parsed = totpDisableSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ ok: false, error: 'Passwort erforderlich.' });
+    }
+
+    const { rows } = await query('SELECT password_hash FROM app_user WHERE id = $1', [req.user.id]);
+    const valid = rows[0] && (await bcrypt.compare(parsed.data.password, rows[0].password_hash));
+    if (!valid) {
+      return res.status(401).json({ ok: false, error: 'Passwort ist falsch.' });
+    }
+
+    await query('UPDATE app_user SET totp_secret_encrypted = NULL, totp_enabled = false WHERE id = $1', [
+      req.user.id,
+    ]);
+    await logAudit({
+      wehrId: req.user.wehrId,
+      actorUserId: req.user.id,
+      actorEmail: req.user.email,
+      action: 'user.totp_disable',
+      targetType: 'app_user',
+      targetId: req.user.id,
+      ip: req.ip,
+    });
+    return res.json({ ok: true, data: null });
+  } catch (err) {
+    return next(err);
+  }
+});
+
+// Admin setzt das 2FA eines anderen Kontos der eigenen Wehr zurueck (Lockout-Recovery, z.B. wenn das
+// Authenticator-Geraet verloren geht) - dasselbe Muster wie /:id/reset-password.
+router.post('/:id/totp/reset', requireRole('admin'), async (req, res, next) => {
+  try {
+    const targetId = Number(req.params.id);
+    const { rows } = await query(
+      `UPDATE app_user SET totp_secret_encrypted = NULL, totp_enabled = false
+       WHERE id = $1 AND wehr_id = $2 RETURNING id, email`,
+      [targetId, req.user.wehrId]
+    );
+    if (rows.length === 0) {
+      return res.status(404).json({ ok: false, error: 'Nutzer nicht gefunden.' });
+    }
+    await logAudit({
+      wehrId: req.user.wehrId,
+      actorUserId: req.user.id,
+      actorEmail: req.user.email,
+      action: 'user.totp_reset_by_admin',
+      targetType: 'app_user',
+      targetId,
+      details: { email: rows[0].email },
+      ip: req.ip,
+    });
     return res.json({ ok: true, data: null });
   } catch (err) {
     return next(err);

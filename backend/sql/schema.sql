@@ -412,3 +412,7 @@ CREATE TABLE IF NOT EXISTS einsatztagebuch_eintrag (
 );
 
 CREATE INDEX IF NOT EXISTS idx_einsatztagebuch_wehr_time ON einsatztagebuch_eintrag(wehr_id, entry_time DESC);
+
+-- Optionales TOTP-Zweitfaktor (Migration 018): siehe Migration 018 fuer Details im Kommentar.
+ALTER TABLE app_user ADD COLUMN IF NOT EXISTS totp_secret_encrypted TEXT;
+ALTER TABLE app_user ADD COLUMN IF NOT EXISTS totp_enabled BOOLEAN NOT NULL DEFAULT false;
