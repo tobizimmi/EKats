@@ -1,0 +1,5 @@
+gridstack.js 10.3.1 (MIT License, siehe LICENSE)
+Bezogen via `npm pack gridstack@10` (npm-Registry war in der Entwicklungsumgebung erreichbar,
+CDN-Hosts nicht), Dateien dist/gridstack-all.js (UMD-Bundle inkl. Drag&Drop-Plugin, bereits
+minifiziert) und dist/gridstack.min.css unveraendert uebernommen.
+Quelle: https://github.com/gridstack/gridstack.js

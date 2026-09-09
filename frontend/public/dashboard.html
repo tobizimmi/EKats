@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Mein Dashboard – EKats</title>
   <link rel="stylesheet" href="vendor/leaflet/leaflet.css" />
+  <link rel="stylesheet" href="vendor/gridstack/gridstack.css" />
   <link rel="stylesheet" href="css/style.css" />
   <link rel="icon" href="icons/icon.svg" type="image/svg+xml" />
   <link rel="manifest" href="manifest.webmanifest" />
@@ -16,13 +17,16 @@
     <div class="card">
       <div class="section-head-row">
         <h2 class="section-title">Mein Dashboard</h2>
-        <button type="button" class="secondary" id="dashboard-reset-button">↺ Zurücksetzen</button>
+        <div class="dashboard-toolbar">
+          <button type="button" class="secondary" id="widget-add-button">+ Widget hinzufügen</button>
+          <button type="button" class="secondary" id="dashboard-reset-button">↺ Zurücksetzen</button>
+        </div>
       </div>
       <p class="muted">
-        Eigene Auswahl und Reihenfolge der Widgets - geräteübergreifend gespeichert. Ziehen zum Umsortieren
-        (Desktop) oder die Pfeil-Buttons je Widget nutzen.
+        Eigene Auswahl, Position und Größe der Widgets - geräteübergreifend gespeichert. Am
+        Griff-Symbol (⠿) ziehen zum Verschieben, an der Kachel-Ecke ziehen zum Größenändern.
       </p>
-      <div class="widget-grid" id="dashboard-grid"></div>
+      <div class="grid-stack" id="dashboard-grid"></div>
     </div>
   </main>
 
@@ -46,6 +50,7 @@
   </dialog>
 
   <script src="vendor/leaflet/leaflet.js"></script>
+  <script src="vendor/gridstack/gridstack-all.js"></script>
   <script src="js/api.js"></script>
   <script src="js/header.js"></script>
   <script src="js/severity.js"></script>

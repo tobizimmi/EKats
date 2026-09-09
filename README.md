@@ -870,22 +870,42 @@ zusätzlich als vorformatierte einzeilige Anschrift verfügbar. Bestehende, vor 
 Vorlagen funktionieren unverändert weiter (nur zusätzliche Platzhalter, keine entfernt) — wer sie
 nutzen will, muss sie im Vorlagen-Editor selbst ergänzen.
 
-## Individuelles Dashboard (Phase 6)
+## Individuelles Dashboard (Phase 6, Raster-Umbau: Nutzerwunsch nach freier Position/Größe)
 
 `dashboard.html` ("Mein Dashboard" in der Seitenleiste) ergänzt die feste Karten-Ansicht
-(`index.html`, unverändert) um einen Baukasten: jeder Nutzer stellt sich seine eigene Auswahl und
-Reihenfolge aus fünf Widget-Typen zusammen — Karte (nicht-interaktive Mini-Karte aller Objekte),
-Prioritäts-Leiste, Objekt-Übersicht, DWD-Wetterbild und (mehrfach möglich, je Station ein Widget)
-Pegel-Liniendiagramm. Umsortieren per natives HTML5-Drag-and-Drop (Desktop) oder die Auf-/Ab-Buttons
-je Widget-Karte als Tastatur-/Touch-Fallback, dieselbe Grundidee wie das bereits produktive
-Drag-and-Drop-Dashboard im Schwesterprojekt FKatInfo.
+(`index.html`, unverändert) um einen Baukasten aus aktuell 16 Widget-Typen: Karte
+(nicht-interaktive Mini-Karte aller Objekte), Prioritäts-Leiste, Objekt-Übersicht, DWD-Wetterbild,
+Pegel-Liniendiagramm (mehrfach möglich, je Station ein Widget), Wetter-Vorhersage, Blitz-Zähler,
+Fahrzeugstatus (Anzahl je Wache), Anstehende Überprüfungen (Liste statt nur Zahl), BBK/NINA-Feed,
+Kachelmann-Wetter, Uhr/Datum, Notiz-Pinnwand (geräteübergreifend geteilter Freitext), Eigene Links,
+Hochwasserzentralen-Liste, DWD-Unwetter-Ticker und eine Gesamt-Statuszeile (Ein-Zeilen-Ampel über
+alle Quellen). Die neuen Listen-Widgets (Vorhersage/BBK/Hochwasser/Unwetter) speisen sich aus
+demselben, einmal pro Seitenaufruf geladenen `GET /api/datapoints` wie die Prioritäts-Leiste — kein
+zusätzlicher Request je Widget.
 
-**Persistenz:** Das Layout (Liste aus `{id, type, config}`) liegt unter dem Schlüssel
+**Freies Raster statt fester Reihenfolge:** Position UND Größe jeder Kachel sind frei wählbar (Ziehen
+am Griff-Symbol ⠿, Größenändern an der Kachel-Ecke), umgesetzt mit
+[gridstack.js](https://github.com/gridstack/gridstack.js) (MIT, lokal vendored unter
+`frontend/public/vendor/gridstack/`, siehe `VERSION.txt` dort für Bezugsweg/Version). Bewusst keine
+selbstgebaute Positionier-/Kollisionslogik (anders als beim Kartenskizzen-Editor mit
+Leaflet-Geoman weiter unten) — freies Ziehen+Größenändern mit automatischer Kollisionsvermeidung hat
+viele Randfälle, die eine gereifte Bibliothek bereits löst, statt sie hier neu zu erfinden.
+Unterhalb von 700px Containerbreite schaltet gridstack automatisch auf eine Spalte um
+(`columnOpts.breakpoints`), Resize-Griffe werden dort per CSS ausgeblendet, Reihenfolge bleibt per
+Drag änderbar; die Mehrspalten-Anordnung bleibt dabei intern gecacht (gridstack-eigener Mechanismus)
+und kommt beim Zurückwechseln auf breitere Bildschirme unverändert zurück.
+
+**Persistenz:** Das Layout (Liste aus `{id, type, config, x, y, w, h}`) liegt unter dem Schlüssel
 `dashboard_layout` in derselben `user_preference`-Tabelle wie die Spaltenwahl der Themenseiten
-(Migration 011, Phase 4) — ein Eintrag mehr in derselben Tabelle statt eines eigenen Mechanismus.
-„Zurücksetzen" löscht die Zeile über denselben Self-Service-Endpunkt
-(`DELETE /api/user-preferences/dashboard_layout`); die Seite fällt dann auf die eingebaute
-Standardauswahl (Karte, Prioritäts-Leiste, Objekt-Übersicht, DWD-Wetterbild) zurück.
+(Migration 011, Phase 4) — ein Eintrag mehr in derselben Tabelle statt eines eigenen Mechanismus oder
+einer Schema-Migration für den Raster-Umbau. Nach jeder Drag-/Resize-Aktion liest
+`syncPositionsAndSave()` die tatsächlichen Positionen direkt aus gridstack aus (`grid.save(false)`)
+statt eine eigene Positions-Buchhaltung zu führen. Widgets ohne gespeicherte Position (Altbestand vor
+dem Raster-Umbau, oder neu hinzugefügt) werden von gridstack automatisch an die erste freie Stelle
+gesetzt und die gefundene Position anschließend sofort mit übernommen. „Zurücksetzen" löscht die
+Zeile über denselben Self-Service-Endpunkt (`DELETE /api/user-preferences/dashboard_layout`); die
+Seite fällt dann auf die eingebaute Standardauswahl zurück (Karte, Gesamt-Statuszeile,
+Prioritäts-Leiste, Objekt-Übersicht, DWD-Wetterbild).
 
 **DWD-Wetterbild-Widget:** bindet den offiziell von DWD dokumentierten WMS-Geodienst
 (`maps.dwd.de/geoserver/dwd/ows`, „Ihr Homepagewetter"/"WMS-Dienste für die eigene Website mit den
