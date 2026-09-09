@@ -478,9 +478,17 @@ Industrie-/Gefahrstoffbetriebe, Versammlungsstätten, Sonstiges) direkt anlegen 
 eigener Layer, als Quadrat dargestellt (unterscheidbar von den runden, nach Dringlichkeit
 eingefärbten Lage-Markern).
 
-- **Anlegen** (Rolle Stab/Admin): Button „Objekt anlegen“ klicken, dann auf die gewünschte Position
-  in der Karte klicken — öffnet ein Formular für Name, Kategorie, Adresse, besondere Gefahren,
-  Zufahrt/Schlüsseldepot, Ansprechpartner und Überprüfungsintervall.
+- **Anlegen** (Rolle Stab/Admin): Button „Objekt anlegen“ klicken — öffnet direkt das Formular für
+  Name, Kategorie, Adresse, besondere Gefahren, Zufahrt/Schlüsseldepot, Ansprechpartner und
+  Überprüfungsintervall. Die Position (lat/lon, Pflichtfeld) lässt sich auf drei Wegen setzen: Adresse
+  eintragen und „Koordinaten aus Adresse ermitteln“ klicken (Geocoding über den öffentlichen
+  [Nominatim](https://nominatim.org/)-Dienst von OpenStreetMap, reiner Client-seitiger Lookup — siehe
+  CSP `connect-src` in `backend/src/app.js`), „Position auf Karte wählen“ klicken und auf die Karte
+  klicken (der Dialog schließt dafür kurz, bereits eingegebene Werte bleiben erhalten und werden beim
+  Wiederöffnen übernommen), oder lat/lon direkt eintippen. Beim Bearbeiten sind dieselben Felder
+  vorbelegt und lassen sich auf demselben Weg korrigieren (z.B. nach ungenauer Erst-Geocodierung).
+  Frühere Version verlangte den Kartenklick *vor* dem Formular — dieser direktere Ablauf orientiert
+  sich am ursprünglichen, lokalen Feuerwehr-Objektverwaltungstool, das diese Funktion inspiriert hat.
 - **Bearbeiten/Löschen** (Stab/Admin): bestehendes Objekt auf der Karte oder in der Objekt-Liste
   anklicken.
 - **Ansehen** (Mitglied): Klick öffnet dieselbe Ansicht schreibgeschützt (Formularfelder,

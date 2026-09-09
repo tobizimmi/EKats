@@ -16,6 +16,7 @@ let objectsCanEdit = false;
 let editingObjectId = null;
 let activeSketchEditor = null;
 let pendingLatLon = null;
+let mapPickArmed = false;
 let vehiclesCache = [];
 let stationsCache = [];
 let allObjectsCache = [];
@@ -26,6 +27,8 @@ function objectFormFields() {
     name: document.getElementById('object-name'),
     category: document.getElementById('object-category'),
     address: document.getElementById('object-address'),
+    lat: document.getElementById('object-lat'),
+    lon: document.getElementById('object-lon'),
     hazards: document.getElementById('object-hazards'),
     accessInfo: document.getElementById('object-access-info'),
     contactName: document.getElementById('object-contact-name'),
@@ -98,6 +101,9 @@ async function openObjectDialog(mode, object) {
   fields.name.value = object?.name || '';
   fields.category.value = object?.category || 'sonstiges';
   fields.address.value = object?.address || '';
+  fields.lat.value = object?.lat ?? pendingLatLon?.lat ?? '';
+  fields.lon.value = object?.lon ?? pendingLatLon?.lng ?? '';
+  document.getElementById('object-geocode-status').textContent = '';
   fields.hazards.value = object?.hazards || '';
   fields.accessInfo.value = object?.access_info || '';
   fields.contactName.value = object?.contact_name || '';
@@ -130,6 +136,88 @@ async function openObjectDialog(mode, object) {
     updateTaskTargetOptions();
     await Promise.all([loadTasksForDialog(object.id), loadAttachmentsForDialog(object.id), loadObjectSketchForDialog(object, mode)]);
   }
+}
+
+// ---------------------------------------------------------------------------
+// Position: Geocoding per Adresse (Nominatim) oder Klick auf die Karte
+// ---------------------------------------------------------------------------
+
+// Reiner Lookup-Request direkt vom Browser gegen den oeffentlichen Nominatim-Dienst (siehe
+// backend/src/app.js CSP connect-src) - fuer den seltenen, manuell ausgeloesten Einzel-Lookup beim
+// Objekt-Anlegen unproblematisch bzgl. Nominatims Nutzungsrichtlinien (kein automatisiertes
+// Massen-Geocoding).
+async function geocodeObjectAddress() {
+  const statusEl = document.getElementById('object-geocode-status');
+  const address = document.getElementById('object-address').value.trim();
+  if (!address) {
+    statusEl.textContent = 'Bitte zuerst eine Adresse eingeben.';
+    return;
+  }
+
+  statusEl.textContent = 'Suche...';
+  try {
+    const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=de&q=${encodeURIComponent(address)}`;
+    const res = await fetch(url, { headers: { 'Accept-Language': 'de' } });
+    const results = await res.json();
+    if (results.length === 0) {
+      statusEl.textContent = 'Keine Koordinaten gefunden - bitte Adresse prüfen oder Position auf der Karte wählen.';
+      return;
+    }
+    document.getElementById('object-lat').value = Number(results[0].lat).toFixed(6);
+    document.getElementById('object-lon').value = Number(results[0].lon).toFixed(6);
+    statusEl.textContent = `Gefunden: ${results[0].display_name}`;
+  } catch (err) {
+    statusEl.textContent = 'Geocoding fehlgeschlagen - bitte Position auf der Karte wählen oder Koordinaten manuell eintragen.';
+  }
+}
+
+// Erlaubt das Setzen der Position per Kartenklick auch waehrend der Dialog schon offen ist: der
+// bereits eingegebene Formularinhalt wird vor dem Schliessen zwischengespeichert und beim
+// Wiederoeffnen (nach dem Klick) als "object" an openObjectDialog uebergeben, damit nichts verloren
+// geht - openObjectDialog fuellt lat/lon dann aus pendingLatLon (siehe dort).
+function pickObjectPositionOnMap() {
+  const draft = collectDraftObjectFields();
+  document.getElementById('object-dialog').close();
+  const addButton = document.getElementById('add-object-button');
+  mapPickArmed = true;
+  addButton.textContent = 'Position auf der Karte anklicken … (erneut klicken zum Abbrechen)';
+  armObjectPlacement((latlng) => {
+    mapPickArmed = false;
+    addButton.textContent = 'Objekt anlegen';
+    pendingLatLon = latlng;
+    openObjectDialog('create', draft);
+  });
+}
+
+// Liest die aktuell im (noch offenen) Formular stehenden Werte als objektaehnliche Struktur aus -
+// selbe Feldnamen wie die API-Antwort (snake_case), damit openObjectDialog() sie unveraendert wie
+// ein frisch geladenes Objekt vorbelegen kann.
+function collectDraftObjectFields() {
+  const fields = objectFormFields();
+  return {
+    name: fields.name.value,
+    category: fields.category.value,
+    address: fields.address.value,
+    hazards: fields.hazards.value,
+    access_info: fields.accessInfo.value,
+    contact_name: fields.contactName.value,
+    contact_phone: fields.contactPhone.value,
+    notes: fields.notes.value,
+    review_interval_months: fields.reviewInterval.value || null,
+    fire_water_supply_type: fields.fireWaterSupplyType.value,
+    fire_water_supply_capacity_lpm: fields.fireWaterSupplyCapacity.value,
+    fire_water_supply_location: fields.fireWaterSupplyLocation.value,
+    fire_alarm_system: fields.fireAlarmSystem.checked,
+    fire_alarm_monitoring_station: fields.fireAlarmMonitoringStation.value,
+    occupant_count_max: fields.occupantCountMax.value,
+    elevators: fields.elevators.checked,
+    smoke_heat_exhaust_system: fields.smokeHeatExhaustSystem.checked,
+    pv_battery_system: fields.pvBatterySystem.checked,
+    pv_battery_disconnect_location: fields.pvBatteryDisconnectLocation.value,
+    assembly_point: fields.assemblyPoint.value,
+    built_year: fields.builtYear.value,
+    custom_fields: collectCustomFieldValues(),
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -302,10 +390,17 @@ async function submitObjectForm(event) {
   const errorEl = document.querySelector('#object-form > .error-message');
   errorEl.textContent = '';
 
+  if (fields.lat.value === '' || fields.lon.value === '') {
+    errorEl.textContent = 'Bitte Koordinaten angeben (Adresse geocodieren, Position auf Karte wählen oder manuell eintragen).';
+    return;
+  }
+
   const payload = {
     name: fields.name.value.trim(),
     category: fields.category.value,
     address: fields.address.value.trim() || null,
+    lat: Number(fields.lat.value),
+    lon: Number(fields.lon.value),
     hazards: fields.hazards.value.trim() || null,
     accessInfo: fields.accessInfo.value.trim() || null,
     contactName: fields.contactName.value.trim() || null,
@@ -331,7 +426,7 @@ async function submitObjectForm(event) {
     if (editingObjectId) {
       await api.patch(`/objects/${editingObjectId}`, payload);
     } else {
-      await api.post('/objects', { ...payload, lat: pendingLatLon.lat, lon: pendingLatLon.lng });
+      await api.post('/objects', payload);
     }
     document.getElementById('object-dialog').close();
     await loadObjects();
@@ -679,6 +774,8 @@ function initObjectsUi(user) {
   document.getElementById('object-attachment-upload-button').addEventListener('click', uploadAttachmentToCurrentObject);
   document.getElementById('object-sketch-cancel-button').addEventListener('click', closeObjectSketchEditor);
   document.getElementById('object-sketch-save-button').addEventListener('click', saveObjectSketch);
+  document.getElementById('object-geocode-button').addEventListener('click', geocodeObjectAddress);
+  document.getElementById('object-pick-on-map-button').addEventListener('click', pickObjectPositionOnMap);
   // Native <dialog>-"close"-Event feuert unabhaengig davon, WIE geschlossen wurde (Abbrechen-Klick,
   // Esc-Taste, Formular-Submit mit method="dialog") - zuverlaessiger Ort, um eine evtl. offene
   // Leaflet-Editor-Instanz aufzuraeumen, statt jeden einzelnen Schliessen-Pfad einzeln abzudecken.
@@ -695,20 +792,18 @@ function initObjectsUi(user) {
     return;
   }
 
+  // Objekt anlegen oeffnet den Dialog direkt (Position per Adress-Geocoding, Kartenklick-Button im
+  // Dialog oder manueller lat/lon-Eingabe - siehe geocodeObjectAddress()/pickObjectPositionOnMap()).
+  // Ein Klick waehrend eine Kartenklick-Positionierung noch aussteht (armed) bricht diese stattdessen
+  // ab, statt einen zweiten Dialog zu oeffnen.
   addButton.addEventListener('click', () => {
-    if (addButton.dataset.armed === 'true') {
+    if (mapPickArmed) {
       disarmObjectPlacement();
-      addButton.dataset.armed = 'false';
+      mapPickArmed = false;
       addButton.textContent = 'Objekt anlegen';
       return;
     }
-    addButton.dataset.armed = 'true';
-    addButton.textContent = 'Position auf der Karte anklicken … (Abbrechen)';
-    armObjectPlacement((latlng) => {
-      addButton.dataset.armed = 'false';
-      addButton.textContent = 'Objekt anlegen';
-      pendingLatLon = latlng;
-      openObjectDialog('create', null);
-    });
+    pendingLatLon = null;
+    openObjectDialog('create', null);
   });
 }

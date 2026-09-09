@@ -47,7 +47,11 @@ function createApp() {
           // ("Ihr Homepagewetter", siehe README "DWD-Wetterbild-Widget"). Wie beim OSM-Kartenlayer
           // nur ein Bild-Host, kein Skript/Tracking.
           imgSrc: ["'self'", 'data:', 'https://tile.openstreetmap.org', 'https://maps.dwd.de'],
-          connectSrc: ["'self'"],
+          // nominatim.openstreetmap.org: Adress-zu-Koordinaten-Geocoding beim Objekt-Anlegen (Button
+          // "Koordinaten aus Adresse ermitteln", siehe js/objects.js) - reiner Lookup-Request direkt
+          // vom Browser, kein Tracking/Skript. Gleiche Nominatim-Instanz, gleiches Nutzungsmuster wie
+          // beim urspruenglichen Feuerwehr-Objektverwaltungstool, das diese Funktion inspiriert hat.
+          connectSrc: ["'self'", 'https://nominatim.openstreetmap.org'],
           workerSrc: ["'self'"],
           manifestSrc: ["'self'"],
           // blob: fuer die PDF-Vorlagen-Live-Vorschau im Admin-Bereich (Konzept Teil 3): das Blob
