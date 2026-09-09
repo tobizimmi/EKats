@@ -769,14 +769,12 @@ DWD-Geodiensten") als `<img>` ein — eine Kartenkombination aus Blaue-Marmor-Hi
 aktuellen amtlichen Warngebieten/-gemeinden, ausgeschnitten auf eine Bounding-Box um den
 Wehr-Kartenmittelpunkt. Kein API-Key nötig, `imgSrc`-Direktive der CSP entsprechend um
 `https://maps.dwd.de` erweitert (`backend/src/app.js`, dieselbe bewusste, dokumentierte Ergänzung
-wie beim OSM-Kartenlayer). **Verifikationshinweis:** `maps.dwd.de` ist wie alle DWD-Hosts in dieser
-Sandbox per Netzwerk-Firewall blockiert und die Bild-URL konnte hier nicht gegen die echte Kachel
-gerendert geprüft werden — die Wahl stützt sich auf die öffentliche DWD-Dokumentation der
-Geodienste (nicht auf `opendata.dwd.de`, das ursprünglich im Konzept vorgesehen war, aber keine
-ebenso klar dokumentierte, fürs Einbetten gedachte Bild-URL bietet). Das Widget fängt einen
-Ladefehler ab und zeigt statt eines kaputten Bildes einen Hinweis mit Link zu dwd.de — vor
-Produktivbetrieb auf dem tatsächlich erreichenden Server prüfen und bei Bedarf die Layer-Auswahl in
-`renderDwdBildWidget()` (`js/dashboard.js`) anpassen.
+wie beim OSM-Kartenlayer). **Verifikationshinweis:** Die Layer-Namen (`bluemarble`,
+`Warngebiete_Kreise`, `Warnungen_Gemeinden_vereinigt`, ohne `dwd:`-Präfix) sind per
+`GetCapabilities`-Abgleich auf dem Produktivserver bestätigt — derselbe `dwd:`-Präfix-Fehler wie
+beim Niederschlagsradar-Overlay (siehe „Gewitterzug / Niederschlagsbewegung" unten) betraf
+ursprünglich auch dieses Widget. Das Widget fängt einen Ladefehler zusätzlich ab und zeigt statt
+eines kaputten Bildes einen Hinweis mit Link zu dwd.de.
 
 **Pegel-Liniendiagramm-Widget:** `live_datapoint` speichert je Station nur den aktuellsten Wert
 (`UNIQUE(source, external_id)`) — für einen Zeitreihen-Chart schreibt `upsertDatapoints()`
@@ -966,24 +964,29 @@ Die ursprüngliche Überlegung war, DWDs **RADOLAN/RADVOR**-Rohdaten
 eigene Projektion) — das wäre deutlich aufwändiger als jeder bestehende Connector gewesen.
 **Einfacherer, umgesetzter Weg**: DWD stellt dieselben Radardaten bereits fertig als Kartenschicht
 über den öffentlichen GeoServer bereit (`https://maps.dwd.de/geoserver/dwd/wms`, Layer
-`dwd:RX-Produkt`) — kein eigenes Dekodieren nötig, nur ein Leaflet-`L.tileLayer.wms(...)` als
+`Niederschlagsradar`) — kein eigenes Dekodieren nötig, nur ein Leaflet-`L.tileLayer.wms(...)` als
 zuschaltbarer Overlay (`js/bundesland.js`, `createNiederschlagsradarLayer()` +
 `addRadarLayerControl()`, auf Dashboard und allen Addon-Kartenseiten über das Leaflet-eigene
-Layer-Steuerelement oben rechts erreichbar, Standard AUS). Die Bewegungsrichtung von Niederschlag/
-Gewittern ist dadurch direkt auf der Karte sichtbar, ohne die Zellverfolgung selbst zu berechnen.
+Layer-Steuerelement oben rechts erreichbar, Standard AUS). Laut GeoServer-Abstract sogar mit
+kurzfristiger Vorhersage-Komponente ("Niederschlagsradar und -vorhersage, Alias für RV-Produkt,
+Auflösung 1km, 5-minütig") — die Bewegungsrichtung von Niederschlag/Gewittern ist dadurch direkt
+auf der Karte sichtbar, ohne eine eigene Zellverfolgung zu berechnen.
 
-**Verifikationsstand**: Der erste Versuch (`dwd:Niederschlagsradar`, aus einer vermuteten GetMap-
-Vorschau-URL) ist in Produktion nachweislich gescheitert (per `tileerror`-Diagnose vom Nutzer
-bestätigt). Der jetzige Name `dwd:RX-Produkt` stammt aus einer tatsächlich funktionierenden
-Drittanbieter-Integration (github.com/Turbo87/ogn-web-viewer, Issue #4) gegen denselben Dienst,
-ist also deutlich verlässlicher, aber weiterhin nicht selbst live gegengeprüft — `maps.dwd.de` ist
-aus dieser Entwicklungsumgebung nicht erreichbar. Schlägt auch dieser Name fehl, erscheint dank
-des `tileerror`-Handlers ein sichtbarer Hinweis direkt auf der Karte statt einer wortlos leeren
-Kachelfläche, und die Browser-Konsole loggt die exakte fehlgeschlagene GetMap-URL — diese direkt
-öffnen liefert eine WMS-ServiceException mit dem tatsächlich erwarteten Layer-Namen. Alternativ per
-`GET https://maps.dwd.de/geoserver/dwd/wms?service=WMS&version=1.3.0&request=GetCapabilities` den
-kompletten Katalog prüfen. Schlägt der Name fehl, bleibt ohnehin nur die Kartenschicht leer, kein
-Fehler und keine Beeinträchtigung der übrigen Lage-Daten.
+**Verifikationsstand: jetzt live bestätigt.** Zwei vorherige Versuche scheiterten aus zwei
+unterschiedlichen Gründen — beide vom Nutzer per `tileerror`-Diagnose auf dem Produktivserver
+bestätigt: `dwd:Niederschlagsradar` hatte den richtigen Basisnamen, aber einen überflüssigen
+`dwd:`-Präfix (der Endpunkt `.../geoserver/dwd/wms` ist bereits auf den Workspace `dwd`
+eingeschränkt — ein zusätzliches `dwd:` im `layers`-Parameter sucht dann fälschlich nach einem
+Layer, der wörtlich `dwd:Niederschlagsradar` heißt, den es nicht gibt); `dwd:RX-Produkt` existierte
+auf diesem GeoServer schlicht nicht. Der Nutzer hat daraufhin `GetCapabilities` direkt vom
+Produktivserver abgerufen (`curl ... | grep -oE '<Name>[^<]*</Name>'`) und den vollständigen
+Layer-Katalog sowie den konkreten `<Layer>`-Eintrag für `Niederschlagsradar` geliefert — bestätigt
+exakt diesen Namen ohne Präfix, Unterstützung für `EPSG:3857` (Leaflets Standardprojektion) und
+eine `time`-Dimension mit Default `"current"` (kein Zusatzparameter nötig, zeigt automatisch den
+aktuellsten Stand). Derselbe `dwd:`-Präfix-Fehler betraf auch das ältere DWD-Wetterbild-Widget
+(`renderDwdBildWidget()`, Phase 6) — ebenfalls korrigiert. Schlägt der Layer dennoch einmal fehl
+(Dienstausfall o.ä.), erscheint dank des `tileerror`-Handlers ein sichtbarer Hinweis direkt auf der
+Karte statt einer wortlos leeren Kachelfläche.
 
 ## Bekannte V1-Vereinfachungen
 

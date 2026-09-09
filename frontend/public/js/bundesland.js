@@ -85,19 +85,25 @@ function createDatapointLayer(dp) {
 // direkt auf der Karte sichtbar, nicht nur als Einzel-Warnung. Von map.js (Dashboard) und addon.js
 // (Themenseiten) genutzt.
 //
-// ZWEITER VERSUCH beim Layer-Namen: "dwd:Niederschlagsradar" (aus einer vermuteten GetMap-Vorschau-
-// URL) ist in Produktion live gescheitert (per tileerror-Diagnose unten vom Nutzer bestaetigt, siehe
-// README). Jetzt "dwd:RX-Produkt" - stammt aus einer tatsaechlich funktionierenden Drittanbieter-
-// Integration (github.com/Turbo87/ogn-web-viewer, Issue #4, OpenLayers-Code mit genau diesem
-// Layer-Namen gegen denselben Dienst), also deutlich verlaesslicher als der erste Versuch, aber
-// WEITERHIN NICHT selbst live gegengeprueft (maps.dwd.de bleibt aus der Entwicklungsumgebung
-// blockiert). Sollte auch dieser Name scheitern, zeigt der tileerror-Handler unten die Diagnose-URL -
-// direkt im Browser geoeffnet liefert eine WMS-ServiceException mit dem tatsaechlich erwarteten Namen.
+// DRITTER UND (jetzt echt) VERIFIZIERTER VERSUCH: der Nutzer hat GetCapabilities live gegen
+// maps.dwd.de geprueft (per curl auf dem Produktivserver, siehe README) und den vollstaendigen
+// Layer-Katalog geliefert. Die vorherigen zwei Versuche waren aus zwei verschiedenen Gruenden falsch:
+// "dwd:Niederschlagsradar" hatte den RICHTIGEN Basisnamen, aber einen ueberfluessigen "dwd:"-Praefix
+// - der Endpunkt "https://maps.dwd.de/geoserver/dwd/wms" ist bereits auf den Workspace "dwd"
+// eingeschraenkt, ein zusaetzliches "dwd:" im layers-Parameter sucht dann faelschlich nach einem
+// Layer, der woertlich "dwd:Niederschlagsradar" heisst (gibt es nicht). "dwd:RX-Produkt" war schlicht
+// kein existierender Layer auf diesem GeoServer (stammte aus einem anderen Kontext). Laut
+// GetCapabilities-XML heisst der Layer exakt "Niederschlagsradar" (ohne Praefix), unterstuetzt
+// EPSG:3857 (Leaflets Standard-Projektion) und hat eine time-Dimension mit Default "current" - ohne
+// TIME-Parameter zeigt er also automatisch den aktuellsten Stand, kein Zusatzparameter noetig. Laut
+// Abstract sogar noch besser als erhofft: "Niederschlagsradar und -vorhersage, Alias fuer RV-Produkt
+// (Aufloesung 1km), 5 minuetig" - enthaelt bereits eine kurzfristige Vorhersage-Komponente.
 // Bewusst als zuschaltbarer Overlay (Standard AUS): schlaegt der Layer-Name doch fehl, bleiben nur
-// Kacheln aus, kein Fehler und keine Beeintraechtigung der eigentlichen Lage-Daten.
+// Kacheln aus, kein Fehler und keine Beeintraechtigung der eigentlichen Lage-Daten (siehe tileerror-
+// Handler unten als Absicherung).
 function createNiederschlagsradarLayer() {
   return L.tileLayer.wms('https://maps.dwd.de/geoserver/dwd/wms', {
-    layers: 'dwd:RX-Produkt',
+    layers: 'Niederschlagsradar',
     format: 'image/png',
     transparent: true,
     opacity: 0.6,

@@ -189,8 +189,12 @@ function renderObjekteWidget(container) {
 
 // DWD-Wetterbild: bindet den offiziell von DWD dokumentierten WMS-Geodienst zum Einbetten von
 // Kartenbildern auf fremden Webseiten ein (siehe README "DWD-Wetterbild-Widget" fuer den
-// Verifikationsstand - in dieser Sandbox nicht renderbar pruefbar, da maps.dwd.de per
-// Netzwerk-Firewall blockiert ist, wie alle DWD-Hosts in diesem Projekt).
+// Verifikationsstand). Layer-Namen bewusst OHNE "dwd:"-Praefix: der Endpunkt
+// "https://maps.dwd.de/geoserver/dwd/ows" ist bereits auf den Workspace "dwd" eingeschraenkt, ein
+// zusaetzliches "dwd:" im layers-Parameter sucht dann faelschlich nach einem Layer, der woertlich
+// "dwd:bluemarble" heisst (gibt es nicht) - derselbe Fehler, der beim Niederschlagsradar-Overlay
+// (siehe createNiederschlagsradarLayer() in js/bundesland.js) live bestaetigt wurde, per
+// GetCapabilities-Abgleich auf dem Produktivserver behoben.
 function renderDwdBildWidget(container) {
   const lat = dash.wehr?.center_lat ?? 51.1657;
   const lon = dash.wehr?.center_lon ?? 10.4515;
@@ -201,7 +205,7 @@ function renderDwdBildWidget(container) {
   const bbox = [lon - dLon, lat - dLat, lon + dLon, lat + dLat].join(',');
   const src =
     'https://maps.dwd.de/geoserver/dwd/ows?service=WMS&version=1.3&request=GetMap' +
-    '&layers=dwd:bluemarble,dwd:Warngebiete_Kreise,dwd:Warnungen_Gemeinden_vereinigt' +
+    '&layers=bluemarble,Warngebiete_Kreise,Warnungen_Gemeinden_vereinigt' +
     `&bbox=${bbox}&width=420&height=300&srs=EPSG:4326&format=image/png`;
 
   const img = document.createElement('img');
