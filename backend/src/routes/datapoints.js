@@ -110,4 +110,39 @@ router.get('/', requireAuth, async (req, res, next) => {
   }
 });
 
+// GET /api/datapoints/history?source=pegelonline&externalId=<uuid>
+// Zeitreihe fuer das Pegel-Liniendiagramm-Widget (Konzept Teil 2, Baustein D) aus datapoint_history
+// (Migration 013). Nur Quellen aus HISTORY_SOURCES in fetchers/normalize.js haben ueberhaupt
+// Historien-Zeilen - fuer alle anderen liefert die Abfrage einfach ein leeres Array statt eines
+// Fehlers, das Widget zeigt dann "keine Daten" statt eines API-Fehlers.
+router.get('/history', requireAuth, async (req, res, next) => {
+  try {
+    const { source, externalId } = req.query;
+    if (!source || !VALID_SOURCES.includes(source)) {
+      return res.status(400).json({ ok: false, error: `Unbekannte Quelle "${source}".` });
+    }
+    if (!externalId) {
+      return res.status(400).json({ ok: false, error: 'externalId fehlt.' });
+    }
+
+    const allowed = await hasFeatureAccess(req.user.id, req.user.role, req.user.wehrId, source);
+    if (!allowed) {
+      return res.status(403).json({ ok: false, error: 'Kein Zugriff auf diese Datenquelle.' });
+    }
+
+    const { rows } = await query(
+      `SELECT value_numeric, unit, item_timestamp, fetched_at
+       FROM datapoint_history
+       WHERE source = $1 AND external_id = $2 AND fetched_at >= now() - interval '14 days'
+       ORDER BY fetched_at ASC
+       LIMIT 2000`,
+      [source, externalId]
+    );
+
+    return res.json({ ok: true, data: rows });
+  } catch (err) {
+    return next(err);
+  }
+});
+
 module.exports = router;

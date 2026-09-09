@@ -654,6 +654,51 @@ vorinstalliertes Chromium an einem abweichenden Pfad liegt.
 
 Schema: `pdf_template` (`backend/sql/migrations/010_add_pdf_templates.sql`).
 
+## Individuelles Dashboard (Phase 6)
+
+`dashboard.html` ("Mein Dashboard" in der Seitenleiste) ergänzt die feste Karten-Ansicht
+(`index.html`, unverändert) um einen Baukasten: jeder Nutzer stellt sich seine eigene Auswahl und
+Reihenfolge aus fünf Widget-Typen zusammen — Karte (nicht-interaktive Mini-Karte aller Objekte),
+Prioritäts-Leiste, Objekt-Übersicht, DWD-Wetterbild und (mehrfach möglich, je Station ein Widget)
+Pegel-Liniendiagramm. Umsortieren per natives HTML5-Drag-and-Drop (Desktop) oder die Auf-/Ab-Buttons
+je Widget-Karte als Tastatur-/Touch-Fallback, dieselbe Grundidee wie das bereits produktive
+Drag-and-Drop-Dashboard im Schwesterprojekt FKatInfo.
+
+**Persistenz:** Das Layout (Liste aus `{id, type, config}`) liegt unter dem Schlüssel
+`dashboard_layout` in derselben `user_preference`-Tabelle wie die Spaltenwahl der Themenseiten
+(Migration 011, Phase 4) — ein Eintrag mehr in derselben Tabelle statt eines eigenen Mechanismus.
+„Zurücksetzen" löscht die Zeile über denselben Self-Service-Endpunkt
+(`DELETE /api/user-preferences/dashboard_layout`); die Seite fällt dann auf die eingebaute
+Standardauswahl (Karte, Prioritäts-Leiste, Objekt-Übersicht, DWD-Wetterbild) zurück.
+
+**DWD-Wetterbild-Widget:** bindet den offiziell von DWD dokumentierten WMS-Geodienst
+(`maps.dwd.de/geoserver/dwd/ows`, „Ihr Homepagewetter"/"WMS-Dienste für die eigene Website mit den
+DWD-Geodiensten") als `<img>` ein — eine Kartenkombination aus Blaue-Marmor-Hintergrund und den
+aktuellen amtlichen Warngebieten/-gemeinden, ausgeschnitten auf eine Bounding-Box um den
+Wehr-Kartenmittelpunkt. Kein API-Key nötig, `imgSrc`-Direktive der CSP entsprechend um
+`https://maps.dwd.de` erweitert (`backend/src/app.js`, dieselbe bewusste, dokumentierte Ergänzung
+wie beim OSM-Kartenlayer). **Verifikationshinweis:** `maps.dwd.de` ist wie alle DWD-Hosts in dieser
+Sandbox per Netzwerk-Firewall blockiert und die Bild-URL konnte hier nicht gegen die echte Kachel
+gerendert geprüft werden — die Wahl stützt sich auf die öffentliche DWD-Dokumentation der
+Geodienste (nicht auf `opendata.dwd.de`, das ursprünglich im Konzept vorgesehen war, aber keine
+ebenso klar dokumentierte, fürs Einbetten gedachte Bild-URL bietet). Das Widget fängt einen
+Ladefehler ab und zeigt statt eines kaputten Bildes einen Hinweis mit Link zu dwd.de — vor
+Produktivbetrieb auf dem tatsächlich erreichenden Server prüfen und bei Bedarf die Layer-Auswahl in
+`renderDwdBildWidget()` (`js/dashboard.js`) anpassen.
+
+**Pegel-Liniendiagramm-Widget:** `live_datapoint` speichert je Station nur den aktuellsten Wert
+(`UNIQUE(source, external_id)`) — für einen Zeitreihen-Chart schreibt `upsertDatapoints()`
+(`backend/src/fetchers/normalize.js`) zusätzlich in eine neue, schlanke `datapoint_history`-Tabelle
+(Migration 013), bewusst nur für Quellen in einer Allowlist (`HISTORY_SOURCES`, aktuell nur
+`pegelonline` — ein Unwetterereignis oder FIRMS-Hotspot hat keinen sinnvollen "Verlauf" im
+Liniendiagramm-Sinn). `GET /api/datapoints/history?source=pegelonline&externalId=…` liefert die
+letzten 14 Tage (deckungsgleich mit `DATA_RETENTION_DAYS` — keine zweite Aufbewahrungsregel), das
+Frontend zeichnet daraus ein leichtgewichtiges, handgeschriebenes SVG-Liniendiagramm (keine neue
+Chart-Bibliothek nötig). Die Bereinigung alter Historien-Punkte läuft im selben Cleanup-Cron wie bei
+`live_datapoint` (`cleanupOldDatapoints()` in `backend/src/scheduler.js`).
+
+Schema: `datapoint_history` (`backend/sql/migrations/013_add_datapoint_history.sql`).
+
 ## Sicherheit & Datenschutz
 
 ### Authentifizierung & Sitzungen

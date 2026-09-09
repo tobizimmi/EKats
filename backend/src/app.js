@@ -41,7 +41,11 @@ function createApp() {
           defaultSrc: ["'self'"],
           scriptSrc: ["'self'"],
           styleSrc: ["'self'", "'unsafe-inline'"],
-          imgSrc: ["'self'", 'data:', 'https://tile.openstreetmap.org'],
+          // maps.dwd.de: DWD-Wetterbild-Widget (Konzept Teil 2, Baustein D) - der offiziell von DWD
+          // dokumentierte WMS-Geodienst zum Einbetten von Kartenbildern auf fremden Webseiten
+          // ("Ihr Homepagewetter", siehe README "DWD-Wetterbild-Widget"). Wie beim OSM-Kartenlayer
+          // nur ein Bild-Host, kein Skript/Tracking.
+          imgSrc: ["'self'", 'data:', 'https://tile.openstreetmap.org', 'https://maps.dwd.de'],
           connectSrc: ["'self'"],
           workerSrc: ["'self'"],
           manifestSrc: ["'self'"],

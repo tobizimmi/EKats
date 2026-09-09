@@ -39,7 +39,17 @@ async function cleanupOldDatapoints() {
     [config.dataRetentionDays]
   );
   console.log(`[scheduler] cleanup: ${rowCount} alte Datenpunkte geloescht.`);
-  return { deleted: rowCount };
+
+  // Pegel-Liniendiagramm-Historie (Migration 013) teilt sich dieselbe Aufbewahrungsfrist wie
+  // live_datapoint - keine zweite Retention-Regel im System (Konzept Teil 2, Entscheidung
+  // "Rueckblick der neuen Pegel-Historie").
+  const { rowCount: historyDeleted } = await query(
+    `DELETE FROM datapoint_history WHERE fetched_at < now() - ($1 || ' days')::interval`,
+    [config.dataRetentionDays]
+  );
+  console.log(`[scheduler] cleanup: ${historyDeleted} alte Historien-Punkte geloescht.`);
+
+  return { deleted: rowCount, historyDeleted };
 }
 
 function startScheduler() {

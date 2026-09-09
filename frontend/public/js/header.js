@@ -17,7 +17,10 @@ const ROLE_LABELS = { admin: 'Admin', stab: 'Stab', mitglied: 'Mitglied' };
 const NAV_GROUPS = [
   {
     label: 'Übersicht',
-    items: [{ href: './', match: ['', 'index.html'], label: 'Karte', icon: '📍' }],
+    items: [
+      { href: './', match: ['', 'index.html'], label: 'Karte', icon: '📍' },
+      { href: 'dashboard.html', label: 'Mein Dashboard', icon: '🗂️' },
+    ],
   },
   {
     label: 'Datenquellen',

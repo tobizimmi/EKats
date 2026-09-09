@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Mein Dashboard – EKats</title>
+  <link rel="stylesheet" href="vendor/leaflet/leaflet.css" />
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <meta name="theme-color" content="#14232f" />
+</head>
+<body>
+  <div id="app-sidebar-root"></div>
+  <main class="stack">
+    <div class="card">
+      <div class="section-head-row">
+        <h2 class="section-title">Mein Dashboard</h2>
+        <button type="button" class="secondary" id="dashboard-reset-button">↺ Zurücksetzen</button>
+      </div>
+      <p class="muted">
+        Eigene Auswahl und Reihenfolge der Widgets - geräteübergreifend gespeichert. Ziehen zum Umsortieren
+        (Desktop) oder die Pfeil-Buttons je Widget nutzen.
+      </p>
+      <div class="widget-grid" id="dashboard-grid"></div>
+    </div>
+  </main>
+
+  <dialog id="widget-add-dialog" class="app-dialog">
+    <form id="widget-add-form" method="dialog">
+      <h3 class="section-title">Widget hinzufügen</h3>
+      <label>
+        <span>Widget-Typ</span>
+        <select id="widget-add-type"></select>
+      </label>
+      <label id="widget-add-pegel-row" hidden>
+        <span>Pegel-Station</span>
+        <select id="widget-add-pegel-station"></select>
+      </label>
+      <p class="error-message" id="widget-add-error" role="alert"></p>
+      <div class="dialog-actions">
+        <button type="submit" class="primary">Hinzufügen</button>
+        <button type="button" class="secondary" id="widget-add-cancel">Abbrechen</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="vendor/leaflet/leaflet.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/header.js"></script>
+  <script src="js/severity.js"></script>
+  <script src="js/sw-register.js"></script>
+  <script src="js/dashboard.js"></script>
+</body>
+</html>

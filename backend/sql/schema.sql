@@ -336,3 +336,17 @@ CREATE TABLE IF NOT EXISTS critical_object_map_sketch (
     updated_by INTEGER REFERENCES app_user(id) ON DELETE SET NULL,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- Pegel-Liniendiagramm-Widget (Migration 013): siehe Migration 013 fuer Details im Kommentar.
+CREATE TABLE IF NOT EXISTS datapoint_history (
+    id BIGSERIAL PRIMARY KEY,
+    source TEXT NOT NULL,
+    external_id TEXT NOT NULL,
+    value_numeric DOUBLE PRECISION,
+    unit TEXT,
+    item_timestamp TIMESTAMPTZ,
+    fetched_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_datapoint_history_lookup
+    ON datapoint_history(source, external_id, fetched_at);

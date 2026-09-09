@@ -1,5 +1,13 @@
 const { query } = require('../db');
 
+// Quellen, fuer die zusaetzlich zum aktuellsten Wert (live_datapoint) auch eine Zeitreihe in
+// datapoint_history mitgeschrieben wird - fuers Pegel-Liniendiagramm-Widget (Konzept Teil 2,
+// Baustein D, Migration 013). Bewusst als Allowlist statt fuer jede Quelle: ein Unwetterereignis
+// oder FIRMS-Hotspot hat keinen sinnvollen "Verlauf" im Liniendiagramm-Sinn, und wetter_vorhersage
+// schreibt ohnehin schon dutzende Zukunftswerte je Fetch in live_datapoint - eine ungefilterte
+// History wuerde die Tabelle unnoetig aufblaehen.
+const HISTORY_SOURCES = new Set(['pegelonline']);
+
 // Gemeinsames internes Format, das jeder Fetcher liefern muss (siehe CLAUDE.md Abschnitt 2.3):
 //   source, external_id, title, lat, lon, value_numeric, unit, severity, item_timestamp,
 //   valid_until (optional), payload (Rohdaten/Zusatzfelder als Objekt)
@@ -50,6 +58,14 @@ async function upsertDatapoints(items) {
       ]
     );
     rows.push(inserted[0]);
+
+    if (HISTORY_SOURCES.has(item.source) && item.value_numeric !== null && item.value_numeric !== undefined) {
+      await query(
+        `INSERT INTO datapoint_history (source, external_id, value_numeric, unit, item_timestamp)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [item.source, item.external_id, item.value_numeric, item.unit ?? null, item.item_timestamp ?? null]
+      );
+    }
   }
   return rows;
 }

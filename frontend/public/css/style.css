@@ -819,3 +819,147 @@ table.data-table td {
   gap: 0.5rem;
   margin-top: 1rem;
 }
+
+/* Individuelles Dashboard (Konzept Teil 2, Baustein D), siehe dashboard.html/js/dashboard.js. */
+.section-head-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.5rem;
+}
+
+.widget-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.widget-card {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.9rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.widget-card.dragging {
+  opacity: 0.5;
+}
+
+.widget-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.widget-card-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.widget-card-controls {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.widget-icon-button {
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  border-radius: 6px;
+  width: 1.8rem;
+  height: 1.8rem;
+  line-height: 1;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+.widget-icon-button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.widget-card-body {
+  min-height: 90px;
+}
+
+.widget-map {
+  width: 100%;
+  height: 160px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  margin-bottom: 0.5rem;
+}
+
+.widget-link {
+  font-size: 0.82rem;
+}
+
+.widget-priority-bar {
+  /* Die Vier-Spalten-Grundform (siehe .priority-bar oben) passt auf die volle Kartenbreite von
+     index.html - im schmaleren Widget-Card-Format quetscht das die Beschriftung ab, deshalb hier
+     als 2x2-Raster. */
+  grid-template-columns: repeat(2, 1fr);
+  margin-bottom: 0;
+}
+
+.widget-objekte-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.88rem;
+  margin-bottom: 0.6rem;
+}
+
+.widget-stat-dot {
+  display: inline-block;
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: 50%;
+  margin-right: 0.4rem;
+}
+
+.widget-dwd-image {
+  width: 100%;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  display: block;
+}
+
+.widget-dwd-note {
+  margin: 0.4rem 0 0;
+  font-size: 0.72rem;
+}
+
+.widget-chart-svg {
+  width: 100%;
+  height: 90px;
+  display: block;
+}
+
+.widget-chart-caption {
+  margin: 0.4rem 0 0;
+  font-size: 0.78rem;
+}
+
+.widget-add-card {
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  border-style: dashed;
+  cursor: pointer;
+  font: inherit;
+  min-height: 120px;
+}
+
+.widget-add-card:hover {
+  color: var(--text);
+  border-color: var(--focus);
+}
