@@ -988,6 +988,17 @@ aktuellsten Stand). Derselbe `dwd:`-Präfix-Fehler betraf auch das ältere DWD-W
 (Dienstausfall o.ä.), erscheint dank des `tileerror`-Handlers ein sichtbarer Hinweis direkt auf der
 Karte statt einer wortlos leeren Kachelfläche.
 
+**Verlauf-Regler** (Nutzerwunsch: "Regenradar Historie per Slider bewegen"): erscheint automatisch
+unten links auf der Karte, sobald der Radar-Layer über die Layer-Auswahl eingeschaltet wird
+(`createRadarTimeSliderControl()`, reagiert auf Leaflets `overlayadd`/`overlayremove`-Events).
+Deckt die letzten 2 Stunden in 5-Minuten-Schritten ab (`RADAR_TIME_WINDOW_HOURS`/
+`RADAR_TIME_STEP_MINUTES`) - passend zur tatsächlich vom Dienst gelieferten Auflösung, per
+`GetCapabilities` bestätigt. Ein Abspiel-Button läuft die Schritte automatisch durch (700ms/Schritt,
+Endlosschleife) für einen klassischen Radar-Loop. **Bewusst nur rückwärts**: das GetCapabilities-
+`time`-Fenster endete beim Abgleich exakt bei "jetzt", nicht in der Zukunft - obwohl der Layer-
+Abstract eine Vorhersage-Komponente erwähnt, sind echte Vorhersage-Zeitstempel unbestätigt und
+deshalb nicht blind ergänzt (gleiche Vorsicht wie beim Rest des Projekts).
+
 ## Bekannte V1-Vereinfachungen
 
 - **PWA-Icon** ist aktuell nur als SVG hinterlegt (`frontend/public/icons/icon.svg`). Für optimale

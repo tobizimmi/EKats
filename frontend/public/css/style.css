@@ -414,6 +414,51 @@ button.secondary {
   border-right-color: var(--border);
 }
 
+/* Verlauf-Regler fuer das Niederschlagsradar (js/bundesland.js createRadarTimeSliderControl) - nur
+   sichtbar, waehrend der Radar-Overlay aktiv ist. */
+.radar-time-slider {
+  background: var(--bg-elevated);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.4rem 0.6rem;
+  font-size: 0.75rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.radar-time-slider-title {
+  font-weight: 600;
+  margin-bottom: 0.3rem;
+}
+
+.radar-time-slider-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.radar-time-slider-play {
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  border-radius: 4px;
+  padding: 0.1rem 0.4rem;
+  cursor: pointer;
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+
+.radar-time-slider input[type='range'] {
+  width: 140px;
+}
+
+.radar-time-slider-label {
+  min-width: 3.2rem;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+}
+
 .layer-toggle-bar {
   display: flex;
   flex-wrap: wrap;
