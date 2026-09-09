@@ -1002,6 +1002,19 @@ Schema: `datapoint_history` (`backend/sql/migrations/013_add_datapoint_history.s
   Aktionen — Nutzer angelegt/gelöscht, Rolle geändert, Passwort geändert/durch Admin zurückgesetzt,
   Konto-Sperrung, Objekt gelöscht — inkl. handelndem Konto, Ziel, Zeitstempel und IP.
 
+### Datenquellen-Status (Health-Dashboard je Fetcher)
+
+Admin-Bereich, Karte „Datenquellen-Status" — zeigt je Datenquelle (und den beiden internen
+Wartungsjobs `dwd_stations_import`/`cleanup`) den letzten Lauf, den letzten Erfolg, den letzten
+Fehler (inkl. Fehlertext) sowie Laufzeit und Anzahl geschriebener Zeilen. Bisher war der einzige Weg
+zu sehen, ob ein Fetcher zuverlässig läuft, das Server-Log — kein Admin-UI. Eine Zeile je Quelle in
+`fetcher_health` (Migration 016), per UPSERT nach jedem Lauf aktualisiert (`backend/src/
+fetcherHealth.js`, aufgerufen aus `scheduler.js::runJob()` für die neun Cron-Jobs sowie aus
+`fetchers/blitzortung.js` für dessen dauerhafte WebSocket-Verbindung — dort bedeutet „Erfolg" sowohl
+ein erfolgreicher Verbindungsaufbau als auch ein erfolgreicher Flush gespeicherter Einschläge, damit
+an einem gewitterfreien Tag nicht fälschlich nie ein Erfolg sichtbar wäre, obwohl die Verbindung
+durchgehend stand). Manuell testen/befüllen: `npm run fetch -- <jobname>` im `backend/`-Verzeichnis.
+
 ### Weitere Maßnahmen
 
 - Rate-Limiting auf allen `/api`-Endpunkten, engeres Limit zusätzlich auf `/api/auth/login`

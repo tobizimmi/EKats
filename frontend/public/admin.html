@@ -209,6 +209,27 @@
       </div>
 
       <div class="card">
+        <h2 class="section-title">Datenquellen-Status</h2>
+        <p class="muted">
+          Letzter Lauf je Fetcher - zeigt, ob eine Quelle gerade zuverlässig aktualisiert wird, ohne
+          dafür das Server-Log durchsuchen zu müssen.
+        </p>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Quelle</th>
+              <th>Letzter Lauf</th>
+              <th>Letzter Erfolg</th>
+              <th>Letzter Fehler</th>
+              <th>Dauer</th>
+              <th>Geschrieben</th>
+            </tr>
+          </thead>
+          <tbody id="fetcher-health-table-body"></tbody>
+        </table>
+      </div>
+
+      <div class="card">
         <h2 class="section-title">Audit-Log</h2>
         <p class="muted">
           Sicherheitsrelevante Aktionen der letzten Zeit (Nutzer angelegt/gelöscht, Rolle geändert,

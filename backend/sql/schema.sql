@@ -385,3 +385,15 @@ CREATE TABLE IF NOT EXISTS password_reset_token (
 );
 
 CREATE INDEX IF NOT EXISTS idx_password_reset_token_user ON password_reset_token(user_id);
+
+-- Health-Dashboard je Datenquelle im Admin-Bereich (Migration 016): siehe Migration 016 fuer
+-- Details im Kommentar.
+CREATE TABLE IF NOT EXISTS fetcher_health (
+    source_key TEXT PRIMARY KEY,
+    last_run_at TIMESTAMPTZ,
+    last_success_at TIMESTAMPTZ,
+    last_duration_ms INTEGER,
+    last_written_count INTEGER,
+    last_error_at TIMESTAMPTZ,
+    last_error_message TEXT
+);

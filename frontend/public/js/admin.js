@@ -111,6 +111,58 @@ async function loadUsers(currentUserId) {
   });
 }
 
+// Jobs, die nicht in severity.js::SOURCE_LABELS stehen, weil sie keine nutzerseitig sichtbare
+// Datenquelle sind, sondern interne Wartungsjobs (siehe scheduler.js).
+const FETCHER_HEALTH_EXTRA_LABELS = {
+  dwd_stations_import: 'DWD-Stationsimport (intern)',
+  cleanup: 'Alte Datenpunkte aufräumen (intern)',
+};
+
+// Fehlermeldungen eines Fetchers koennen Fragmente einer externen Antwort enthalten (siehe
+// httpClient.js-Fehlertexte) - anders als die uebrigen, vom System selbst erzeugten Admin-Tabellen-
+// Felder hier bewusst escaped statt roh interpoliert.
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+function formatDurationMs(ms) {
+  if (ms === null || ms === undefined) return '-';
+  return ms < 1000 ? `${ms} ms` : `${(ms / 1000).toFixed(1)} s`;
+}
+
+async function loadFetcherHealth() {
+  const tbody = document.getElementById('fetcher-health-table-body');
+  tbody.innerHTML = '';
+  let rows;
+  try {
+    rows = await api.get('/fetcher-health');
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="6" class="error-message">${err.message}</td></tr>`;
+    return;
+  }
+
+  if (rows.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="6" class="muted">Noch kein Fetcher-Lauf protokolliert (Server evtl. gerade erst gestartet).</td></tr>';
+    return;
+  }
+
+  rows.forEach((row) => {
+    const label = SOURCE_LABELS[row.source_key] || FETCHER_HEALTH_EXTRA_LABELS[row.source_key] || row.source_key;
+    const hasRecentError = row.last_error_at && (!row.last_success_at || new Date(row.last_error_at) > new Date(row.last_success_at));
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${label}</td>
+      <td>${formatTimestamp(row.last_run_at)}</td>
+      <td>${formatTimestamp(row.last_success_at)}</td>
+      <td class="${hasRecentError ? 'error-message' : 'muted'}">${row.last_error_at ? formatTimestamp(row.last_error_at) : '-'}${row.last_error_message ? ` – ${escapeHtml(row.last_error_message)}` : ''}</td>
+      <td>${formatDurationMs(row.last_duration_ms)}</td>
+      <td>${row.last_written_count ?? '-'}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+
 async function loadAuditLog() {
   const tbody = document.getElementById('audit-log-table-body');
   tbody.innerHTML = '';
@@ -434,6 +486,7 @@ async function loadSmtpSettings() {
   await loadUsers(user.id);
   await loadStations();
   await loadVehicles();
+  await loadFetcherHealth();
   await loadAuditLog();
 
   document.getElementById('station-form').addEventListener('submit', async (event) => {

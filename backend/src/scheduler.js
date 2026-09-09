@@ -2,6 +2,7 @@ const cron = require('node-cron');
 const config = require('./config');
 const { query } = require('./db');
 const { evaluateAlertsForSource } = require('./notifications/evaluate');
+const fetcherHealth = require('./fetcherHealth');
 
 const { fetchDwdUnwetter } = require('./fetchers/dwdUnwetter');
 const { fetchPegelonline } = require('./fetchers/pegelonline');
@@ -21,12 +22,15 @@ async function runJob(name, fn) {
     const result = await fn();
     const ms = Date.now() - startedAt;
     console.log(`[scheduler] ${name} ok (${ms}ms):`, result);
+    await fetcherHealth.recordSuccess(name, { durationMs: ms, writtenCount: result?.written ?? null });
     if (result?.rows?.length) {
       await evaluateAlertsForSource(result.source, result.rows);
     }
     return result;
   } catch (err) {
+    const ms = Date.now() - startedAt;
     console.error(`[scheduler] ${name} fehlgeschlagen:`, err.message);
+    await fetcherHealth.recordFailure(name, { durationMs: ms, message: err.message });
     return null;
   }
 }

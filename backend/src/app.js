@@ -25,6 +25,7 @@ const featureAccessRoutes = require('./routes/featureAccess');
 const pdfTemplatesRoutes = require('./routes/pdfTemplates');
 const userPreferencesRoutes = require('./routes/userPreferences');
 const smtpSettingsRoutes = require('./routes/smtpSettings');
+const fetcherHealthRoutes = require('./routes/fetcherHealth');
 
 function createApp() {
   const app = express();
@@ -122,6 +123,7 @@ function createApp() {
   app.use('/api/pdf-templates', pdfTemplatesRoutes);
   app.use('/api/user-preferences', userPreferencesRoutes);
   app.use('/api/smtp-settings', smtpSettingsRoutes);
+  app.use('/api/fetcher-health', fetcherHealthRoutes);
 
   app.use('/api', notFoundHandler);
 

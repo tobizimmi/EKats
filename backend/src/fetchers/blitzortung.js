@@ -37,6 +37,7 @@ const { query } = require('../db');
 const { haversineKm } = require('../utils/geo');
 const { upsertDatapoints } = require('./normalize');
 const config = require('../config');
+const fetcherHealth = require('../fetcherHealth');
 
 const SERVERS = [1, 5, 6, 7].map((n) => `wss://ws${n}.blitzortung.org:3000/`);
 const RECONNECT_DELAY_MS = 15000;
@@ -80,8 +81,10 @@ async function flushPendingStrikes() {
   try {
     const rows = await upsertDatapoints(items);
     console.log(`[blitzortung] ${rows.length} Blitzeinschlaege im Gebiet gespeichert.`);
+    await fetcherHealth.recordSuccess('blitzortung', { writtenCount: rows.length });
   } catch (err) {
     console.error('[blitzortung] Speichern fehlgeschlagen:', err.message);
+    await fetcherHealth.recordFailure('blitzortung', { message: err.message });
   }
 }
 
@@ -163,6 +166,10 @@ async function connect() {
     clearTimeout(connectTimeout);
     console.log('[blitzortung] Verbunden, sende Subscribe-Nachricht.');
     ws.send(JSON.stringify({ time: 0 }));
+    // Verbindung selbst ist schon ein "Erfolg", unabhaengig davon, ob spaeter tatsaechlich ein
+    // Einschlag im Gebiet auftritt - sonst saehe ein Admin an einem ruhigen Wettertag faelschlich
+    // nie einen Erfolg, obwohl die Verbindung die ganze Zeit stand.
+    fetcherHealth.recordSuccess('blitzortung', {});
   });
 
   ws.on('message', (data) => handleMessage(data.toString()));
@@ -175,6 +182,7 @@ async function connect() {
 
   ws.on('error', (err) => {
     console.error('[blitzortung] Verbindungsfehler:', err.message);
+    fetcherHealth.recordFailure('blitzortung', { message: err.message });
   });
 }
 
