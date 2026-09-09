@@ -359,6 +359,13 @@ ebenfalls wehrweit).
      fälschlich wie Bundesland-genau (3.) behandelt — eine Station irgendwo im selben, oft großen
      Bundesland wurde dadurch angezeigt und einem Nachbarlandkreis zugeordnet, obwohl sie
      geografisch weit entfernt lag.*
+     **Zusatzregel für PEGELONLINE + Hochwasserzentralen** (`RADIUS_SCOPED_SOURCES` in
+     `gebietFilter.js`): Pegelmessstellen liegen nur an (Bundes-)Wasserstraßen — viele Kreise haben
+     überhaupt keine eigene Station, auch nicht in ihren direkt angrenzenden Nachbarkreisen (nur ein
+     Nachbarschafts-Ring wird berechnet). Reine Kreis-Zugehörigkeit blendete dadurch die nächstgelegene,
+     für die Lage trotzdem relevante Messstelle komplett aus — ein Wehr konnte "Pegel"-Werte fetchen,
+     aber auf Karte/Liste erschien nichts. Zusätzlich zählt daher ein 60km-Luftlinien-Umkreis um den
+     Wehr-Kartenmittelpunkt (`ST_DWithin`) als ODER-Bedingung.
   3. **Bundesland-genau** (nur DWD-Unwetterwarnungen — einzige Quelle wirklich ohne
      Geokoordinate): gegen die im Gebiet vertretenen Bundesländer geprüft — präziser ist dort ohne
      die amtliche Warncell-Zuordnung nicht möglich (siehe „Warnungen als Fläche“ unten).
@@ -759,6 +766,22 @@ Frontend zeichnet daraus ein leichtgewichtiges, handgeschriebenes SVG-Liniendiag
 Chart-Bibliothek nötig). Die Bereinigung alter Historien-Punkte läuft im selben Cleanup-Cron wie bei
 `live_datapoint` (`cleanupOldDatapoints()` in `backend/src/scheduler.js`).
 
+Die Zeichenlogik steckt in einer eigenen, geteilten Datei (`frontend/public/js/pegel-chart.js`,
+`renderPegelHistoryChart()`) — genutzt sowohl vom Dashboard-Widget als auch vom Detail-Panel jeder
+Pegel-Themenseite (`js/detail.js`, `renderDetailPanel()`): ein Klick auf eine Pegel-Messstelle zeigt
+den 14-Tage-Verlauf direkt im Detail-Panel, ohne dass dafür erst ein Dashboard-Widget angelegt werden
+muss.
+
+**Pegelstand permanent auf der Karte:** Pegel-Marker (PEGELONLINE + Hochwasserzentralen) zeigen den
+aktuellen Wert als dauerhaftes Label direkt an der Messstelle (`js/bundesland.js`,
+`createDatapointLayer()`, Leaflet-Tooltip mit `permanent: true`) statt nur beim Hovern/Anklicken.
+Ein zusätzlicher HW100-Referenzwert (statistisches 100-jährliches Hochwasser) wird bewusst **nicht**
+angezeigt: weder PEGELONLINE noch die Hochwasserzentralen-API liefern diesen Wert — letztere liefert
+laut eigener Dokumentation überhaupt keine numerischen Messwerte, nur eine Meldestufen-Klassifikation
+(0–4). Eine erfundene Zahl anzuzeigen wäre bei einem Katastrophenschutz-Tool falsch und gefährlich;
+ein echter HW100-Wert bräuchte eine zusätzliche, länderspezifische Hydrologie-Datenquelle, die aktuell
+nicht angebunden ist.
+
 Schema: `datapoint_history` (`backend/sql/migrations/013_add_datapoint_history.sql`).
 
 ## Sicherheit & Datenschutz
@@ -850,11 +873,13 @@ mit Zeitstempel des letzten Standes. Kein voller Offline-Betrieb mit Sync (das i
 Fahrzeugeinsatz) — API-Aufrufe gehen immer live ans Netz, Kartenkacheln werden nicht vorab
 zwischengespeichert.
 
-## Geplant: Wetter-Entwicklung (Windrichtung/-geschwindigkeit, Gewitterzug, Warnungen als Fläche)
+## Wetter-Entwicklung (Windrichtung/-geschwindigkeit, Gewitterzug, Warnungen als Fläche)
 
 Recherche-Ergebnis zur Anforderung „Windrichtung und wie sie sich entwickelt/ändert, ziehende
-Gewitter, Warnungen als Fläche statt Punkt wie beim DWD“ — **bewusst noch nicht implementiert**,
-siehe Begründung unten.
+Gewitter, Warnungen als Fläche statt Punkt wie beim DWD“. Zwei der drei Teile sind inzwischen
+umgesetzt (Warnungen als Fläche auf Bundesland-Ebene, Gewitterzug über die DWD-Radar-Kartenschicht
+— siehe jeweils unten); Windrichtung/-geschwindigkeit als eigene Datenquelle bleibt **bewusst noch
+nicht implementiert**, siehe Begründung dort.
 
 ### Warnungen als Fläche statt Punkt (Bundesland-Ebene implementiert, Kreis-Ebene noch offen)
 
@@ -911,21 +936,27 @@ unehrlich. **Empfehlung**: in einer Session mit echtem Internetzugriff die Stati
 verifizieren, dann den Fetcher nach obigem Muster umsetzen (geschätzter Aufwand: ähnlich zu einem
 der 5 bestehenden Connectors, ca. 1 Fetcher-Datei + 1 Addon-Seite + Migration entfällt).
 
-### Gewitterzug / Niederschlagsbewegung (Empfehlung: eigene, spätere Phase)
+### Gewitterzug / Niederschlagsbewegung (umgesetzt: DWD-WMS-Kartenschicht statt eigenem RADOLAN-Parser)
 
-Für „wie zieht ein Gewitter“ liefert DWD **RADOLAN/RADVOR** Radar-Kompositen
-(`https://opendata.dwd.de/weather/radar/composite/`, 5-15-Minuten-Takt). Das ist ein
-**binäres 900×900-Rasterformat** mit eigener Projektion (polar-stereografisch) — die Auswertung
-(Kachel-Dekodierung, Koordinatentransformation, ggf. Zellverfolgung für "zieht nach Nordost")
-ist deutlich aufwändiger als jeder bestehende Connector und ohne Möglichkeit zur Live-Verifikation
-in dieser Umgebung ein zu hohes Risiko für blind geschriebenen, ungetesteten Code. **Korrektur
-einer früheren Annahme**: Die „kostenlosen RADOLAN-Kartendaten“ von DWD
-(`dwd.de/DE/leistungen/radolan/radolan_info/home_freie_radolan_kartendaten.html`, ebenfalls nicht
-erreichbar aus dieser Umgebung) sind laut Recherche **weiterhin die rohen Binär-Kompositdateien,
-keine fertigen Bild-Loops** — es gibt lediglich ein von DWD verlinktes Beispielprogramm namens
-`radolan2png` zur Konvertierung, das als Referenz für die Formatauswertung dienen kann. Empfehlung:
-als eigene Phase mit echtem DWD-Netzwerkzugriff planen, `radolan2png` als Ausgangspunkt für den
-eigenen Parser pruefen.
+Die ursprüngliche Überlegung war, DWDs **RADOLAN/RADVOR**-Rohdaten
+(`https://opendata.dwd.de/weather/radar/composite/`) selbst zu dekodieren (binäres 900×900-Raster,
+eigene Projektion) — das wäre deutlich aufwändiger als jeder bestehende Connector gewesen.
+**Einfacherer, umgesetzter Weg**: DWD stellt dieselben Radardaten bereits fertig als Kartenschicht
+über den öffentlichen GeoServer bereit (`https://maps.dwd.de/geoserver/dwd/wms`, Layer
+`dwd:Niederschlagsradar`) — kein eigenes Dekodieren nötig, nur ein Leaflet-`L.tileLayer.wms(...)`
+als zuschaltbarer Overlay (`js/bundesland.js`, `createNiederschlagsradarLayer()` +
+`addRadarLayerControl()`, auf Dashboard und allen Addon-Kartenseiten über das Leaflet-eigene
+Layer-Steuerelement oben rechts erreichbar, Standard AUS). Die Bewegungsrichtung von Niederschlag/
+Gewittern ist dadurch direkt auf der Karte sichtbar, ohne die Zellverfolgung selbst zu berechnen.
+
+**Verifikationsstand**: Der Layer-Name `dwd:Niederschlagsradar` stammt aus einer von DWDs eigenem
+GeoServer erzeugten GetMap-Vorschau-URL, ist also kein geratener Name — `maps.dwd.de` ist aus dieser
+Entwicklungsumgebung aber nicht erreichbar, ein Live-Rendering-Test war deshalb nicht möglich. Sollte
+der Layer in Produktion keine Kacheln liefern, per `GET
+https://maps.dwd.de/geoserver/dwd/wms?service=WMS&version=1.3.0&request=GetCapabilities` den
+tatsächlichen Layer-Namen prüfen und in `createNiederschlagsradarLayer()` anpassen — schlägt der
+Name fehl, bleibt nur die Kartenschicht leer, kein Fehler und keine Beeinträchtigung der übrigen
+Lage-Daten.
 
 ## Bekannte V1-Vereinfachungen
 

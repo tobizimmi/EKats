@@ -34,6 +34,7 @@ function initMap(center) {
     });
   layerGroups[OBJECT_LAYER_KEY] = L.layerGroup().addTo(map);
   layerGroups[GEBIET_LAYER_KEY] = L.layerGroup().addTo(map);
+  addRadarLayerControl(map);
 
   map.on('click', (event) => {
     if (!placementCallback) return;
@@ -95,7 +96,12 @@ function renderMap(datapoints) {
   datapoints.forEach((dp) => {
     const layer = createDatapointLayer(dp);
     if (!layer) return;
-    layer.bindTooltip(dp.title || SOURCE_LABELS[dp.source] || dp.source);
+    // Pegel-Marker haben bereits ein permanentes Wert-Label (js/bundesland.js) - bindTooltip() ersetzt
+    // ein bestehendes Tooltip komplett statt es zu ergaenzen, ein zweiter Aufruf hier wuerde das
+    // Wert-Label also wieder durch den (nicht-permanenten) Titel-Tooltip ueberschreiben.
+    if (!layer.getTooltip()) {
+      layer.bindTooltip(dp.title || SOURCE_LABELS[dp.source] || dp.source);
+    }
     layer.on('click', () => window.selectDatapoint(dp));
     layer.addTo(layerGroups[dp.source]);
     markersByDatapointId.set(dp.id, layer);

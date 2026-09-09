@@ -382,6 +382,24 @@ button.secondary {
   border: 1px solid var(--border);
 }
 
+/* Permanentes Pegelstand-Label an Pegel-Messstellen (js/bundesland.js createDatapointLayer) - eigene
+   Regel statt Leaflets Default-Tooltip-Optik, damit es sich an Karte + Theme (hell/dunkel) einfuegt. */
+.leaflet-tooltip.pegel-value-label {
+  background: var(--bg-elevated);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  box-shadow: none;
+  white-space: nowrap;
+}
+
+.leaflet-tooltip.pegel-value-label::before {
+  border-right-color: var(--border);
+}
+
 .layer-toggle-bar {
   display: flex;
   flex-wrap: wrap;
@@ -543,6 +561,12 @@ button.secondary {
 .detail-panel dd {
   margin: 0;
   font-size: 0.95rem;
+}
+
+.detail-chart {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border);
 }
 
 #offline-banner {

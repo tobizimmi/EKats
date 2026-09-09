@@ -56,11 +56,50 @@ function createDatapointLayer(dp) {
   }
 
   if (dp.lat === null || dp.lon === null) return null;
-  return L.circleMarker([dp.lat, dp.lon], {
+  const marker = L.circleMarker([dp.lat, dp.lon], {
     radius: 8,
     color,
     fillColor: color,
     fillOpacity: 0.85,
     weight: 2,
   });
+
+  // Pegelstand permanent an der Messstelle einblenden statt nur im Tooltip-on-Hover/Klick-Panel -
+  // bei einer Hochwasserlage soll der Wert auf einen Blick sichtbar sein, ohne jede Messstelle
+  // einzeln anzuklicken. Einen HW100-Referenzwert (100-jaehrliches Hochwasser) gibt es dazu bewusst
+  // nicht: weder PEGELONLINE (WSV) noch die Hochwasserzentralen-Schnittstelle liefern diesen Wert
+  // (siehe README, Abschnitt "Individuelles Dashboard", Pegelstand-Absatz) - keine erfundene Zahl.
+  if ((dp.source === 'pegelonline' || dp.source === 'hochwasserzentralen') && dp.value_numeric !== null && dp.value_numeric !== undefined) {
+    marker.bindTooltip(`${dp.value_numeric}${dp.unit ? ` ${dp.unit}` : ''}`, {
+      permanent: true,
+      direction: 'right',
+      offset: [8, 0],
+      className: 'pegel-value-label',
+    });
+  }
+
+  return marker;
+}
+
+// DWD-Niederschlagsradar als optionaler WMS-Overlay - macht die Zugrichtung von Niederschlag/Gewitter
+// direkt auf der Karte sichtbar, nicht nur als Einzel-Warnung. Von map.js (Dashboard) und addon.js
+// (Themenseiten) genutzt. Layer-Name "dwd:Niederschlagsradar" stammt aus einer von DWDs eigenem
+// GeoServer generierten GetMap-Vorschau-URL (siehe README, Abschnitt "Gewitterzug/Niederschlags-
+// bewegung") - im Entwicklungs-Sandbox nicht gegenpruefbar, da maps.dwd.de dort blockiert ist. Bewusst als
+// zuschaltbarer Overlay (Standard AUS): schlaegt der Layer-Name doch fehl, bleiben nur Kacheln aus,
+// kein Fehler und keine Beeintraechtigung der eigentlichen Lage-Daten.
+function createNiederschlagsradarLayer() {
+  return L.tileLayer.wms('https://maps.dwd.de/geoserver/dwd/wms', {
+    layers: 'dwd:Niederschlagsradar',
+    format: 'image/png',
+    transparent: true,
+    opacity: 0.6,
+    attribution: 'Radardaten: Deutscher Wetterdienst (DWD)',
+  });
+}
+
+// Haengt die Radar-Layer-Auswahl (Leaflet-eigenes Steuerelement, oben rechts auf der Karte) an -
+// gemeinsam von map.js und addon.js aufgerufen, damit beide Kartenarten dieselbe Bedienung haben.
+function addRadarLayerControl(map) {
+  L.control.layers(null, { 'Niederschlagsradar (DWD)': createNiederschlagsradarLayer() }, { collapsed: true }).addTo(map);
 }

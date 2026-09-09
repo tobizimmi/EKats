@@ -22,6 +22,8 @@ function initAddonMap(center) {
     maxZoom: 19,
     attribution: '&copy; OpenStreetMap-Mitwirkende',
   }).addTo(addonMap);
+
+  addRadarLayerControl(addonMap);
 }
 
 function renderAddonMap(datapoints) {
@@ -31,7 +33,12 @@ function renderAddonMap(datapoints) {
   datapoints.forEach((dp) => {
     const layer = createDatapointLayer(dp);
     if (!layer) return;
-    layer.bindTooltip(dp.title || SOURCE_LABELS[dp.source] || dp.source);
+    // Pegel-Marker haben bereits ein permanentes Wert-Label (js/bundesland.js) - bindTooltip() ersetzt
+    // ein bestehendes Tooltip komplett statt es zu ergaenzen, ein zweiter Aufruf hier wuerde das
+    // Wert-Label also wieder durch den (nicht-permanenten) Titel-Tooltip ueberschreiben.
+    if (!layer.getTooltip()) {
+      layer.bindTooltip(dp.title || SOURCE_LABELS[dp.source] || dp.source);
+    }
     layer.on('click', () => window.selectDatapoint(dp));
     layer.addTo(addonMap);
     addonMarkersById.set(dp.id, layer);
@@ -63,7 +70,12 @@ async function loadAndRenderAddonDatapoints() {
     errorEl.textContent = '';
     renderAddonMap(datapoints);
     addonTable.setData(datapoints);
-    document.getElementById('list-updated').textContent = `Stand: ${new Date().toLocaleTimeString('de-DE')}`;
+    const stand = `Stand: ${new Date().toLocaleTimeString('de-DE')}`;
+    // Ohne diesen Hinweis wirkt eine leere Karte/Liste wie ein Fehler ("die Karte bringt nichts") -
+    // dabei ist "aktuell keine Meldungen" (z.B. kein Unwetter, keine Warnung) der Normalfall und
+    // muss von "kaputt" unterscheidbar sein.
+    document.getElementById('list-updated').textContent =
+      datapoints.length === 0 ? `${stand} · Aktuell keine Meldungen für Ihr Zuständigkeitsgebiet.` : stand;
     return datapoints;
   } catch (err) {
     console.error('[addon] Datenpunkte konnten nicht geladen werden:', err);

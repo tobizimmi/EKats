@@ -221,50 +221,15 @@ function renderDwdBildWidget(container) {
   container.appendChild(note);
 }
 
+// Duenner Wrapper um die geteilte Chart-Funktion (js/pegel-chart.js) - loest hier nur die
+// Stations-Auswahl aus der Widget-Konfiguration auf.
 async function renderPegelChartWidget(container, widget) {
   const externalId = widget.config?.externalId;
   if (!externalId) {
     container.innerHTML = '<p class="muted">Keine Station ausgewählt.</p>';
     return;
   }
-  container.innerHTML = '<p class="muted">Lade…</p>';
-  let history;
-  try {
-    history = await api.get(`/datapoints/history?source=pegelonline&externalId=${encodeURIComponent(externalId)}`);
-  } catch (err) {
-    container.innerHTML = '<p class="error-message">Konnte nicht geladen werden.</p>';
-    return;
-  }
-
-  const points = history.filter((h) => h.value_numeric !== null && h.value_numeric !== undefined);
-  if (points.length < 2) {
-    container.innerHTML =
-      '<p class="muted">Noch nicht genug Verlaufsdaten (sammelt sich mit jedem Abruf, alle 15 Min. - Rückblick 14 Tage).</p>';
-    return;
-  }
-
-  const values = points.map((p) => p.value_numeric);
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  const range = max - min || 1;
-  const w = 220;
-  const h = 70;
-  const coords = points.map((p, i) => {
-    const x = (i / (points.length - 1)) * w;
-    const y = h - ((p.value_numeric - min) / range) * h;
-    return `${x.toFixed(1)},${y.toFixed(1)}`;
-  });
-  const last = points[points.length - 1];
-  const lastCoord = coords[coords.length - 1].split(',');
-
-  container.innerHTML = `
-    <svg class="widget-chart-svg" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" role="img"
-         aria-label="Pegelverlauf der letzten 14 Tage, aktueller Wert ${last.value_numeric} ${last.unit || ''}">
-      <polyline points="${coords.join(' ')}" fill="none" stroke="var(--focus)" stroke-width="2" />
-      <circle cx="${lastCoord[0]}" cy="${lastCoord[1]}" r="3" fill="var(--focus)" />
-    </svg>
-    <p class="muted widget-chart-caption">Aktuell: ${last.value_numeric} ${last.unit || ''} · Verlauf 14 Tage (min ${min}, max ${max})</p>
-  `;
+  await renderPegelHistoryChart(container, externalId);
 }
 
 // --- Layout-Rendering ----------------------------------------------------------------------------

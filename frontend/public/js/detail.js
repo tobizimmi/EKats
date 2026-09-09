@@ -69,5 +69,21 @@ function renderDetailPanel(dp) {
     content.appendChild(dd);
   });
 
+  // Pegel-Verlauf direkt im Detail-Panel (js/pegel-chart.js) - wird dynamisch angehaengt statt in
+  // jeder der zehn Seiten, die dieses Panel einbinden, einzeln im HTML ergaenzt zu werden.
+  let chartContainer = document.getElementById('detail-chart');
+  if (dp.source === 'pegelonline') {
+    if (!chartContainer) {
+      chartContainer = document.createElement('div');
+      chartContainer.id = 'detail-chart';
+      chartContainer.className = 'detail-chart';
+      panel.appendChild(chartContainer);
+    }
+    chartContainer.hidden = false;
+    renderPegelHistoryChart(chartContainer, dp.external_id);
+  } else if (chartContainer) {
+    chartContainer.hidden = true;
+  }
+
   panel.hidden = false;
 }
