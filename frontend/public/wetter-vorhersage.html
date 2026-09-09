@@ -19,7 +19,7 @@
         <h2 class="section-title">Wetter-Vorhersage</h2>
         <p class="muted" id="list-updated"></p>
         <p class="error-message" id="addon-error" role="alert"></p>
-        <div id="addon-table-container"></div>
+        <div id="forecast-container" class="forecast-container"></div>
         <div class="detail-panel" id="detail-panel" hidden>
           <h3 class="section-title">Details</h3>
           <dl id="detail-content"></dl>
@@ -29,7 +29,8 @@
     <p class="attribution">
       Quelle: Bright Sky (brightsky.dev) - kostenlose Aufbereitung von DWD-Stationsmessungen und
       MOSMIX-Vorhersagen, kein API-Key nötig. Anders als die Wetter-Warnungen zeigt diese Seite
-      stündliche Prognosewerte (Temperatur, Niederschlag, Wind).
+      stündliche Prognosewerte (Temperatur, Niederschlag, Wind) für den Wehr-Kartenmittelpunkt, nach
+      Tag gruppiert. Ein Klick auf eine Stunde zeigt alle Details (inkl. Bewölkung, Böen).
     </p>
   </main>
   <script src="vendor/leaflet/leaflet.js"></script>
@@ -37,11 +38,8 @@
   <script src="js/header.js"></script>
   <script src="js/severity.js"></script>
   <script src="js/sw-register.js"></script>
-  <script src="js/gebiet-info.js"></script>
   <script src="js/detail.js"></script>
-  <script src="js/pegel-chart.js"></script>
   <script src="js/bundesland.js"></script>
-  <script src="js/data-table.js"></script>
-  <script src="js/addon.js"></script>
+  <script src="js/wetter-vorhersage.js"></script>
 </body>
 </html>

@@ -569,6 +569,82 @@ button.secondary {
   border-top: 1px solid var(--border);
 }
 
+/* Wetter-Vorhersage: nach Tag gruppierte Stunden-Kacheln (js/wetter-vorhersage.js) statt Tabelle -
+   die Quelle liefert eine Zeitreihe an einem Punkt, keine raeumlich verteilten Einzelereignisse. */
+.forecast-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.forecast-day-card + .forecast-day-card {
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+.forecast-day-heading {
+  margin: 0 0 0.5rem;
+  font-size: 0.95rem;
+}
+
+.forecast-hour-row {
+  display: flex;
+  gap: 0.5rem;
+  overflow-x: auto;
+  padding-bottom: 0.25rem;
+}
+
+.forecast-hour-tile {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  min-width: 76px;
+  padding: 0.5rem 0.4rem;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+  text-align: center;
+}
+
+.forecast-hour-tile:hover {
+  border-color: var(--focus);
+}
+
+.forecast-hour-time {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.forecast-hour-icon {
+  font-size: 1.4rem;
+  line-height: 1.2;
+}
+
+.forecast-hour-temp {
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.forecast-hour-wind {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.wind-arrow {
+  display: inline-block;
+}
+
+.forecast-hour-precip {
+  font-size: 0.68rem;
+  color: var(--focus);
+}
+
 #offline-banner {
   background: var(--warn);
   color: #1a1200;

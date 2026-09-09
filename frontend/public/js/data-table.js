@@ -3,7 +3,9 @@
 // persistiert, geraeteuebergreifend nutzbar, mit Zuruecksetzen-Button) und CSV-Export. Ersetzt auf
 // den Addon-Einzelseiten die bisherige reine Liste. Basisspalten sind quellen-unabhaengig (jeder
 // Datenpunkt hat sie); Zusatzspalten stammen aus tatsaechlich verifizierten payload-Feldern der
-// jeweiligen Fetcher (siehe backend/src/fetchers/*.js) - keine erfundenen Feldnamen.
+// jeweiligen Fetcher (siehe backend/src/fetchers/*.js) - keine erfundenen Feldnamen. wetter_vorhersage
+// fehlt hier bewusst: die eigene Ansicht (js/wetter-vorhersage.js, wetter-vorhersage.html) nutzt diese
+// Tabellen-Komponente nicht mehr, siehe README "Themenseiten je Datenquelle".
 
 const BASE_COLUMNS = [
   { key: 'title', label: 'Titel', default: true, get: (dp) => dp.title || '–' },
@@ -35,10 +37,6 @@ const SOURCE_EXTRA_COLUMNS = {
   bbk_warnung: [
     { key: 'provider', label: 'Warnsystem', default: true, get: (dp) => dp.payload?.provider || '–' },
     { key: 'event', label: 'Ereignis', default: false, get: (dp) => dp.payload?.event || '–' },
-  ],
-  wetter_vorhersage: [
-    { key: 'precipitation', label: 'Niederschlag (mm)', default: true, get: (dp) => dp.payload?.precipitation ?? '–' },
-    { key: 'wind', label: 'Wind (km/h)', default: true, get: (dp) => dp.payload?.windSpeedKmh ?? '–' },
   ],
   kachelmann: [],
   // "Wert" (Basisspalte) zeigt bereits die Ortungsgenauigkeit in Metern (value_numeric/unit) - hier

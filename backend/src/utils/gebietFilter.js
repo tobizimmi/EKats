@@ -3,7 +3,7 @@
 // Von routes/datapoints.js genutzt (Karte, Lage-Liste und der Dashboard-Tab "Wetter" - siehe
 // frontend/public/js/weather-overview.js - teilen sich alle denselben Endpunkt).
 //
-// Vier Filterarten, je nachdem wie genau eine Quelle ihre eigene Lage kennt:
+// Fuenf Filterarten, je nachdem wie genau eine Quelle ihre eigene Lage kennt:
 // 1. LANDKREIS_SCOPED_SOURCES: die Quelle wurde beim Abruf bereits PRO KREIS erfragt (siehe
 //    fetchers/bbkWarnungen.js) und traegt den exakten Kreis in payload.landkreisAgs - einfacher
 //    Gleichheitsvergleich gegen das Gebiet, die praezisteste Filterart.
@@ -15,15 +15,25 @@
 //    (zustaendigkeit.js bildet nur einen Nachbarschafts-Ring). Reine Kreis-Zugehoerigkeit blendet
 //    dann die naechstgelegene, fuer die Lage trotzdem relevante Station komplett aus - deshalb
 //    zaehlt hier zusaetzlich ein Luftlinien-Umkreis um den Wehr-Kartenmittelpunkt
-//    (wehr.center_lat/center_lon), als ODER-Ergaenzung zur normalen Kreis-Pruefung aus #4, nicht als
-//    deren Ersatz. Ohne konfigurierten Kartenmittelpunkt greift fuer diese Quellen weiterhin nur #4.
-// 4. Alle anderen Quellen (und zusaetzlich #3) haben eine echte Geokoordinate je Meldung und werden
-//    per ST_Contains gegen die Kreis-Polygone im Gebiet gefiltert (auch waldbrandindex - siehe
-//    Kommentar in der Fetcher-Datei, eine fruehere Version hatte das faelschlich wie #2 behandelt).
+//    (wehr.center_lat/center_lon), als ODER-Ergaenzung zur normalen Kreis-Pruefung aus #5, nicht als
+//    deren Ersatz. Ohne konfigurierten Kartenmittelpunkt greift fuer diese Quellen weiterhin nur #5.
+// 4. UNSCOPED_SOURCES: wetter_vorhersage traegt IMMER die Koordinate des Wehr-Kartenmittelpunkts
+//    selbst (siehe fetchers/brightsky.js - jede Vorhersage-Stunde nutzt wehr.center_lat/center_lon),
+//    nie eine unabhaengige Ereignis-Koordinate. Eine ST_Contains-Pruefung "liegt der eigene
+//    Kartenmittelpunkt im eigenen Zustaendigkeitsgebiet" ist damit keine echte Ortsfilterung, sondern
+//    prueft nur, ob die Admin-Konfiguration (Heimat-Landkreis-Auswahl vs. Kartenmittelpunkt-Klick)
+//    exakt zusammenpasst - liegt der Mittelpunkt nur knapp ausserhalb der eigenen Kreisgrenze (z.B.
+//    nahe der Grenze gesetzt), blieb die eigene Vorhersage bislang dauerhaft leer, ohne dass das mit
+//    "Lage ausserhalb des Zustaendigkeitsgebiets" zu tun hatte. Deshalb ungefiltert durchgereicht.
+// 5. Alle anderen Quellen (und zusaetzlich #3) haben eine echte, unabhaengige Geokoordinate je
+//    Meldung und werden per ST_Contains gegen die Kreis-Polygone im Gebiet gefiltert (auch
+//    waldbrandindex - siehe Kommentar in der Fetcher-Datei, eine fruehere Version hatte das
+//    faelschlich wie #2 behandelt).
 const LANDKREIS_SCOPED_SOURCES = ['bbk_warnung'];
 const BUNDESLAND_SCOPED_SOURCES = ['dwd_unwetter'];
 const RADIUS_SCOPED_SOURCES = ['pegelonline', 'hochwasserzentralen'];
 const RADIUS_SCOPED_METERS = 60000; // 60km, deckt sich mit dem Standard von HOCHWASSERZENTRALEN_RADIUS_KM (config.js)
+const UNSCOPED_SOURCES = ['wetter_vorhersage'];
 
 // Mutiert `params` (haengt an) und gibt den SQL-Bedingungs-String zurueck, oder null wenn `gebiet`
 // null ist (kein Heimat-Landkreis konfiguriert -> keine Gebietsfilterung moeglich).
@@ -38,6 +48,8 @@ function buildGebietCondition(gebiet, params) {
   const blScopedIdx = params.length;
   params.push(gebiet.bundeslandCodes.length ? gebiet.bundeslandCodes : ['__keine__']);
   const codesIdx = params.length;
+  params.push(UNSCOPED_SOURCES);
+  const unscopedIdx = params.length;
 
   // Radius-Klausel nur bauen, wenn die Wehr ueberhaupt einen Kartenmittelpunkt hat - sonst bleibt es
   // bei der reinen Kreis-Pruefung fuer diese Quellen (kein Fehler, nur keine Zusatz-Erweiterung).
@@ -63,9 +75,12 @@ function buildGebietCondition(gebiet, params) {
     OR
     (live_datapoint.source = ANY($${blScopedIdx}) AND live_datapoint.payload->>'bundeslandCode' = ANY($${codesIdx}))
     OR
+    live_datapoint.source = ANY($${unscopedIdx})
+    OR
     ${radiusClause}
     OR
     (live_datapoint.source != ALL($${lkScopedIdx}) AND live_datapoint.source != ALL($${blScopedIdx})
+     AND live_datapoint.source != ALL($${unscopedIdx})
      AND live_datapoint.geom IS NOT NULL AND EXISTS (
       SELECT 1 FROM landkreis l WHERE l.ags = ANY($${agsIdx}) AND ST_Contains(l.geom, live_datapoint.geom)
     ))
@@ -78,4 +93,5 @@ module.exports = {
   LANDKREIS_SCOPED_SOURCES,
   RADIUS_SCOPED_SOURCES,
   RADIUS_SCOPED_METERS,
+  UNSCOPED_SOURCES,
 };

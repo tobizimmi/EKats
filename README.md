@@ -258,7 +258,7 @@ Mini-Karte + durchsuch-/filterbarer Tabelle (analog zur Objekt-Übersicht):
 | Seite | Quelle |
 |---|---|
 | `dwd-unwetter.html` | DWD-Unwetterwarnungen |
-| `wetter-vorhersage.html` | Wetter-Vorhersage (Bright Sky) |
+| `wetter-vorhersage.html` | Wetter-Vorhersage (Bright Sky) — eigene Ansicht, siehe unten |
 | `pegelonline.html` | Pegelstände (PEGELONLINE) |
 | `hochwasserzentralen.html` | Landespegel (Hochwasserzentralen) |
 | `waldbrandindex.html` | Waldbrandgefahrenindex |
@@ -279,6 +279,29 @@ Die Addon-Seiten teilen sich ein gemeinsames Skript (`js/addon.js`) — welche Q
 anzeigt, steht im `data-addon-source`-Attribut auf `<body>` (nicht als Inline-`<script>`, das würde
 an der Content-Security-Policy scheitern). Die eigentliche Tabelle stammt aus der gemeinsamen
 Komponente `js/data-table.js` (siehe „Generische Tabellen-Komponente" unten).
+
+**`wetter-vorhersage.html` ist die eine Ausnahme** und nutzt statt `addon.js`/`data-table.js` ein
+eigenes Skript (`js/wetter-vorhersage.js`): eine Tabelle mit ~40 Zeilen und eine Karte mit ~40
+übereinandergestapelten Markern an derselben Koordinate (jede Vorhersage-Stunde trägt den
+Wehr-Kartenmittelpunkt als Ort, kein raumliches Einzelereignis) waren als Ansicht unbrauchbar.
+Stattdessen: nach Tag gruppierte Vorhersage-Karten (Icon, Temperatur, Windrichtung/-geschwindigkeit
+als gedrehter Pfeil + Himmelsrichtung, Niederschlagsmenge falls >0), ein Klick auf eine Stunde öffnet
+das gewohnte Detail-Panel mit allen Werten (inkl. Böen, Bewölkung). Die Karte zeigt nur noch EINEN
+Marker für den Vorhersage-Standort statt der gestapelten Duplikate, plus denselben zuschaltbaren
+DWD-Niederschlagsradar-Layer wie die übrigen Kartenseiten (`addRadarLayerControl()`).
+
+Wetter-Icons sind Emoji nach Bright Skys Icon-Taxonomie (`clear-day`, `partly-cloudy-day`, `rain`,
+`thunderstorm`, …) — bewusst keine Icon-Bibliothek/Bilddateien, passt zum bisherigen
+Projekt-Stil (siehe Pegel-Diagramm: handgeschriebenes SVG statt Chart-Bibliothek).
+
+**Gebietsfilter-Ausnahme:** `wetter_vorhersage`-Datenpunkte tragen immer die Koordinate des
+Wehr-Kartenmittelpunkts selbst (nie eine unabhängige Ereignis-Koordinate, siehe `brightsky.js`) und
+sind deshalb von der Kreis-Zugehörigkeitsprüfung ausgenommen (`UNSCOPED_SOURCES` in
+`backend/src/utils/gebietFilter.js`). Eine `ST_Contains`-Prüfung "liegt der eigene Kartenmittelpunkt
+im eigenen Zuständigkeitsgebiet" testet sonst nur, ob Heimat-Landkreis-Auswahl und
+Kartenmittelpunkt-Klick exakt zusammenpassen — bei einem nur knapp außerhalb der Kreisgrenze
+gesetzten Mittelpunkt blieb die eigene Vorhersage dadurch dauerhaft leer, unabhängig vom
+tatsächlichen Zuständigkeitsgebiet.
 
 ### Seitenleisten-Navigation
 

@@ -41,6 +41,22 @@ function payloadEntries(dp) {
         ['Beschreibung', p.description],
         ['Verhaltenshinweise', p.instruction],
       ];
+    // degToCardinal() kommt aus js/wetter-vorhersage.js - dieser Fall greift nur auf
+    // wetter-vorhersage.html, wo dieses Skript immer mitgeladen ist (siehe dortige Script-Reihenfolge).
+    case 'wetter_vorhersage':
+      return [
+        ['Bedingung', p.condition],
+        ['Niederschlag', p.precipitation !== null && p.precipitation !== undefined ? `${p.precipitation} mm` : null],
+        ['Windgeschwindigkeit', p.windSpeedKmh !== null && p.windSpeedKmh !== undefined ? `${p.windSpeedKmh} km/h` : null],
+        ['Windböen', p.windGustKmh !== null && p.windGustKmh !== undefined ? `${p.windGustKmh} km/h` : null],
+        [
+          'Windrichtung',
+          p.windDirectionDeg !== null && p.windDirectionDeg !== undefined
+            ? `${p.windDirectionDeg}° (${degToCardinal(p.windDirectionDeg) || '-'})`
+            : null,
+        ],
+        ['Bewölkung', p.cloudCoverPercent !== null && p.cloudCoverPercent !== undefined ? `${p.cloudCoverPercent}%` : null],
+      ];
     default:
       return [];
   }
