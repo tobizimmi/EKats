@@ -792,6 +792,50 @@ table.data-table td {
   margin-bottom: 0;
 }
 
+.form-row-full {
+  grid-column: 1 / -1;
+}
+
+.tagebuch-entry {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.7rem 0.9rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.tagebuch-entry-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.tagebuch-entry-time {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.tagebuch-entry-message {
+  white-space: pre-wrap;
+}
+
+.tagebuch-entry-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+}
+
+.tagebuch-entry-actions {
+  display: flex;
+  gap: 0.4rem;
+}
+
 .checkbox-inline {
   display: flex;
   align-items: center;

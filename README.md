@@ -870,6 +870,23 @@ zusätzlich als vorformatierte einzeilige Anschrift verfügbar. Bestehende, vor 
 Vorlagen funktionieren unverändert weiter (nur zusätzliche Platzhalter, keine entfernt) — wer sie
 nutzen will, muss sie im Vorlagen-Editor selbst ergänzen.
 
+## Einsatztagebuch
+
+`einsatztagebuch.html` ("Einsatzführung" in der Seitenleiste) schließt die größte inhaltliche Lücke
+aus dem Produkt-Review: EKats bündelt externe Lage-Informationen sehr gut, bot aber bisher keine
+Möglichkeit, während eines Einsatzes selbst etwas zu protokollieren. Ein durchlaufendes,
+chronologisches Logbuch je Wehr (`einsatztagebuch_eintrag`, Migration 017) — bewusst **kein**
+eigenes "Einsatz"-Konzept mit Beginn/Ende/Zuordnung (das wäre ein deutlich größerer Baustein mit
+eigenem Lebenszyklus); ein Eintrag "Einsatz X begonnen" trägt sich als normaler Tagebucheintrag
+genauso ein. Jeder Eintrag hat einen frei wählbaren `entry_time` (Default: jetzt, aber änderbar, da
+ein Eintrag oft erst nachträglich getippt wird, den tatsächlichen Ereigniszeitpunkt aber zeigen
+soll), eine optionale Kategorie (Meldung/Maßnahme/Lageänderung/Sonstiges) und den Freitext.
+
+Lesen für alle Rollen, Anlegen/Ändern/Löschen nur für `stab`/`admin` (dasselbe Muster wie bei
+`critical_object`) — die Formular-Karte ist für `mitglied` per `data-role="stab-only"` ausgeblendet.
+API: `GET/POST/PATCH/DELETE /api/einsatztagebuch`, `GET` filterbar über `?since=&until=` (ISO-Zeit,
+filtert auf `entry_time`). Kein PDF-Export in dieser ersten Ausbaustufe.
+
 ## Individuelles Dashboard (Phase 6, Raster-Umbau: Nutzerwunsch nach freier Position/Größe)
 
 `dashboard.html` ("Mein Dashboard" in der Seitenleiste) ergänzt die feste Karten-Ansicht

@@ -397,3 +397,18 @@ CREATE TABLE IF NOT EXISTS fetcher_health (
     last_error_at TIMESTAMPTZ,
     last_error_message TEXT
 );
+
+-- Einsatztagebuch (Migration 017): siehe Migration 017 fuer Details im Kommentar.
+CREATE TABLE IF NOT EXISTS einsatztagebuch_eintrag (
+    id SERIAL PRIMARY KEY,
+    wehr_id INTEGER NOT NULL REFERENCES wehr(id) ON DELETE CASCADE,
+    entry_time TIMESTAMPTZ NOT NULL DEFAULT now(),
+    category TEXT CHECK (category IS NULL OR category IN ('meldung', 'massnahme', 'lage', 'sonstiges')),
+    message TEXT NOT NULL,
+    created_by INTEGER REFERENCES app_user(id) ON DELETE SET NULL,
+    created_by_email TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_einsatztagebuch_wehr_time ON einsatztagebuch_eintrag(wehr_id, entry_time DESC);

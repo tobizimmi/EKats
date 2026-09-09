@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Einsatztagebuch – EKats</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <meta name="theme-color" content="#14232f" />
+</head>
+<body>
+  <div id="app-sidebar-root"></div>
+  <main class="stack">
+    <div class="card" data-role="stab-only" hidden>
+      <h2 class="section-title" id="tagebuch-form-title">Neuer Eintrag</h2>
+      <form id="tagebuch-form" class="form-row">
+        <label>
+          <span>Zeitpunkt</span>
+          <input id="tagebuch-entry-time" type="datetime-local" required />
+        </label>
+        <label>
+          <span>Kategorie</span>
+          <select id="tagebuch-category">
+            <option value="">Allgemein</option>
+            <option value="meldung">Meldung</option>
+            <option value="massnahme">Maßnahme</option>
+            <option value="lage">Lageänderung</option>
+            <option value="sonstiges">Sonstiges</option>
+          </select>
+        </label>
+        <label class="form-row-full">
+          <span>Nachricht</span>
+          <textarea id="tagebuch-message" rows="3" maxlength="4000" required></textarea>
+        </label>
+        <p class="error-message" id="tagebuch-form-error" role="alert"></p>
+        <div class="dialog-actions">
+          <button type="submit" class="primary" id="tagebuch-submit-button">Eintrag speichern</button>
+          <button type="button" class="secondary" id="tagebuch-cancel-edit-button" hidden>Bearbeitung abbrechen</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="card">
+      <div class="section-head-row">
+        <h2 class="section-title">Einsatztagebuch</h2>
+        <form id="tagebuch-filter-form" class="form-row">
+          <label>
+            <span>Von</span>
+            <input id="tagebuch-filter-since" type="date" />
+          </label>
+          <label>
+            <span>Bis</span>
+            <input id="tagebuch-filter-until" type="date" />
+          </label>
+          <button type="submit" class="secondary">Filtern</button>
+          <button type="button" class="secondary" id="tagebuch-filter-reset">Zurücksetzen</button>
+        </form>
+      </div>
+      <p class="muted">
+        Chronologisches Logbuch der Wehr - für Meldungen, Maßnahmen und Lageänderungen während eines
+        Einsatzes. Sichtbar für alle, Einträge anlegen/ändern nur für Stab/Admin.
+      </p>
+      <p class="error-message" id="tagebuch-list-error" role="alert"></p>
+      <div id="tagebuch-entries" class="stack"></div>
+    </div>
+  </main>
+
+  <script src="js/api.js"></script>
+  <script src="js/header.js"></script>
+  <script src="js/severity.js"></script>
+  <script src="js/sw-register.js"></script>
+  <script src="js/einsatztagebuch.js"></script>
+</body>
+</html>

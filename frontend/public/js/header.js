@@ -41,6 +41,10 @@ const NAV_GROUPS = [
     items: [{ href: 'objekte.html', label: 'Objekt-Übersicht', icon: '🏫' }],
   },
   {
+    label: 'Einsatzführung',
+    items: [{ href: 'einsatztagebuch.html', label: 'Einsatztagebuch', icon: '📓' }],
+  },
+  {
     label: 'Verwaltung',
     items: [
       { href: 'settings.html', label: 'Einstellungen', icon: '⚙️' },
