@@ -382,6 +382,14 @@ button.secondary {
   border: 1px solid var(--border);
 }
 
+#objekte-map {
+  height: 50vh;
+  min-height: 320px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  margin-bottom: 1rem;
+}
+
 /* Permanentes Pegelstand-Label an Pegel-Messstellen (js/bundesland.js createDatapointLayer) - eigene
    Regel statt Leaflets Default-Tooltip-Optik, damit es sich an Karte + Theme (hell/dunkel) einfuegt. */
 .leaflet-tooltip.pegel-value-label {
@@ -890,15 +898,25 @@ table.data-table td {
   margin-bottom: 0.75rem;
 }
 
-/* Marker fuer kritische Objekte: bewusst ein Quadrat statt Kreis, damit sie sich von den nach
-   Dringlichkeit eingefaerbten runden Lage-Markern unterscheiden (siehe js/map.js). */
+/* Marker fuer kritische Objekte: bewusst ein (abgerundetes) Quadrat statt Kreis, damit sie sich von
+   den nach Dringlichkeit eingefaerbten runden Lage-Markern unterscheiden (siehe js/map.js). Zeigt die
+   Objekt-Nummer (id) direkt im Marker - Nutzerwunsch, angelehnt an die "#<id>"-Kennzeichnung im
+   Referenz-Tool (siehe Objekt-Detailansicht in objekte-page.js). */
 .object-marker-inner {
-  width: 14px;
-  height: 14px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 3px;
   background: #6d28d9;
   border: 2px solid #ffffff;
   box-shadow: 0 0 0 1px #6d28d9;
-  transform: rotate(45deg);
+  border-radius: 5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
 }
 
 #map.placing-object {
@@ -915,6 +933,115 @@ table.data-table td {
   width: calc(100% - 2rem);
   max-height: calc(100vh - 4rem);
   overflow-y: auto;
+}
+
+/* Gruppierte Themenbloecke im Objekt-Formular/Detailansicht (Vorbild: das vom Nutzer bereitgestellte
+   lokale Feuerwehr-Objektverwaltungstool - Kartenabschnitte je Themenblock statt einer langen
+   Formularliste). Bewusst im bestehenden dunklen EKats-Farbschema (--accent) gehalten, nicht die
+   dortige Bootstrap-/Rot-Optik uebernommen. */
+.app-dialog.wide {
+  max-width: 720px;
+}
+
+.dialog-section {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.9rem 1rem 0.2rem;
+  margin-bottom: 1rem;
+}
+
+.dialog-section-title {
+  margin: 0 0 0.6rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.badge {
+  display: inline-block;
+  padding: 0.1rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.badge-yes {
+  background: color-mix(in srgb, var(--ok) 20%, transparent);
+  color: var(--ok);
+}
+
+.badge-no {
+  background: color-mix(in srgb, var(--danger) 18%, transparent);
+  color: var(--danger);
+}
+
+/* Toggle-Switch fuer Ja/Nein-Felder statt einer nackten Checkbox - optisch naeher am Referenz-Tool,
+   ohne eine ganze UI-Bibliothek wie Bootstrap einzubinden (siehe CLAUDE.md: kein Skript-CDN). */
+.switch-inline {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.switch-inline input[type='checkbox'] {
+  appearance: none;
+  width: 2.4rem;
+  height: 1.4rem;
+  border-radius: 999px;
+  background: var(--border);
+  position: relative;
+  cursor: pointer;
+  flex: none;
+  transition: background 0.15s ease;
+}
+
+.switch-inline input[type='checkbox']::before {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 1.1rem;
+  height: 1.1rem;
+  border-radius: 50%;
+  background: var(--bg-elevated);
+  transition: transform 0.15s ease;
+}
+
+.switch-inline input[type='checkbox']:checked {
+  background: var(--accent);
+}
+
+.switch-inline input[type='checkbox']:checked::before {
+  transform: translateX(1rem);
+}
+
+.switch-inline input[type='checkbox']:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* Read-only Feld-Raster fuer die Objekt-Detailansicht (objekte-page.js openDetailDialog) - Label
+   klein/grau/uppercase, Wert normal, mehrspaltig wie im .form-row-Raster. */
+.detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 0.6rem 1.25rem;
+  margin-bottom: 0.4rem;
+}
+
+.detail-field-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 0.15rem;
+}
+
+.detail-field-value {
+  font-size: 0.92rem;
 }
 
 .app-dialog hr {

@@ -36,6 +36,7 @@ let objektePage = {
   allObjects: [],
   fieldDefinitions: [],
   overdueOnly: false,
+  map: null,
 };
 
 function baseColumns() {
@@ -129,31 +130,161 @@ function applyOverdueFilter(objects) {
 async function loadObjects() {
   objektePage.allObjects = await api.get('/objects');
   objektePage.table.setData(applyOverdueFilter(objektePage.allObjects));
+  if (objektePage.map) renderObjekteMapMarkers();
+}
+
+// ---------------------------------------------------------------------------
+// Optionale Karte neben der Tabelle (Nutzerwunsch) - rein zur Orientierung/Navigation, das
+// eigentliche Anlegen/Bearbeiten mit Kartenposition bleibt bewusst auf index.html (siehe
+// Datei-Kopfkommentar). Wird erst beim ersten Einblenden initialisiert, weil Leaflet einen bereits
+// sichtbaren, korrekt bemessenen Container braucht (sonst falsche Kachel-Ausrichtung).
+function objekteMapMarkerIcon(id) {
+  return L.divIcon({
+    className: 'object-marker',
+    html: `<div class="object-marker-inner">${id}</div>`,
+    iconSize: [24, 20],
+    iconAnchor: [12, 10],
+  });
+}
+
+function renderObjekteMapMarkers() {
+  objektePage.map.markersLayer.clearLayers();
+  const withCoords = applyOverdueFilter(objektePage.allObjects).filter((o) => o.lat !== null && o.lon !== null);
+  withCoords.forEach((obj) => {
+    const marker = L.marker([obj.lat, obj.lon], { icon: objekteMapMarkerIcon(obj.id) });
+    marker.bindTooltip(`#${obj.id} · ${obj.name}`);
+    marker.on('click', () => openDetailDialog(obj));
+    marker.addTo(objektePage.map.markersLayer);
+  });
+  if (withCoords.length > 0) {
+    objektePage.map.instance.fitBounds(L.latLngBounds(withCoords.map((o) => [o.lat, o.lon])).pad(0.15));
+  }
+}
+
+function toggleObjekteMap() {
+  const container = document.getElementById('objekte-map');
+  const button = document.getElementById('objekte-map-toggle');
+  const showing = container.hidden;
+  container.hidden = !showing;
+  button.textContent = showing ? 'Karte ausblenden' : 'Karte anzeigen';
+  if (!showing) return;
+
+  if (!objektePage.map) {
+    const instance = L.map(container).setView([51.1657, 10.4515], 6);
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; OpenStreetMap-Mitwirkende',
+    }).addTo(instance);
+    objektePage.map = { instance, markersLayer: L.layerGroup().addTo(instance) };
+  }
+  // invalidateSize: der Container war beim urspruenglichen L.map()-Aufruf ggf. noch hidden
+  // (Groesse 0x0) - ohne diesen Aufruf bleibt die Karte bis zum naechsten Browser-Resize verzerrt.
+  requestAnimationFrame(() => objektePage.map.instance.invalidateSize());
+  renderObjekteMapMarkers();
+}
+
+// Baut einen Themenblock wie im Objekt-Formular (js/objects.js) - Label/Wert-Raster mit
+// Abschnitts-Ueberschrift, aber read-only. Felder mit Wert "–" werden trotzdem angezeigt (Konsistenz
+// mit dem Formular, das dieselben Felder zeigt), damit das Fehlen einer Angabe sichtbar ist statt der
+// Block bei einem leeren Pflichtfeld einfach zu verschwinden.
+function detailSection(title, fields) {
+  const section = document.createElement('div');
+  section.className = 'dialog-section';
+  const heading = document.createElement('h4');
+  heading.className = 'dialog-section-title';
+  heading.textContent = title;
+  section.appendChild(heading);
+  const grid = document.createElement('div');
+  grid.className = 'detail-grid';
+  fields.forEach(([label, value]) => {
+    const field = document.createElement('div');
+    const labelEl = document.createElement('div');
+    labelEl.className = 'detail-field-label';
+    labelEl.textContent = label;
+    const valueEl = document.createElement('div');
+    valueEl.className = 'detail-field-value';
+    if (value instanceof Node) {
+      valueEl.appendChild(value);
+    } else {
+      valueEl.textContent = value ?? '–';
+    }
+    field.appendChild(labelEl);
+    field.appendChild(valueEl);
+    grid.appendChild(field);
+  });
+  section.appendChild(grid);
+  return section;
+}
+
+function yesNoBadge(value) {
+  const span = document.createElement('span');
+  span.className = `badge ${value ? 'badge-yes' : 'badge-no'}`;
+  span.textContent = value ? 'Ja' : 'Nein';
+  return span;
 }
 
 function openDetailDialog(obj) {
   const dialog = document.getElementById('objekte-detail-dialog');
-  document.getElementById('objekte-detail-title').textContent = obj.name;
-  const dl = document.getElementById('objekte-detail-content');
-  dl.innerHTML = '';
-  const entries = [
-    ['Kategorie', OBJECT_CATEGORY_LABELS[obj.category] || obj.category],
-    ['Adresse', obj.address || '–'],
-    ['Besondere Gefahren', obj.hazards || '–'],
-    ['Zufahrt/Schlüsseldepot', obj.access_info || '–'],
-    ['Ansprechpartner', obj.contact_name ? `${obj.contact_name}${obj.contact_phone ? ' · ' + obj.contact_phone : ''}` : '–'],
-    ['Fälligkeit', obj.next_review_at ? `${formatTimestamp(obj.next_review_at)}${isOverdue(obj) ? ' (ÜBERFÄLLIG)' : ''}` : '–'],
-    ['Löschwasserversorgung', FIRE_WATER_SUPPLY_LABELS[obj.fire_water_supply_type] || '–'],
-    ['Sammelplatz', obj.assembly_point || '–'],
-  ];
-  entries.forEach(([label, value]) => {
-    const dt = document.createElement('dt');
-    dt.textContent = label;
-    const dd = document.createElement('dd');
-    dd.textContent = value;
-    dl.appendChild(dt);
-    dl.appendChild(dd);
-  });
+  document.getElementById('objekte-detail-title').textContent = `#${obj.id} · ${obj.name}`;
+  const container = document.getElementById('objekte-detail-content');
+  container.innerHTML = '';
+
+  const addressLine = [obj.street, obj.house_number].filter(Boolean).join(' ');
+  const cityLine = [obj.postal_code, obj.city].filter(Boolean).join(' ');
+
+  container.appendChild(
+    detailSection('Stammdaten', [
+      ['Anschrift', [addressLine, cityLine].filter(Boolean).join(', ') || obj.address],
+      ['Ortsteil', obj.district],
+      ['Objekttyp', OBJECT_CATEGORY_LABELS[obj.category] || obj.category],
+    ])
+  );
+
+  container.appendChild(
+    detailSection('Ansprechpartner', [
+      ['Name', obj.contact_name],
+      ['Telefon', obj.contact_phone],
+      ['E-Mail', obj.contact_email],
+      ['Notfalltelefon', obj.emergency_phone],
+    ])
+  );
+
+  container.appendChild(
+    detailSection('Planstatus', [
+      ['Offizieller Einsatzplan', yesNoBadge(obj.has_official_plan)],
+      ['FW-eigener Plan', yesNoBadge(obj.has_fw_plan)],
+      ['Plandatum', obj.plan_date ? new Date(obj.plan_date).toLocaleDateString('de-DE') : null],
+      ['Planersteller', obj.plan_creator],
+    ])
+  );
+
+  container.appendChild(
+    detailSection('Gebäudedaten', [
+      ['Baujahr', obj.built_year],
+      ['Etagen/Stockwerke', obj.floors],
+      ['Fläche', obj.area],
+    ])
+  );
+
+  container.appendChild(
+    detailSection('Besonderheiten & Gefahren', [
+      ['Besonderheiten', obj.special_features],
+      ['Besondere Gefahren', obj.hazards],
+      ['Löschwasserversorgung', FIRE_WATER_SUPPLY_LABELS[obj.fire_water_supply_type]],
+      ['Zufahrt/Schlüsseldepot', obj.access_info],
+      ['Sammelplatz', obj.assembly_point],
+    ])
+  );
+
+  container.appendChild(
+    detailSection('Überprüfung', [
+      [
+        'Fälligkeit',
+        obj.next_review_at ? `${formatTimestamp(obj.next_review_at)}${isOverdue(obj) ? ' (ÜBERFÄLLIG)' : ''}` : null,
+      ],
+    ])
+  );
+
   document.getElementById('objekte-detail-map-link').href = `./?object=${obj.id}`;
   dialog.showModal();
 }
@@ -248,8 +379,10 @@ async function exportSelectedOrFilteredPdfs() {
     objektePage.overdueOnly = !objektePage.overdueOnly;
     event.target.classList.toggle('primary', objektePage.overdueOnly);
     objektePage.table.setData(applyOverdueFilter(objektePage.allObjects));
+    if (objektePage.map) renderObjekteMapMarkers();
   });
   document.getElementById('objekte-pdf-export').addEventListener('click', exportSelectedOrFilteredPdfs);
+  document.getElementById('objekte-map-toggle').addEventListener('click', toggleObjekteMap);
   document.getElementById('objekte-bulk-apply').addEventListener('click', applyBulkEdit);
   document.getElementById('objekte-bulk-clear').addEventListener('click', () => {
     objektePage.table.selectedKeys.clear();

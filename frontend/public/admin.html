@@ -148,6 +148,24 @@
         </div>
         <p class="error-message" id="object-import-error" role="alert"></p>
         <div id="object-import-result" class="muted" hidden></div>
+
+        <hr />
+        <p class="muted">
+          Objektdaten aus der ursprünglichen, lokalen Feuerwehr-Objektverwaltung übernehmen: die
+          dortige <code>.sqlite</code>-Datenbankdatei (Menü „Datenbank" in dem Tool, bzw. die Datei
+          unter <code>~/feuerwehr-daten/</code>) hier hochladen. Objekttypen werden bestmöglich auf
+          die EKats-Kategorien übertragen, Fahrzeugaufgaben per Fahrzeugname neu zugeordnet
+          (unbekannte Fahrzeuge werden als Hinweis gemeldet, nicht stillschweigend verworfen).
+        </p>
+        <div class="form-row">
+          <label>
+            <span>feuerwehr-app-Datenbank importieren</span>
+            <input type="file" id="object-import-feuerwehrapp-file" accept=".sqlite,.sqlite3,.db" />
+          </label>
+          <button type="button" class="secondary" id="object-import-feuerwehrapp-button">Importieren</button>
+        </div>
+        <p class="error-message" id="object-import-feuerwehrapp-error" role="alert"></p>
+        <div id="object-import-feuerwehrapp-result" class="muted" hidden></div>
       </div>
 
       <div class="card">

@@ -121,14 +121,17 @@ function focusDatapointOnMap(dp) {
   layer.openTooltip();
 }
 
-// Kritische Objekte werden bewusst als Quadrat (statt Kreis) dargestellt, damit sie sich auf den
-// ersten Blick von den nach Dringlichkeit eingefaerbten Lage-Markern unterscheiden.
-const objectIcon = L.divIcon({
-  className: 'object-marker',
-  html: '<div class="object-marker-inner"></div>',
-  iconSize: [16, 16],
-  iconAnchor: [8, 8],
-});
+// Kritische Objekte werden bewusst als (abgerundetes) Quadrat statt Kreis dargestellt, damit sie
+// sich auf den ersten Blick von den nach Dringlichkeit eingefaerbten Lage-Markern unterscheiden -
+// zusaetzlich mit der Objekt-Nummer (id) beschriftet (Nutzerwunsch).
+function objectIcon(id) {
+  return L.divIcon({
+    className: 'object-marker',
+    html: `<div class="object-marker-inner">${id}</div>`,
+    iconSize: [24, 20],
+    iconAnchor: [12, 10],
+  });
+}
 
 // Zeigt den Heimat-Landkreis (kraeftig) und die angrenzenden Landkreise (dezent) als Umriss-Layer,
 // damit die Wehr ihr Zustaendigkeitsgebiet auf einen Blick sieht (siehe admin.html "Wehr-
@@ -153,8 +156,8 @@ function renderObjects(objects) {
   objects
     .filter((obj) => obj.lat !== null && obj.lon !== null)
     .forEach((obj) => {
-      const marker = L.marker([obj.lat, obj.lon], { icon: objectIcon });
-      marker.bindTooltip(obj.name);
+      const marker = L.marker([obj.lat, obj.lon], { icon: objectIcon(obj.id) });
+      marker.bindTooltip(`#${obj.id} · ${obj.name}`);
       marker.on('click', () => window.selectObject(obj));
       marker.addTo(layerGroups[OBJECT_LAYER_KEY]);
       markersByObjectId.set(obj.id, marker);

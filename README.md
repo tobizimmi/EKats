@@ -475,8 +475,13 @@ nötig, kein Zugriffsverlust.
 
 Auf der Karte lassen sich kritische Objekte (Schulen/Kitas, Krankenhäuser/Pflegeeinrichtungen,
 Industrie-/Gefahrstoffbetriebe, Versammlungsstätten, Sonstiges) direkt anlegen und pflegen —
-eigener Layer, als Quadrat dargestellt (unterscheidbar von den runden, nach Dringlichkeit
-eingefärbten Lage-Markern).
+eigener Layer, als (abgerundetes) Quadrat mit der Objekt-Nummer darauf dargestellt (unterscheidbar
+von den runden, nach Dringlichkeit eingefärbten Lage-Markern). Das Formular selbst ist thematisch
+gruppiert (Stammdaten/Adresse/Ansprechpartner/Planstatus/Gebäudedaten/Besonderheiten/DIN-14095-
+Standardfelder als eigene Abschnitte statt einer langen Liste) — Vorbild ist auch hier das
+ursprüngliche lokale Feuerwehr-Objektverwaltungstool, dessen Feld-Gruppierung und -Umfang EKats bei
+dieser Überarbeitung übernommen hat (siehe strukturierte Adresse, Kontakt-Email/Notfalltelefon,
+Planstatus und Gebäudedaten unten in "Anlegen").
 
 - **Anlegen** (Rolle Stab/Admin): Button „Objekt anlegen“ klicken — öffnet direkt das Formular für
   Name, Kategorie, Adresse, besondere Gefahren, Zufahrt/Schlüsseldepot, Ansprechpartner und
@@ -558,6 +563,11 @@ Werkzeuge:
 - **Sammel-PDF-Export** — Datenblätter aller ausgewählten (oder, ohne Auswahl, aller aktuell
   gefilterten) Objekte werden sequentiell als einzelne PDFs heruntergeladen (bewusst nacheinander
   statt parallel, damit der Browser das nicht als Popup-Flut blockiert).
+- **„Karte anzeigen"-Umschalter** — blendet zusätzlich zur Tabelle eine Übersichtskarte mit allen
+  (gefilterten) Objekten ein, nummerierte Marker wie auf der Hauptkarte, Klick öffnet denselben
+  Detail-Dialog. Erst beim ersten Einblenden initialisiert (Leaflet braucht einen bereits sichtbaren,
+  korrekt bemessenen Container). Bleibt bewusst rein zur Orientierung — Anlegen/Bearbeiten mit
+  Kartenposition ist weiterhin allein Sache der Hauptkarte.
 
 ### Kartenskizzen direkt am Objekt
 
@@ -613,6 +623,35 @@ andere EKats-Installation zu übertragen. Sicherheits- und Datenintegritäts-Üb
 - Rollenbeschränkung wie beim Export (`requireRole('stab', 'admin')`); die JSON-Body-Größe (`app.js`,
   `express.json`) wurde von 200kb auf 2mb angehoben, da eine Export-Datei mit vielen Objekten und
   vollen Freitextfeldern das alte Limit überschreiten kann.
+
+### Import aus der urspünglichen, lokalen Feuerwehr-Objektverwaltung
+
+Zusätzlicher, eigener Importer (`POST /api/objects/import-feuerwehrapp`, Admin-Bereich → Objektdaten-
+Export/-Import) für Wehren, die zuvor das ursprüngliche, lokale Feuerwehr-Objektverwaltungstool
+(Electron/Node-App, SQLite über `sql.js`) genutzt haben und ihre Bestandsdaten übernehmen wollen -
+anderes Datenmodell als EKats, daher ein eigener Endpunkt statt Wiederverwendung des JSON-Imports
+oben. Liest die hochgeladene `.sqlite`-Datei direkt aus dem Upload-Buffer via `sql.js` (WASM, keine
+native Kompilierung nötig - dieselbe Bibliothek, die das Referenz-Tool selbst verwendet), ohne sie
+auf Platte zu schreiben.
+
+- **Feld-Mapping**: strukturierte Adresse (Straße/Hausnr./PLZ/Ort/Ortsteil), Kontakt-Email/
+  Notfalltelefon, Planstatus, Baujahr/Etagen/Fläche/Besonderheiten übernehmen 1:1 (dieselben Felder
+  wurden für EKats extra ergänzt, siehe oben). Der freie Objekttyp des Referenz-Tools wird
+  bestmöglich auf die feste EKats-Kategorie-Enum abgebildet (`FEUERWEHRAPP_TYPE_TO_CATEGORY` in
+  `routes/objects.js`), unbekannte/eigene Typen landen in „Sonstiges" statt den Import mit einem
+  Fehler abzubrechen. Die dortige einzelne Freitext-Löschwasserversorgung wird als Bestwert in EKats'
+  Feld „Lage/Standort" übernommen (EKats hat hier drei strukturierte Felder statt einem) - „Art"
+  bleibt bewusst leer statt fälschlich „keine Angabe" zu suggerieren.
+- **Gleiche Sicherheitsprinzipien wie beim JSON-Import**: jedes Objekt wird immer als neue Zeile in
+  der eigenen Wehr angelegt (nie per fremder id referenziert/überschrieben), Fahrzeugaufgaben werden
+  per Fahrzeugname (nicht per dort bedeutungsloser id) gegen die eigenen Fahrzeuge zugeordnet -
+  unbekannte Fahrzeugnamen werden als Hinweis gemeldet, nie stillschweigend verworfen oder falsch
+  verknüpft. Zusatzfelder durchlaufen dieselbe Validierung (`validateCustomFields`) gegen die
+  aktuellen Feld-Definitionen der Wehr. Einzelne fehlerhafte Objekte (z.B. fehlende Koordinaten)
+  überspringen nur diese Zeile, nicht den gesamten Import.
+- Datei-Erkennung per Endung (`.sqlite`/`.sqlite3`/`.db`) statt MIME-Type, da Browser dafür keinen
+  standardisierten MIME-Type senden. Multipart-Upload mit eigenem 25MB-Limit (separates
+  `multer.memoryStorage()`, unabhängig vom JSON-Body-Limit oben).
 
 ### Standardfelder (Einsatzplan, DIN 14095)
 
@@ -782,6 +821,16 @@ Chromium; ein `PLAYWRIGHT_CHROMIUM_PATH` in `.env` ist nur für diese Sandbox n�
 vorinstalliertes Chromium an einem abweichenden Pfad liegt.
 
 Schema: `pdf_template` (`backend/sql/migrations/010_add_pdf_templates.sql`).
+
+**Neue Platzhalter fürs Objekt-Datenblatt** (Migration 015, siehe „Objektverwaltung" oben):
+`{{objekt.strasse}}`, `{{objekt.hausnummer}}`, `{{objekt.plz}}`, `{{objekt.ort}}`,
+`{{objekt.ortsteil}}`, `{{objekt.contactEmail}}`, `{{objekt.emergencyPhone}}`,
+`{{objekt.hasOfficialPlan}}`/`{{objekt.hasFwPlan}}` (Text „ja"/„nein", für ein Badge-Aussehen
+`{{#if objekt.hasOfficialPlan}}...{{/if}}` nutzen), `{{objekt.planDate}}`, `{{objekt.planCreator}}`,
+`{{objekt.floors}}`, `{{objekt.area}}`, `{{objekt.specialFeatures}}` — `{{objekt.adresse}}` bleibt
+zusätzlich als vorformatierte einzeilige Anschrift verfügbar. Bestehende, vor Migration 015 erstellte
+Vorlagen funktionieren unverändert weiter (nur zusätzliche Platzhalter, keine entfernt) — wer sie
+nutzen will, muss sie im Vorlagen-Editor selbst ergänzen.
 
 ## Individuelles Dashboard (Phase 6)
 

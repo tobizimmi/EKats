@@ -26,13 +26,26 @@ function objectFormFields() {
   return {
     name: document.getElementById('object-name'),
     category: document.getElementById('object-category'),
-    address: document.getElementById('object-address'),
+    street: document.getElementById('object-street'),
+    houseNumber: document.getElementById('object-house-number'),
+    postalCode: document.getElementById('object-postal-code'),
+    city: document.getElementById('object-city'),
+    district: document.getElementById('object-district'),
     lat: document.getElementById('object-lat'),
     lon: document.getElementById('object-lon'),
     hazards: document.getElementById('object-hazards'),
     accessInfo: document.getElementById('object-access-info'),
     contactName: document.getElementById('object-contact-name'),
     contactPhone: document.getElementById('object-contact-phone'),
+    contactEmail: document.getElementById('object-contact-email'),
+    emergencyPhone: document.getElementById('object-emergency-phone'),
+    hasOfficialPlan: document.getElementById('object-has-official-plan'),
+    hasFwPlan: document.getElementById('object-has-fw-plan'),
+    planDate: document.getElementById('object-plan-date'),
+    planCreator: document.getElementById('object-plan-creator'),
+    floors: document.getElementById('object-floors'),
+    area: document.getElementById('object-area'),
+    specialFeatures: document.getElementById('object-special-features'),
     notes: document.getElementById('object-notes'),
     reviewInterval: document.getElementById('object-review-interval'),
     fireWaterSupplyType: document.getElementById('object-fire-water-supply-type'),
@@ -100,7 +113,11 @@ async function openObjectDialog(mode, object) {
 
   fields.name.value = object?.name || '';
   fields.category.value = object?.category || 'sonstiges';
-  fields.address.value = object?.address || '';
+  fields.street.value = object?.street || '';
+  fields.houseNumber.value = object?.house_number || '';
+  fields.postalCode.value = object?.postal_code || '';
+  fields.city.value = object?.city || '';
+  fields.district.value = object?.district || '';
   fields.lat.value = object?.lat ?? pendingLatLon?.lat ?? '';
   fields.lon.value = object?.lon ?? pendingLatLon?.lng ?? '';
   document.getElementById('object-geocode-status').textContent = '';
@@ -108,6 +125,15 @@ async function openObjectDialog(mode, object) {
   fields.accessInfo.value = object?.access_info || '';
   fields.contactName.value = object?.contact_name || '';
   fields.contactPhone.value = object?.contact_phone || '';
+  fields.contactEmail.value = object?.contact_email || '';
+  fields.emergencyPhone.value = object?.emergency_phone || '';
+  fields.hasOfficialPlan.checked = !!object?.has_official_plan;
+  fields.hasFwPlan.checked = !!object?.has_fw_plan;
+  fields.planDate.value = object?.plan_date ? String(object.plan_date).slice(0, 10) : '';
+  fields.planCreator.value = object?.plan_creator || '';
+  fields.floors.value = object?.floors || '';
+  fields.area.value = object?.area || '';
+  fields.specialFeatures.value = object?.special_features || '';
   fields.notes.value = object?.notes || '';
   fields.reviewInterval.value = object?.review_interval_months || '';
   fields.fireWaterSupplyType.value = object?.fire_water_supply_type || '';
@@ -148,9 +174,9 @@ async function openObjectDialog(mode, object) {
 // Massen-Geocoding).
 async function geocodeObjectAddress() {
   const statusEl = document.getElementById('object-geocode-status');
-  const address = document.getElementById('object-address').value.trim();
+  const address = composeAddressLine(objectFormFields());
   if (!address) {
-    statusEl.textContent = 'Bitte zuerst eine Adresse eingeben.';
+    statusEl.textContent = 'Bitte zuerst Straße und/oder Ort eingeben.';
     return;
   }
 
@@ -197,11 +223,24 @@ function collectDraftObjectFields() {
   return {
     name: fields.name.value,
     category: fields.category.value,
-    address: fields.address.value,
+    street: fields.street.value,
+    house_number: fields.houseNumber.value,
+    postal_code: fields.postalCode.value,
+    city: fields.city.value,
+    district: fields.district.value,
     hazards: fields.hazards.value,
     access_info: fields.accessInfo.value,
     contact_name: fields.contactName.value,
     contact_phone: fields.contactPhone.value,
+    contact_email: fields.contactEmail.value,
+    emergency_phone: fields.emergencyPhone.value,
+    has_official_plan: fields.hasOfficialPlan.checked,
+    has_fw_plan: fields.hasFwPlan.checked,
+    plan_date: fields.planDate.value,
+    plan_creator: fields.planCreator.value,
+    floors: fields.floors.value,
+    area: fields.area.value,
+    special_features: fields.specialFeatures.value,
     notes: fields.notes.value,
     review_interval_months: fields.reviewInterval.value || null,
     fire_water_supply_type: fields.fireWaterSupplyType.value,
@@ -384,6 +423,15 @@ window.selectObject = function selectObject(obj) {
   openObjectDialog(objectsCanEdit ? 'edit' : 'view', obj);
 };
 
+// Setzt aus den strukturierten Adressfeldern eine einzeilige Anzeige-Adresse zusammen (fuer
+// Listenspalten/Suche/PDF-Vorlage, siehe critical_object.address in Migration 015) - das Formular
+// selbst zeigt nur noch die getrennten Felder, keine redundante Freitext-Adresse mehr.
+function composeAddressLine(fields) {
+  const streetLine = [fields.street.value.trim(), fields.houseNumber.value.trim()].filter(Boolean).join(' ');
+  const cityLine = [fields.postalCode.value.trim(), fields.city.value.trim()].filter(Boolean).join(' ');
+  return [streetLine, cityLine].filter(Boolean).join(', ') || null;
+}
+
 async function submitObjectForm(event) {
   event.preventDefault();
   const fields = objectFormFields();
@@ -398,13 +446,27 @@ async function submitObjectForm(event) {
   const payload = {
     name: fields.name.value.trim(),
     category: fields.category.value,
-    address: fields.address.value.trim() || null,
+    address: composeAddressLine(fields),
+    street: fields.street.value.trim() || null,
+    houseNumber: fields.houseNumber.value.trim() || null,
+    postalCode: fields.postalCode.value.trim() || null,
+    city: fields.city.value.trim() || null,
+    district: fields.district.value.trim() || null,
     lat: Number(fields.lat.value),
     lon: Number(fields.lon.value),
     hazards: fields.hazards.value.trim() || null,
     accessInfo: fields.accessInfo.value.trim() || null,
     contactName: fields.contactName.value.trim() || null,
     contactPhone: fields.contactPhone.value.trim() || null,
+    contactEmail: fields.contactEmail.value.trim() || null,
+    emergencyPhone: fields.emergencyPhone.value.trim() || null,
+    hasOfficialPlan: fields.hasOfficialPlan.checked,
+    hasFwPlan: fields.hasFwPlan.checked,
+    planDate: fields.planDate.value || null,
+    planCreator: fields.planCreator.value.trim() || null,
+    floors: fields.floors.value.trim() || null,
+    area: fields.area.value.trim() || null,
+    specialFeatures: fields.specialFeatures.value.trim() || null,
     notes: fields.notes.value.trim() || null,
     reviewIntervalMonths: fields.reviewInterval.value ? Number(fields.reviewInterval.value) : null,
     fireWaterSupplyType: fields.fireWaterSupplyType.value || null,

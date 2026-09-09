@@ -17,16 +17,18 @@ router.use(requireAuth);
 const CATEGORIES = ['schule_kita', 'krankenhaus_pflege', 'industrie_gefahrstoff', 'versammlungsstaette', 'sonstiges'];
 
 const SELECT_COLUMNS = `
-  id, name, category, address, hazards, access_info, contact_name, contact_phone, notes,
+  id, name, category, address, street, house_number, postal_code, city, district,
+  hazards, access_info, contact_name, contact_phone, contact_email, emergency_phone, notes,
   review_interval_months, last_reviewed_at,
   CASE WHEN review_interval_months IS NOT NULL
     THEN COALESCE(last_reviewed_at, created_at) + (review_interval_months || ' months')::interval
     ELSE NULL
   END AS next_review_at,
+  has_official_plan, has_fw_plan, plan_date, plan_creator,
   fire_water_supply_type, fire_water_supply_capacity_lpm, fire_water_supply_location,
   fire_alarm_system, fire_alarm_monitoring_station, occupant_count_max, elevators,
   smoke_heat_exhaust_system, pv_battery_system, pv_battery_disconnect_location, assembly_point,
-  built_year, custom_fields,
+  built_year, floors, area, special_features, custom_fields,
   created_by, created_at, updated_at, ST_Y(geom) AS lat, ST_X(geom) AS lon
 `;
 
@@ -168,14 +170,31 @@ const objectSchema = z.object({
   name: z.string().trim().min(1).max(200),
   category: z.enum(CATEGORIES).optional().default('sonstiges'),
   address: z.string().trim().max(300).nullable().optional(),
+  // Strukturierte Adresse (Nutzerwunsch, angelehnt an das urspruengliche lokale
+  // Feuerwehr-Objektverwaltungstool) - ergaenzt "address" (bleibt als freie Anzeige-/Fallback-Zeile
+  // erhalten, siehe Migration 015), ersetzt es aber nicht.
+  street: z.string().trim().max(200).nullable().optional(),
+  houseNumber: z.string().trim().max(20).nullable().optional(),
+  postalCode: z.string().trim().max(10).nullable().optional(),
+  city: z.string().trim().max(200).nullable().optional(),
+  district: z.string().trim().max(200).nullable().optional(),
   lat: z.number().min(-90).max(90),
   lon: z.number().min(-180).max(180),
   hazards: z.string().trim().max(2000).nullable().optional(),
   accessInfo: z.string().trim().max(2000).nullable().optional(),
   contactName: z.string().trim().max(200).nullable().optional(),
   contactPhone: z.string().trim().max(50).nullable().optional(),
+  contactEmail: z.string().trim().max(200).nullable().optional(),
+  emergencyPhone: z.string().trim().max(50).nullable().optional(),
   notes: z.string().trim().max(2000).nullable().optional(),
   reviewIntervalMonths: z.number().int().positive().nullable().optional(),
+  // Planstatus (Nutzerwunsch, angelehnt an das urspruengliche lokale Tool): getrennt vom
+  // Ueberpruefungs-Turnus oben - dort geht es um WANN zuletzt begangen, hier um OB/WANN ein
+  // Feuerwehrplan fuer das Objekt existiert.
+  hasOfficialPlan: z.boolean().nullable().optional(),
+  hasFwPlan: z.boolean().nullable().optional(),
+  planDate: z.string().trim().max(30).nullable().optional(),
+  planCreator: z.string().trim().max(200).nullable().optional(),
   // Standardfelder (Migration 008, recherchiert gegen DIN 14095 "Allgemeine Objektinformationen" -
   // siehe Kommentar in der Migration fuer die Quellenlage).
   fireWaterSupplyType: z.enum(FIRE_WATER_SUPPLY_TYPES).nullable().optional(),
@@ -190,6 +209,11 @@ const objectSchema = z.object({
   pvBatteryDisconnectLocation: z.string().trim().max(300).nullable().optional(),
   assemblyPoint: z.string().trim().max(300).nullable().optional(),
   builtYear: z.number().int().min(1000).max(2100).nullable().optional(),
+  // floors/area bewusst Text statt Zahl (siehe Migration 015) - in der Praxis oft mit
+  // Zusatzangabe erfasst ("3 (EG + 2 OG)", "ca. 2.500 qm") statt als reine Zahl.
+  floors: z.string().trim().max(50).nullable().optional(),
+  area: z.string().trim().max(50).nullable().optional(),
+  specialFeatures: z.string().trim().max(2000).nullable().optional(),
   customFields: z.record(z.string(), z.any()).nullable().optional(),
 });
 
@@ -198,27 +222,42 @@ const objectSchema = z.object({
 async function insertObjectRow(d, customFieldsValue, wehrId, userId) {
   const { rows } = await query(
     `INSERT INTO critical_object
-       (wehr_id, name, category, address, geom, hazards, access_info, contact_name, contact_phone, notes,
-        review_interval_months, fire_water_supply_type, fire_water_supply_capacity_lpm,
+       (wehr_id, name, category, address, street, house_number, postal_code, city, district, geom,
+        hazards, access_info, contact_name, contact_phone, contact_email, emergency_phone, notes,
+        review_interval_months, has_official_plan, has_fw_plan, plan_date, plan_creator,
+        fire_water_supply_type, fire_water_supply_capacity_lpm,
         fire_water_supply_location, fire_alarm_system, fire_alarm_monitoring_station,
         occupant_count_max, elevators, smoke_heat_exhaust_system, pv_battery_system,
-        pv_battery_disconnect_location, assembly_point, built_year, custom_fields, created_by)
-     VALUES ($1, $2, $3, $4, ST_SetSRID(ST_MakePoint($5, $6), 4326), $7, $8, $9, $10, $11, $12,
-             $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26)
+        pv_battery_disconnect_location, assembly_point, built_year, floors, area,
+        special_features, custom_fields, created_by)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, ST_SetSRID(ST_MakePoint($10, $11), 4326), $12, $13,
+             $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30,
+             $31, $32, $33, $34, $35, $36, $37, $38, $39, $40)
      RETURNING ${SELECT_COLUMNS}`,
     [
       wehrId,
       d.name,
       d.category,
       d.address || null,
+      d.street || null,
+      d.houseNumber || null,
+      d.postalCode || null,
+      d.city || null,
+      d.district || null,
       d.lon,
       d.lat,
       d.hazards || null,
       d.accessInfo || null,
       d.contactName || null,
       d.contactPhone || null,
+      d.contactEmail || null,
+      d.emergencyPhone || null,
       d.notes || null,
       d.reviewIntervalMonths || null,
+      d.hasOfficialPlan ?? null,
+      d.hasFwPlan ?? null,
+      d.planDate || null,
+      d.planCreator || null,
       d.fireWaterSupplyType || null,
       d.fireWaterSupplyCapacityLpm ?? null,
       d.fireWaterSupplyLocation || null,
@@ -231,6 +270,9 @@ async function insertObjectRow(d, customFieldsValue, wehrId, userId) {
       d.pvBatteryDisconnectLocation || null,
       d.assemblyPoint || null,
       d.builtYear ?? null,
+      d.floors || null,
+      d.area || null,
+      d.specialFeatures || null,
       JSON.stringify(customFieldsValue ?? {}),
       userId,
     ]
@@ -265,14 +307,25 @@ function exportRowToObjectInput(row) {
     name: row.name,
     category: row.category,
     address: row.address,
+    street: row.street,
+    houseNumber: row.house_number,
+    postalCode: row.postal_code,
+    city: row.city,
+    district: row.district,
     lat: row.lat,
     lon: row.lon,
     hazards: row.hazards,
     accessInfo: row.access_info,
     contactName: row.contact_name,
     contactPhone: row.contact_phone,
+    contactEmail: row.contact_email,
+    emergencyPhone: row.emergency_phone,
     notes: row.notes,
     reviewIntervalMonths: row.review_interval_months,
+    hasOfficialPlan: row.has_official_plan,
+    hasFwPlan: row.has_fw_plan,
+    planDate: row.plan_date,
+    planCreator: row.plan_creator,
     fireWaterSupplyType: row.fire_water_supply_type,
     fireWaterSupplyCapacityLpm: row.fire_water_supply_capacity_lpm,
     fireWaterSupplyLocation: row.fire_water_supply_location,
@@ -285,6 +338,9 @@ function exportRowToObjectInput(row) {
     pvBatteryDisconnectLocation: row.pv_battery_disconnect_location,
     assemblyPoint: row.assembly_point,
     builtYear: row.built_year,
+    floors: row.floors,
+    area: row.area,
+    specialFeatures: row.special_features,
     customFields: row.custom_fields,
   };
 }
@@ -377,6 +433,207 @@ router.post('/import', requireRole('stab', 'admin'), async (req, res, next) => {
   }
 });
 
+// ---------------------------------------------------------------------------
+// Import aus der urspruenglichen, lokalen Feuerwehr-Objektverwaltung (Electron/Node-App des Nutzers,
+// SQLite ueber sql.js - siehe deren db/database.js) - andere Anwendung, anderes Datenmodell, daher
+// eigener Importer statt Wiederverwendung von POST /import oben. Dieselben Sicherheitsprinzipien wie
+// dort: jedes Objekt wird IMMER neu angelegt (nie per fremder id ueberschrieben), landet in der
+// eigenen Wehr, Fahrzeugaufgaben werden per Name statt fremder id neu zugeordnet, ein einzelnes
+// fehlerhaftes Objekt blockiert nicht den restlichen Import.
+//
+// sql.js (WASM, keine native Kompilierung noetig - dieselbe Bibliothek, die das Referenz-Tool selbst
+// verwendet) liest die hochgeladene .sqlite-Datei direkt aus dem Upload-Buffer, ohne sie auf Platte
+// zu schreiben. Kein Netzwerkzugriff, keine Skriptausfuehrung aus der Datei - nur SELECT-Statements
+// gegen ein festes, erwartetes Tabellenschema.
+let sqlJsPromise = null;
+function getSqlJs() {
+  if (!sqlJsPromise) sqlJsPromise = require('sql.js')();
+  return sqlJsPromise;
+}
+
+function sqliteAll(db, sql) {
+  const stmt = db.prepare(sql);
+  const rows = [];
+  while (stmt.step()) rows.push(stmt.getAsObject());
+  stmt.free();
+  return rows;
+}
+
+const sqliteUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 25 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (!/\.(sqlite3?|db)$/i.test(file.originalname)) {
+      return cb(new Error('Bitte eine .sqlite-/.db-Datei hochladen.'));
+    }
+    return cb(null, true);
+  },
+});
+
+// Bestmoegliche Zuordnung der im Referenz-Tool vordefinierten Objekttypen (freier Text, admin-
+// konfigurierbar) auf die feste EKats-Kategorie-Enum - unbekannte/eigene Typen landen in "sonstiges"
+// statt den Import mit einem Fehler abzubrechen.
+const FEUERWEHRAPP_TYPE_TO_CATEGORY = {
+  schule: 'schule_kita',
+  'krankenhaus / pflegeeinrichtung': 'krankenhaus_pflege',
+  industriebetrieb: 'industrie_gefahrstoff',
+  'sport- / veranstaltungshalle': 'versammlungsstaette',
+  einkaufszentrum: 'versammlungsstaette',
+  'kirche / religionsstätte': 'versammlungsstaette',
+  'hotel / beherbergung': 'versammlungsstaette',
+};
+function mapFeuerwehrappCategory(type) {
+  if (!type) return 'sonstiges';
+  return FEUERWEHRAPP_TYPE_TO_CATEGORY[String(type).trim().toLowerCase()] || 'sonstiges';
+}
+
+// Wandelt eine Zeile der "objects"-Tabelle des Referenz-Tools in die objectSchema-Eingabeform um.
+function feuerwehrappRowToObjectInput(row) {
+  return {
+    name: row.name,
+    category: mapFeuerwehrappCategory(row.type),
+    street: row.street || null,
+    houseNumber: row.house_number || null,
+    postalCode: row.postal_code || null,
+    city: row.city || null,
+    district: row.district || null,
+    lat: row.lat,
+    lon: row.lng,
+    contactName: row.contact_name || null,
+    contactPhone: row.contact_phone || null,
+    contactEmail: row.contact_email || null,
+    emergencyPhone: row.emergency_phone || null,
+    hasOfficialPlan: !!row.has_official_plan,
+    hasFwPlan: !!row.has_fw_plan,
+    planDate: row.plan_date || null,
+    planCreator: row.plan_creator || null,
+    builtYear: row.construction_year ? Number.parseInt(row.construction_year, 10) || null : null,
+    floors: row.floors ? String(row.floors) : null,
+    area: row.area ? String(row.area) : null,
+    specialFeatures: row.special_features || null,
+    hazards: row.hazardous_materials || null,
+    accessInfo: row.access_routes || null,
+    // Loeschwasserversorgung war im Referenz-Tool EIN Freitextfeld statt EKats' drei strukturierten
+    // Feldern (Art/Ergiebigkeit/Lage) - bestmoeglich als Freitext in "Lage/Standort" uebernommen;
+    // "Art" bleibt bewusst leer statt fälschlich "keine Angabe" zu suggerieren.
+    fireWaterSupplyLocation: row.water_supply || null,
+    notes: row.notes || null,
+  };
+}
+
+router.post('/import-feuerwehrapp', requireRole('stab', 'admin'), (req, res, next) => {
+  sqliteUpload.single('file')(req, res, async (uploadErr) => {
+    try {
+      if (uploadErr) {
+        return res.status(400).json({ ok: false, error: uploadErr.message });
+      }
+      if (!req.file) {
+        return res.status(400).json({ ok: false, error: 'Keine Datei hochgeladen.' });
+      }
+
+      const SQL = await getSqlJs();
+      let sqliteDb;
+      try {
+        sqliteDb = new SQL.Database(req.file.buffer);
+      } catch (err) {
+        return res.status(400).json({ ok: false, error: 'Datei ist keine gültige SQLite-Datenbank.' });
+      }
+
+      let feObjects;
+      let feTasks;
+      let feCustomFields;
+      try {
+        feObjects = sqliteAll(sqliteDb, 'SELECT * FROM objects');
+        feTasks = sqliteAll(
+          sqliteDb,
+          `SELECT ovt.object_id, ovt.task, ovt.notes, ovt.sort_order, v.name AS vehicle_name
+           FROM object_vehicle_tasks ovt JOIN vehicles v ON v.id = ovt.vehicle_id`
+        );
+        feCustomFields = sqliteAll(sqliteDb, 'SELECT object_id, field_key, field_value FROM object_custom_fields');
+      } catch (err) {
+        return res.status(400).json({
+          ok: false,
+          error:
+            'Datei enthält nicht die erwartete Tabellenstruktur (objects/object_vehicle_tasks/object_custom_fields) - ist das ein Export der lokalen Feuerwehr-Objektverwaltung?',
+        });
+      } finally {
+        sqliteDb.close();
+      }
+
+      const tasksByObject = new Map();
+      feTasks.forEach((t) => {
+        if (!tasksByObject.has(t.object_id)) tasksByObject.set(t.object_id, []);
+        tasksByObject.get(t.object_id).push(t);
+      });
+      const customFieldsByObject = new Map();
+      feCustomFields.forEach((f) => {
+        if (!customFieldsByObject.has(f.object_id)) customFieldsByObject.set(f.object_id, {});
+        customFieldsByObject.get(f.object_id)[f.field_key] = f.field_value;
+      });
+
+      const { rows: vehicles } = await query('SELECT id, name FROM vehicle WHERE wehr_id = $1', [req.user.wehrId]);
+      const vehicleByName = new Map(vehicles.map((v) => [v.name.trim().toLowerCase(), v.id]));
+
+      const imported = [];
+      const errors = [];
+      const taskWarnings = [];
+
+      for (const feObj of feObjects) {
+        const label = feObj.name || `Objekt #${feObj.id}`;
+        const input = feuerwehrappRowToObjectInput(feObj);
+        input.customFields = customFieldsByObject.get(feObj.id) || undefined;
+
+        const objParsed = objectSchema.safeParse(input);
+        if (!objParsed.success) {
+          errors.push(`"${label}": ${objParsed.error.issues[0].message}`);
+          continue;
+        }
+        const d = objParsed.data;
+
+        const customFieldsResult = await validateCustomFields(d.customFields, req.user.wehrId);
+        if (!customFieldsResult.ok) {
+          errors.push(`"${label}": ${customFieldsResult.error}`);
+          continue;
+        }
+
+        const object = await insertObjectRow(d, customFieldsResult.value, req.user.wehrId, req.user.id);
+        imported.push(object);
+
+        for (const task of tasksByObject.get(feObj.id) || []) {
+          const vehicleId = task.vehicle_name ? vehicleByName.get(String(task.vehicle_name).trim().toLowerCase()) : undefined;
+          if (!vehicleId) {
+            taskWarnings.push(
+              `Aufgabe "${task.task}" bei "${label}" übersprungen: Fahrzeug "${task.vehicle_name || '?'}" nicht gefunden.`
+            );
+            continue;
+          }
+          await query(
+            `INSERT INTO critical_object_task (critical_object_id, vehicle_id, station_id, title, description, sort_order)
+             VALUES ($1, $2, NULL, $3, $4, $5)`,
+            [object.id, vehicleId, task.task || 'Aufgabe', task.notes || null, task.sort_order || 0]
+          );
+        }
+      }
+
+      await logAudit({
+        wehrId: req.user.wehrId,
+        actorUserId: req.user.id,
+        actorEmail: req.user.email,
+        action: 'objects.import_feuerwehrapp',
+        details: { importedCount: imported.length, errorCount: errors.length, taskWarningCount: taskWarnings.length },
+        ip: req.ip,
+      });
+
+      return res.json({
+        ok: true,
+        data: { importedCount: imported.length, objects: imported, errors, taskWarnings },
+      });
+    } catch (err) {
+      return next(err);
+    }
+  });
+});
+
 const updateSchema = objectSchema.partial();
 
 router.patch('/:id', requireRole('stab', 'admin'), async (req, res, next) => {
@@ -393,12 +650,23 @@ router.patch('/:id', requireRole('stab', 'admin'), async (req, res, next) => {
       name: 'name',
       category: 'category',
       address: 'address',
+      street: 'street',
+      houseNumber: 'house_number',
+      postalCode: 'postal_code',
+      city: 'city',
+      district: 'district',
       hazards: 'hazards',
       accessInfo: 'access_info',
       contactName: 'contact_name',
       contactPhone: 'contact_phone',
+      contactEmail: 'contact_email',
+      emergencyPhone: 'emergency_phone',
       notes: 'notes',
       reviewIntervalMonths: 'review_interval_months',
+      hasOfficialPlan: 'has_official_plan',
+      hasFwPlan: 'has_fw_plan',
+      planDate: 'plan_date',
+      planCreator: 'plan_creator',
       fireWaterSupplyType: 'fire_water_supply_type',
       fireWaterSupplyCapacityLpm: 'fire_water_supply_capacity_lpm',
       fireWaterSupplyLocation: 'fire_water_supply_location',
@@ -411,10 +679,16 @@ router.patch('/:id', requireRole('stab', 'admin'), async (req, res, next) => {
       pvBatteryDisconnectLocation: 'pv_battery_disconnect_location',
       assemblyPoint: 'assembly_point',
       builtYear: 'built_year',
+      floors: 'floors',
+      area: 'area',
+      specialFeatures: 'special_features',
     };
     // Boolean-Felder duerfen explizit auf "false" gesetzt werden - "d[key] || null" wuerde false
     // faelschlich zu null verwerfen, daher hier nur echtes undefined/null rausfiltern.
-    const booleanKeys = new Set(['fireAlarmSystem', 'elevators', 'smokeHeatExhaustSystem', 'pvBatterySystem']);
+    const booleanKeys = new Set([
+      'fireAlarmSystem', 'elevators', 'smokeHeatExhaustSystem', 'pvBatterySystem',
+      'hasOfficialPlan', 'hasFwPlan',
+    ]);
     for (const [key, column] of Object.entries(simpleColumns)) {
       if (d[key] !== undefined) {
         params.push(booleanKeys.has(key) ? d[key] : (d[key] || null));
@@ -811,11 +1085,25 @@ router.get('/:id/datasheet/pdf', async (req, res, next) => {
       objekt: {
         name: o.name,
         adresse: o.address || '',
+        strasse: o.street || '',
+        hausnummer: o.house_number || '',
+        plz: o.postal_code || '',
+        ort: o.city || '',
+        ortsteil: o.district || '',
         kategorie: CATEGORY_LABELS[o.category] || o.category,
         hazards: o.hazards || '',
         accessInfo: o.access_info || '',
+        specialFeatures: o.special_features || '',
         contactName: o.contact_name || '',
         contactPhone: o.contact_phone || '',
+        contactEmail: o.contact_email || '',
+        emergencyPhone: o.emergency_phone || '',
+        hasOfficialPlan: boolLabel(o.has_official_plan),
+        hasFwPlan: boolLabel(o.has_fw_plan),
+        planDate: o.plan_date ? new Date(o.plan_date).toLocaleDateString('de-DE') : '',
+        planCreator: o.plan_creator || '',
+        floors: o.floors || '',
+        area: o.area || '',
         fireWaterSupplyType: FIRE_WATER_SUPPLY_LABELS[o.fire_water_supply_type] || '',
         fireWaterSupplyCapacityLpm: o.fire_water_supply_capacity_lpm ?? '',
         fireWaterSupplyLocation: o.fire_water_supply_location || '',

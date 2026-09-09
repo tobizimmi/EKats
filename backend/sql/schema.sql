@@ -273,6 +273,22 @@ ALTER TABLE critical_object ADD COLUMN IF NOT EXISTS built_year INTEGER CHECK (
 );
 ALTER TABLE critical_object ADD COLUMN IF NOT EXISTS custom_fields JSONB NOT NULL DEFAULT '{}'::jsonb;
 
+-- Migration 015: Adresse strukturiert, Kontakt-Email/Notfalltelefon, Planstatus, Gebaeudedaten.
+ALTER TABLE critical_object ADD COLUMN IF NOT EXISTS street TEXT;
+ALTER TABLE critical_object ADD COLUMN IF NOT EXISTS house_number TEXT;
+ALTER TABLE critical_object ADD COLUMN IF NOT EXISTS postal_code TEXT;
+ALTER TABLE critical_object ADD COLUMN IF NOT EXISTS city TEXT;
+ALTER TABLE critical_object ADD COLUMN IF NOT EXISTS district TEXT;
+ALTER TABLE critical_object ADD COLUMN IF NOT EXISTS contact_email TEXT;
+ALTER TABLE critical_object ADD COLUMN IF NOT EXISTS emergency_phone TEXT;
+ALTER TABLE critical_object ADD COLUMN IF NOT EXISTS has_official_plan BOOLEAN;
+ALTER TABLE critical_object ADD COLUMN IF NOT EXISTS has_fw_plan BOOLEAN;
+ALTER TABLE critical_object ADD COLUMN IF NOT EXISTS plan_date DATE;
+ALTER TABLE critical_object ADD COLUMN IF NOT EXISTS plan_creator TEXT;
+ALTER TABLE critical_object ADD COLUMN IF NOT EXISTS floors TEXT;
+ALTER TABLE critical_object ADD COLUMN IF NOT EXISTS area TEXT;
+ALTER TABLE critical_object ADD COLUMN IF NOT EXISTS special_features TEXT;
+
 CREATE TABLE IF NOT EXISTS object_field_definition (
     id SERIAL PRIMARY KEY,
     wehr_id INTEGER NOT NULL REFERENCES wehr(id) ON DELETE CASCADE,

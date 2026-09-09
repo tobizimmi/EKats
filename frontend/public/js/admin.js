@@ -668,4 +668,43 @@ async function loadSmtpSettings() {
       errorEl.textContent = err.message;
     }
   });
+
+  // Import aus der urspruenglichen lokalen Feuerwehr-Objektverwaltung: multipart-Upload wie beim
+  // Anhang-Upload im Objekt-Dialog (js/objects.js uploadAttachmentToCurrentObject) statt api.post -
+  // eine Binaerdatei laesst sich nicht als JSON durch den api.js-Wrapper schicken.
+  document.getElementById('object-import-feuerwehrapp-button').addEventListener('click', async () => {
+    const fileInput = document.getElementById('object-import-feuerwehrapp-file');
+    const errorEl = document.getElementById('object-import-feuerwehrapp-error');
+    const resultEl = document.getElementById('object-import-feuerwehrapp-result');
+    errorEl.textContent = '';
+    resultEl.hidden = true;
+
+    const file = fileInput.files[0];
+    if (!file) {
+      errorEl.textContent = 'Bitte zuerst eine .sqlite-Datei auswählen.';
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const res = await fetch('api/objects/import-feuerwehrapp', {
+        method: 'POST',
+        credentials: 'include',
+        body: formData,
+      });
+      const json = await res.json();
+      if (!res.ok || !json.ok) throw new Error(json.error || `Fehler (Status ${res.status}).`);
+      const result = json.data;
+      const parts = [`${result.importedCount} Objekt(e) importiert.`];
+      if (result.errors.length) parts.push(`${result.errors.length} übersprungen: ${result.errors.join(' | ')}`);
+      if (result.taskWarnings.length) parts.push(`${result.taskWarnings.length} Aufgaben-Hinweis(e): ${result.taskWarnings.join(' | ')}`);
+      resultEl.textContent = parts.join(' ');
+      resultEl.hidden = false;
+      fileInput.value = '';
+    } catch (err) {
+      errorEl.textContent = err.message;
+    }
+  });
 })();

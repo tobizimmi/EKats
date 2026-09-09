@@ -24,7 +24,10 @@
       <div class="form-row">
         <button type="button" id="objekte-overdue-toggle" class="secondary">Nur überfällige</button>
         <button type="button" id="objekte-pdf-export" class="secondary">Sammel-PDF-Export</button>
+        <button type="button" id="objekte-map-toggle" class="secondary">Karte anzeigen</button>
       </div>
+
+      <div id="objekte-map" hidden></div>
 
       <div id="objekte-bulk-bar" class="card" hidden style="background: var(--bg); margin: 0.75rem 0;">
         <div class="form-row" style="align-items: end;">
@@ -43,9 +46,9 @@
     </div>
   </main>
 
-  <dialog id="objekte-detail-dialog" class="app-dialog">
+  <dialog id="objekte-detail-dialog" class="app-dialog wide">
     <h3 id="objekte-detail-title" class="section-title">Objekt</h3>
-    <dl id="objekte-detail-content"></dl>
+    <div id="objekte-detail-content"></div>
     <div class="dialog-actions">
       <a id="objekte-detail-map-link" href="./" class="button-link">Auf der Karte öffnen</a>
       <button type="button" id="objekte-detail-close" class="secondary">Schließen</button>
