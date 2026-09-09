@@ -570,12 +570,41 @@ Netzwerkzugriff nötig für die Zeichenfunktion selbst (nur die Kartenkacheln la
 OpenStreetMap) — funktioniert daher auch bei eingeschränkter Konnektivität zur Karte, solange diese
 bereits einmal geladen wurde.
 
-### Export
+### Export / Import
 
-Im Admin-Bereich („Objektdaten-Export“) lassen sich alle Objekte der eigenen Wehr inkl. aller
-Aufgaben und Anhangs-**Metadaten** (Dateiname/Typ/Größe, nicht die Binärdateien selbst) als
+Im Admin-Bereich („Objektdaten-Export/-Import“) lassen sich alle Objekte der eigenen Wehr inkl.
+aller Aufgaben und Anhangs-**Metadaten** (Dateiname/Typ/Größe, nicht die Binärdateien selbst) als
 JSON-Datei herunterladen (`GET /api/objects/export`, Stab/Admin). Die eigentlichen Anhangsdateien
 müssen einzeln über den Datei-Download-Endpunkt geholt werden.
+
+Dieselbe Datei kann über denselben Admin-Bereich wieder importiert werden (`POST
+/api/objects/import`, Stab/Admin) — z.B. als Sicherung/Wiederherstellung oder um Objektdaten in eine
+andere EKats-Installation zu übertragen. Sicherheits- und Datenintegritäts-Überlegungen:
+
+- **Immer Neuanlage, nie Überschreiben**: `critical_object.id` ist eine global (nicht je Wehr)
+  fortlaufende Seriennummer — eine importierte `id` aus einer fremden Installation zu übernehmen
+  würde entweder auf ein zufälliges, völlig anderes Objekt derselben Wehr zeigen oder mit einer
+  bestehenden `id` kollidieren. Der Import ignoriert importierte `id`-Werte daher vollständig und
+  legt jedes Objekt als komplett neue Zeile mit neuer `id` an; bestehende Objekte werden nie
+  verändert oder gelöscht.
+- **Wehr-Scoping**: importierte Objekte werden immer der Wehr des einloggten Nutzers zugeordnet,
+  unabhängig davon, welcher Wehr sie ursprünglich gehörten — verhindert, dass eine Export-Datei
+  versehentlich fremde Wehr-Zuordnungen in die eigene Installation einschleust.
+- **Aufgaben-Zuordnung per Name statt ID**: aus demselben Grund referenziert eine exportierte
+  Aufgabe ihr Fahrzeug/ihre Wache nicht über die (in der Zielinstallation bedeutungslose)
+  `vehicle_id`/`station_id`, sondern über den zum Exportzeitpunkt aktuellen Namen
+  (`vehicle_name`/`station_name`). Beim Import wird dieser Name gegen die Fahrzeuge/Wachen der
+  eigenen Wehr abgeglichen; findet sich kein exakter Treffer, wird die Aufgabe übersprungen und als
+  „Aufgaben-Hinweis“ in der Ergebnismeldung aufgeführt, statt das Objekt selbst fehlschlagen zu
+  lassen.
+- **Zeilenweise Fehlerbehandlung**: jedes Objekt wird einzeln validiert (Pflichtfelder, bekannte
+  Zusatzfeld-Schlüssel und -Typen anhand der *aktuellen* Feld-Definitionen der Wehr — siehe
+  „Zusatzfelder“ unten). Ein fehlerhaftes Objekt wird mit Fehlermeldung übersprungen, der Import der
+  restlichen Datei läuft trotzdem weiter; die Antwort listet importierte Anzahl, übersprungene
+  Objekte samt Grund und Aufgaben-Hinweise gesammelt auf.
+- Rollenbeschränkung wie beim Export (`requireRole('stab', 'admin')`); die JSON-Body-Größe (`app.js`,
+  `express.json`) wurde von 200kb auf 2mb angehoben, da eine Export-Datei mit vielen Objekten und
+  vollen Freitextfeldern das alte Limit überschreiten kann.
 
 ### Standardfelder (Einsatzplan, DIN 14095)
 

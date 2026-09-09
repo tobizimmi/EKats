@@ -129,13 +129,25 @@
         </table>
       </div>
 
-      <div class="card">
-        <h2 class="section-title">Objektdaten-Export</h2>
+      <div class="card stack">
+        <h2 class="section-title">Objektdaten-Export/-Import</h2>
         <p class="muted">
           Exportiert alle kritischen Objekte inkl. Aufgaben und Anhangs-Metadaten (nicht die
-          Dateien selbst) als JSON-Datei.
+          Dateien selbst) als JSON-Datei. Dieselbe Datei kann anschließend wieder importiert werden
+          (z.B. als Sicherung oder zum Übertragen in eine andere EKats-Installation) - importierte
+          Objekte werden immer als neue Objekte angelegt, bestehende Objekte bleiben unverändert.
         </p>
         <a id="object-export-link" class="button-link" href="api/objects/export">Alle Objektdaten exportieren</a>
+
+        <div class="form-row">
+          <label>
+            <span>Export-Datei importieren</span>
+            <input type="file" id="object-import-file" accept="application/json,.json" />
+          </label>
+          <button type="button" class="secondary" id="object-import-button">Importieren</button>
+        </div>
+        <p class="error-message" id="object-import-error" role="alert"></p>
+        <div id="object-import-result" class="muted" hidden></div>
       </div>
 
       <div class="card">

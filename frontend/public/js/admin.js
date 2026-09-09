@@ -630,4 +630,42 @@ async function loadSmtpSettings() {
       errorEl.textContent = err.message;
     }
   });
+
+  // Objektdaten-Import (Kehrseite von GET /api/objects/export, siehe backend/src/routes/objects.js
+  // POST /import) - liest die vom Nutzer ausgewaehlte Datei clientseitig als JSON, damit ein
+  // fehlerhaftes/fremdes JSON-Dokument schon hier mit einer klaren Meldung abgelehnt wird statt erst
+  // nach einem Server-Roundtrip.
+  document.getElementById('object-import-button').addEventListener('click', async () => {
+    const fileInput = document.getElementById('object-import-file');
+    const errorEl = document.getElementById('object-import-error');
+    const resultEl = document.getElementById('object-import-result');
+    errorEl.textContent = '';
+    resultEl.hidden = true;
+
+    const file = fileInput.files[0];
+    if (!file) {
+      errorEl.textContent = 'Bitte zuerst eine Export-Datei auswählen.';
+      return;
+    }
+
+    let payload;
+    try {
+      payload = JSON.parse(await file.text());
+    } catch (err) {
+      errorEl.textContent = 'Datei ist kein gültiges JSON.';
+      return;
+    }
+
+    try {
+      const result = await api.post('/objects/import', payload);
+      const parts = [`${result.importedCount} Objekt(e) importiert.`];
+      if (result.errors.length) parts.push(`${result.errors.length} übersprungen: ${result.errors.join(' | ')}`);
+      if (result.taskWarnings.length) parts.push(`${result.taskWarnings.length} Aufgaben-Hinweis(e): ${result.taskWarnings.join(' | ')}`);
+      resultEl.textContent = parts.join(' ');
+      resultEl.hidden = false;
+      fileInput.value = '';
+    } catch (err) {
+      errorEl.textContent = err.message;
+    }
+  });
 })();

@@ -193,6 +193,51 @@ const objectSchema = z.object({
   customFields: z.record(z.string(), z.any()).nullable().optional(),
 });
 
+// Gemeinsame INSERT-Logik fuer POST / und POST /import (Roundtrip zum Export, siehe dort) - vermeidet
+// die lange Spaltenliste zweimal zu pflegen.
+async function insertObjectRow(d, customFieldsValue, wehrId, userId) {
+  const { rows } = await query(
+    `INSERT INTO critical_object
+       (wehr_id, name, category, address, geom, hazards, access_info, contact_name, contact_phone, notes,
+        review_interval_months, fire_water_supply_type, fire_water_supply_capacity_lpm,
+        fire_water_supply_location, fire_alarm_system, fire_alarm_monitoring_station,
+        occupant_count_max, elevators, smoke_heat_exhaust_system, pv_battery_system,
+        pv_battery_disconnect_location, assembly_point, built_year, custom_fields, created_by)
+     VALUES ($1, $2, $3, $4, ST_SetSRID(ST_MakePoint($5, $6), 4326), $7, $8, $9, $10, $11, $12,
+             $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26)
+     RETURNING ${SELECT_COLUMNS}`,
+    [
+      wehrId,
+      d.name,
+      d.category,
+      d.address || null,
+      d.lon,
+      d.lat,
+      d.hazards || null,
+      d.accessInfo || null,
+      d.contactName || null,
+      d.contactPhone || null,
+      d.notes || null,
+      d.reviewIntervalMonths || null,
+      d.fireWaterSupplyType || null,
+      d.fireWaterSupplyCapacityLpm ?? null,
+      d.fireWaterSupplyLocation || null,
+      d.fireAlarmSystem ?? null,
+      d.fireAlarmMonitoringStation || null,
+      d.occupantCountMax ?? null,
+      d.elevators ?? null,
+      d.smokeHeatExhaustSystem ?? null,
+      d.pvBatterySystem ?? null,
+      d.pvBatteryDisconnectLocation || null,
+      d.assemblyPoint || null,
+      d.builtYear ?? null,
+      JSON.stringify(customFieldsValue ?? {}),
+      userId,
+    ]
+  );
+  return rows[0];
+}
+
 router.post('/', requireRole('stab', 'admin'), async (req, res, next) => {
   try {
     const parsed = objectSchema.safeParse(req.body);
@@ -206,46 +251,127 @@ router.post('/', requireRole('stab', 'admin'), async (req, res, next) => {
       return res.status(400).json({ ok: false, error: customFieldsResult.error });
     }
 
-    const { rows } = await query(
-      `INSERT INTO critical_object
-         (wehr_id, name, category, address, geom, hazards, access_info, contact_name, contact_phone, notes,
-          review_interval_months, fire_water_supply_type, fire_water_supply_capacity_lpm,
-          fire_water_supply_location, fire_alarm_system, fire_alarm_monitoring_station,
-          occupant_count_max, elevators, smoke_heat_exhaust_system, pv_battery_system,
-          pv_battery_disconnect_location, assembly_point, built_year, custom_fields, created_by)
-       VALUES ($1, $2, $3, $4, ST_SetSRID(ST_MakePoint($5, $6), 4326), $7, $8, $9, $10, $11, $12,
-               $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26)
-       RETURNING ${SELECT_COLUMNS}`,
-      [
-        req.user.wehrId,
-        d.name,
-        d.category,
-        d.address || null,
-        d.lon,
-        d.lat,
-        d.hazards || null,
-        d.accessInfo || null,
-        d.contactName || null,
-        d.contactPhone || null,
-        d.notes || null,
-        d.reviewIntervalMonths || null,
-        d.fireWaterSupplyType || null,
-        d.fireWaterSupplyCapacityLpm ?? null,
-        d.fireWaterSupplyLocation || null,
-        d.fireAlarmSystem ?? null,
-        d.fireAlarmMonitoringStation || null,
-        d.occupantCountMax ?? null,
-        d.elevators ?? null,
-        d.smokeHeatExhaustSystem ?? null,
-        d.pvBatterySystem ?? null,
-        d.pvBatteryDisconnectLocation || null,
-        d.assemblyPoint || null,
-        d.builtYear ?? null,
-        JSON.stringify(customFieldsResult.value ?? {}),
-        req.user.id,
-      ]
-    );
-    return res.status(201).json({ ok: true, data: rows[0] });
+    const object = await insertObjectRow(d, customFieldsResult.value, req.user.wehrId, req.user.id);
+    return res.status(201).json({ ok: true, data: object });
+  } catch (err) {
+    return next(err);
+  }
+});
+
+// Wandelt die snake_case-Feldnamen aus dem Export (siehe SELECT_COLUMNS oben) in die camelCase-Form
+// um, die objectSchema erwartet - Kehrseite von GET /export, fuer den Roundtrip beim Import.
+function exportRowToObjectInput(row) {
+  return {
+    name: row.name,
+    category: row.category,
+    address: row.address,
+    lat: row.lat,
+    lon: row.lon,
+    hazards: row.hazards,
+    accessInfo: row.access_info,
+    contactName: row.contact_name,
+    contactPhone: row.contact_phone,
+    notes: row.notes,
+    reviewIntervalMonths: row.review_interval_months,
+    fireWaterSupplyType: row.fire_water_supply_type,
+    fireWaterSupplyCapacityLpm: row.fire_water_supply_capacity_lpm,
+    fireWaterSupplyLocation: row.fire_water_supply_location,
+    fireAlarmSystem: row.fire_alarm_system,
+    fireAlarmMonitoringStation: row.fire_alarm_monitoring_station,
+    occupantCountMax: row.occupant_count_max,
+    elevators: row.elevators,
+    smokeHeatExhaustSystem: row.smoke_heat_exhaust_system,
+    pvBatterySystem: row.pv_battery_system,
+    pvBatteryDisconnectLocation: row.pv_battery_disconnect_location,
+    assemblyPoint: row.assembly_point,
+    builtYear: row.built_year,
+    customFields: row.custom_fields,
+  };
+}
+
+const importSchema = z.object({
+  objects: z.array(z.record(z.string(), z.any())).max(2000),
+});
+
+// Importiert einen Export aus GET /export wieder zurueck (Nutzerwunsch: Daten online in der DB
+// halten, aber zusaetzlich export-/importierbar). Jedes Objekt wird IMMER als NEUES Objekt der
+// eigenen Wehr angelegt, nie per importierter id ueberschrieben - critical_object.id ist global
+// (nicht je Wehr eindeutig), ein Ueberschreiben per fremder id waere sowohl ein Datenrisiko (falsches
+// Objekt getroffen) als auch ein Sicherheitsrisiko (fremde-Wehr-Objekt per praeparierter id treffen).
+// Aufgaben werden per Fahrzeug-/Wachenname der EIGENEN Wehr neu zugeordnet (nicht per importierter
+// vehicle_id/station_id, die in der Zielinstallation etwas ganz anderes bedeuten koennten) - kein
+// Namenstreffer heisst die Aufgabe wird uebersprungen und als Warnung gemeldet, nie falsch verknuepft.
+// Anhaenge werden NICHT importiert: der Export enthaelt nur Metadaten, keine Binaerdateien (siehe
+// Kommentar bei /export oben) - ein Eintrag ohne dahinterliegende Datei waere nur ein toter Link.
+// Einzelne fehlerhafte Objekte brechen den gesamten Import nicht ab, sondern werden übersprungen und
+// gesammelt gemeldet - bei z.B. 150 Objekten soll ein einzelner Tippfehler nicht die anderen 149
+// blockieren.
+router.post('/import', requireRole('stab', 'admin'), async (req, res, next) => {
+  try {
+    const parsed = importSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res
+        .status(400)
+        .json({ ok: false, error: 'Ungültiges Import-Format: erwartet wird eine Export-Datei aus "Alle Objektdaten exportieren".' });
+    }
+
+    const { rows: vehicles } = await query('SELECT id, name FROM vehicle WHERE wehr_id = $1', [req.user.wehrId]);
+    const { rows: stations } = await query('SELECT id, name FROM station WHERE wehr_id = $1', [req.user.wehrId]);
+    const vehicleByName = new Map(vehicles.map((v) => [v.name.trim().toLowerCase(), v.id]));
+    const stationByName = new Map(stations.map((s) => [s.name.trim().toLowerCase(), s.id]));
+
+    const imported = [];
+    const errors = [];
+    const taskWarnings = [];
+
+    for (const [index, raw] of parsed.data.objects.entries()) {
+      const label = raw.name || `Objekt #${index + 1}`;
+      const objParsed = objectSchema.safeParse(exportRowToObjectInput(raw));
+      if (!objParsed.success) {
+        errors.push(`"${label}": ${objParsed.error.issues[0].message}`);
+        continue;
+      }
+      const d = objParsed.data;
+
+      const customFieldsResult = await validateCustomFields(d.customFields, req.user.wehrId);
+      if (!customFieldsResult.ok) {
+        errors.push(`"${label}": ${customFieldsResult.error}`);
+        continue;
+      }
+
+      const object = await insertObjectRow(d, customFieldsResult.value, req.user.wehrId, req.user.id);
+      imported.push(object);
+
+      for (const task of Array.isArray(raw.tasks) ? raw.tasks : []) {
+        const vehicleId = task.vehicle_name ? vehicleByName.get(String(task.vehicle_name).trim().toLowerCase()) : undefined;
+        const stationId = task.station_name ? stationByName.get(String(task.station_name).trim().toLowerCase()) : undefined;
+        if (!vehicleId && !stationId) {
+          taskWarnings.push(
+            `Aufgabe "${task.title}" bei "${label}" übersprungen: Fahrzeug/Wache "${task.vehicle_name || task.station_name || '?'}" nicht gefunden.`
+          );
+          continue;
+        }
+        await query(
+          `INSERT INTO critical_object_task (critical_object_id, vehicle_id, station_id, title, description, sort_order)
+           VALUES ($1, $2, $3, $4, $5, $6)`,
+          [object.id, vehicleId || null, stationId || null, task.title, task.description || null, task.sort_order || 0]
+        );
+      }
+    }
+
+    await logAudit({
+      wehrId: req.user.wehrId,
+      actorUserId: req.user.id,
+      actorEmail: req.user.email,
+      action: 'objects.import',
+      details: { importedCount: imported.length, errorCount: errors.length, taskWarningCount: taskWarnings.length },
+      ip: req.ip,
+    });
+
+    return res.json({
+      ok: true,
+      data: { importedCount: imported.length, objects: imported, errors, taskWarnings },
+    });
   } catch (err) {
     return next(err);
   }

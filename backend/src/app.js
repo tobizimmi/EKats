@@ -68,7 +68,10 @@ function createApp() {
   // fuer den CORS-Vergleich abgeschnitten werden.
   app.use(cors({ origin: new URL(config.baseUrl).origin, credentials: true }));
   app.use(cookieParser());
-  app.use(express.json({ limit: '200kb' }));
+  // 2mb statt 200kb: der Objekt-Import (routes/objects.js, POST /import) laedt den kompletten
+  // JSON-Export (GET /export) wieder ein - bei vielen Objekten mit vollen Freitextfeldern
+  // (Gefahren/Hinweise/Zusatzfelder je bis 2000 Zeichen) reicht das alte 200kb-Limit nicht.
+  app.use(express.json({ limit: '2mb' }));
 
   // Globales Rate-Limit auf allen /api-Endpunkten (Login hat zusaetzlich sein eigenes, engeres Limit).
   app.use(
