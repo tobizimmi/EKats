@@ -29,6 +29,8 @@ const WIDGET_CATALOG = {
   objekte: { label: 'Objekt-Übersicht', icon: '🏫', singleton: true, w: 4, h: 2, minW: 3, minH: 2 },
   'dwd-bild': { label: 'DWD-Wetterbild', icon: '🌩️', singleton: true, w: 6, h: 4, minW: 4, minH: 3 },
   'pegel-chart': { label: 'Pegel-Liniendiagramm', icon: '📈', singleton: false, w: 6, h: 3, minW: 4, minH: 2 },
+  'waldbrand-trend': { label: 'Waldbrand-Trend', icon: '🔥', singleton: false, w: 6, h: 3, minW: 4, minH: 2 },
+  'firms-map': { label: 'FIRMS-Hotspot-Karte', icon: '🛰️', singleton: true, w: 6, h: 4, minW: 4, minH: 3 },
   'wetter-vorhersage': { label: 'Wetter-Vorhersage', icon: '🌦️', singleton: true, w: 4, h: 3, minW: 3, minH: 2 },
   'blitz-zaehler': { label: 'Blitz-Zähler', icon: '⚡', singleton: true, w: 3, h: 2, minW: 2, minH: 2 },
   fahrzeugstatus: { label: 'Fahrzeugstatus', icon: '🚒', singleton: true, w: 4, h: 3, minW: 3, minH: 2 },
@@ -58,6 +60,7 @@ const dash = {
   allObjects: [],
   vehicles: [],
   pegelStations: [],
+  waldbrandStations: [],
   datapoints: [],
   leafletMaps: {}, // widgetId -> Leaflet-Map-Instanz, fuer invalidateSize() nach Resize
   timers: [], // laufende setInterval-IDs (Uhr-Widget), vor jedem Neuaufbau geleert
@@ -269,6 +272,60 @@ async function renderPegelChartWidget(container, widget) {
     return;
   }
   await renderPegelHistoryChart(container, externalId);
+}
+
+// Duenner Wrapper wie renderPegelChartWidget, nur fuer den Waldbrandgefahrenindex-Verlauf (seit der
+// Erweiterung von HISTORY_SOURCES, siehe backend/src/fetchers/normalize.js).
+async function renderWaldbrandTrendWidget(container, widget) {
+  const externalId = widget.config?.externalId;
+  if (!externalId) {
+    container.innerHTML = '<p class="muted">Keine Station ausgewählt.</p>';
+    return;
+  }
+  await renderWaldbrandHistoryChart(container, externalId);
+}
+
+// Nicht-interaktive Mini-Karte mit den aktuellen FIRMS-Hotspots (Ergaenzung zur bisherigen
+// Listendarstellung auf der FIRMS-Themenseite) - gleiches Muster wie renderKarteWidget.
+function renderFirmsMapWidget(container, widget) {
+  const items = dash.datapoints.filter(
+    (dp) => dp.source === 'firms' && dp.lat !== null && dp.lat !== undefined && dp.lon !== null && dp.lon !== undefined
+  );
+
+  const mapEl = document.createElement('div');
+  mapEl.className = 'widget-map';
+  container.appendChild(mapEl);
+
+  const center =
+    dash.wehr?.center_lat != null && dash.wehr?.center_lon != null
+      ? [dash.wehr.center_lat, dash.wehr.center_lon]
+      : items.length
+        ? [items[0].lat, items[0].lon]
+        : [51.1657, 10.4515];
+
+  const map = L.map(mapEl, {
+    attributionControl: false,
+    zoomControl: false,
+    dragging: false,
+    scrollWheelZoom: false,
+    doubleClickZoom: false,
+    touchZoom: false,
+    boxZoom: false,
+    keyboard: false,
+  }).setView(center, 9);
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+  items.forEach((dp) => {
+    L.circleMarker([dp.lat, dp.lon], { radius: 5, color: '#ef6c00', fillColor: '#ef6c00', fillOpacity: 0.85 }).addTo(map);
+  });
+  setTimeout(() => map.invalidateSize(), 0);
+  dash.leafletMaps[widget.id] = map;
+
+  if (items.length === 0) {
+    const hint = document.createElement('p');
+    hint.className = 'muted';
+    hint.textContent = 'Keine aktuellen Hotspots im Gebiet.';
+    container.appendChild(hint);
+  }
 }
 
 // --- Neue Widgets (Dashboard-Flexibilisierung) --------------------------------------------------
@@ -584,6 +641,12 @@ function renderWidgetContent(widget, body) {
     case 'pegel-chart':
       renderPegelChartWidget(body, widget);
       break;
+    case 'waldbrand-trend':
+      renderWaldbrandTrendWidget(body, widget);
+      break;
+    case 'firms-map':
+      renderFirmsMapWidget(body, widget);
+      break;
     case 'wetter-vorhersage':
       renderWetterVorhersageWidget(body);
       break;
@@ -695,35 +758,43 @@ function availableWidgetTypes() {
   return Object.entries(WIDGET_CATALOG).filter(([type, entry]) => !entry.singleton || !present.has(type));
 }
 
+// Laedt (einmalig, gecacht in dash[cacheKey]) die aktuellen Stationen einer Quelle in ein <select> -
+// gemeinsame Logik fuer den Pegel- und den Waldbrand-Stationsauswahl-Schritt im "Widget
+// hinzufügen"-Dialog (beide brauchen einen externalId, um ein Verlaufs-Widget zu erzeugen).
+async function loadStationOptions(sourceKey, selectEl, rowEl, cacheKey) {
+  if (selectEl.dataset.loaded === 'true') return;
+  try {
+    const stations = await api.get(`/datapoints?source=${sourceKey}`);
+    dash[cacheKey] = stations;
+    selectEl.innerHTML = stations.map((s) => `<option value="${s.external_id}">${s.title}</option>`).join('');
+    selectEl.dataset.loaded = 'true';
+  } catch (err) {
+    selectEl.innerHTML = '';
+    rowEl.querySelector('span').textContent = `${rowEl.querySelector('span').textContent} (kein Zugriff oder keine Daten)`;
+  }
+}
+
 async function openAddWidgetDialog() {
   const typeSelect = document.getElementById('widget-add-type');
   const pegelRow = document.getElementById('widget-add-pegel-row');
   const pegelSelect = document.getElementById('widget-add-pegel-station');
+  const waldbrandRow = document.getElementById('widget-add-waldbrand-row');
+  const waldbrandSelect = document.getElementById('widget-add-waldbrand-station');
   const errorEl = document.getElementById('widget-add-error');
   errorEl.textContent = '';
 
   const options = availableWidgetTypes();
   typeSelect.innerHTML = options.map(([type, entry]) => `<option value="${type}">${entry.icon} ${entry.label}</option>`).join('');
 
-  const updatePegelVisibility = () => {
+  const updateStationRowVisibility = () => {
     pegelRow.hidden = typeSelect.value !== 'pegel-chart';
+    waldbrandRow.hidden = typeSelect.value !== 'waldbrand-trend';
   };
-  typeSelect.onchange = updatePegelVisibility;
-  updatePegelVisibility();
+  typeSelect.onchange = updateStationRowVisibility;
+  updateStationRowVisibility();
 
-  if (pegelSelect.dataset.loaded !== 'true') {
-    try {
-      const stations = await api.get('/datapoints?source=pegelonline');
-      dash.pegelStations = stations;
-      pegelSelect.innerHTML = stations
-        .map((s) => `<option value="${s.external_id}">${s.title}</option>`)
-        .join('');
-      pegelSelect.dataset.loaded = 'true';
-    } catch (err) {
-      pegelSelect.innerHTML = '';
-      pegelRow.querySelector('span').textContent = 'Pegel-Station (kein Zugriff oder keine Daten)';
-    }
-  }
+  await loadStationOptions('pegelonline', pegelSelect, pegelRow, 'pegelStations');
+  await loadStationOptions('waldbrandindex', waldbrandSelect, waldbrandRow, 'waldbrandStations');
 
   document.getElementById('widget-add-dialog').showModal();
 }
@@ -742,18 +813,20 @@ function initAddWidgetDialog() {
     const catalogEntry = WIDGET_CATALOG[type];
     if (!catalogEntry) return;
 
-    if (type === 'pegel-chart') {
-      const pegelSelect = document.getElementById('widget-add-pegel-station');
-      const externalId = pegelSelect.value;
+    if (type === 'pegel-chart' || type === 'waldbrand-trend') {
+      const isWaldbrand = type === 'waldbrand-trend';
+      const select = document.getElementById(isWaldbrand ? 'widget-add-waldbrand-station' : 'widget-add-pegel-station');
+      const stations = isWaldbrand ? dash.waldbrandStations : dash.pegelStations;
+      const externalId = select.value;
       if (!externalId) {
-        errorEl.textContent = 'Keine Pegel-Station verfügbar.';
+        errorEl.textContent = `Keine ${isWaldbrand ? 'Waldbrand-Station' : 'Pegel-Station'} verfügbar.`;
         return;
       }
-      const station = dash.pegelStations.find((s) => s.external_id === externalId);
+      const station = stations.find((s) => s.external_id === externalId);
       dash.widgets.push({
-        id: `pegel-${externalId}-${Date.now()}`,
+        id: `${type}-${externalId}-${Date.now()}`,
         type,
-        config: { externalId, title: station ? station.title : 'Pegel' },
+        config: { externalId, title: station ? station.title : (isWaldbrand ? 'Waldbrand' : 'Pegel') },
       });
     } else {
       dash.widgets.push({ id: `${type}-${Date.now()}`, type });

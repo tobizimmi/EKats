@@ -1,12 +1,21 @@
 const { query } = require('../db');
 
 // Quellen, fuer die zusaetzlich zum aktuellsten Wert (live_datapoint) auch eine Zeitreihe in
-// datapoint_history mitgeschrieben wird - fuers Pegel-Liniendiagramm-Widget (Konzept Teil 2,
-// Baustein D, Migration 013). Bewusst als Allowlist statt fuer jede Quelle: ein Unwetterereignis
-// oder FIRMS-Hotspot hat keinen sinnvollen "Verlauf" im Liniendiagramm-Sinn, und wetter_vorhersage
-// schreibt ohnehin schon dutzende Zukunftswerte je Fetch in live_datapoint - eine ungefilterte
-// History wuerde die Tabelle unnoetig aufblaehen.
-const HISTORY_SOURCES = new Set(['pegelonline']);
+// datapoint_history mitgeschrieben wird - fuer Liniendiagramm-Widgets (Konzept Teil 2, Baustein D,
+// Migration 013; js/pegel-chart.js). Bewusst als Allowlist statt fuer jede Quelle - nur Quellen mit
+// einem stabilen external_id je Station/Messpunkt UND einem sich veraendernden numerischen Wert
+// eignen sich fuer einen Verlauf im Liniendiagramm-Sinn:
+//   pegelonline:    Pegelstand je Station - klassischer Verlauf.
+//   waldbrandindex: Gefahrenindex je Station - dieselbe Eigenschaft, daher ebenfalls sinnvoll.
+// Bewusst NICHT aufgenommen:
+//   dwd_unwetter/bbk_warnung/hochwasserzentralen: Einzelmeldungen ohne "Verlauf" im selben Sinn.
+//   firms: Hotspot-Meldungen sind je Sichtung ein neuer external_id, kein wiederkehrender Messpunkt.
+//   blitzortung: dasselbe wie firms - jeder Einschlag ist ein eigenes Ereignis, keine je Station
+//   wiederkehrende Messreihe. Die aktuelle Anzahl zeigt bereits das Blitz-Zähler-Dashboard-Widget
+//   (js/dashboard.js) - ein "Verlauf" ueber datapoint_history wuerde hier nur die Tabelle unnoetig
+//   aufblaehen, ohne eine sinnvolle Liniengrafik zu ergeben.
+//   wetter_vorhersage: schreibt ohnehin schon dutzende Zukunftswerte je Fetch in live_datapoint.
+const HISTORY_SOURCES = new Set(['pegelonline', 'waldbrandindex']);
 
 // Gemeinsames internes Format, das jeder Fetcher liefern muss (siehe CLAUDE.md Abschnitt 2.3):
 //   source, external_id, title, lat, lon, value_numeric, unit, severity, item_timestamp,

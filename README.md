@@ -873,15 +873,23 @@ nutzen will, muss sie im Vorlagen-Editor selbst ergänzen.
 ## Individuelles Dashboard (Phase 6, Raster-Umbau: Nutzerwunsch nach freier Position/Größe)
 
 `dashboard.html` ("Mein Dashboard" in der Seitenleiste) ergänzt die feste Karten-Ansicht
-(`index.html`, unverändert) um einen Baukasten aus aktuell 16 Widget-Typen: Karte
+(`index.html`, unverändert) um einen Baukasten aus aktuell 18 Widget-Typen: Karte
 (nicht-interaktive Mini-Karte aller Objekte), Prioritäts-Leiste, Objekt-Übersicht, DWD-Wetterbild,
-Pegel-Liniendiagramm (mehrfach möglich, je Station ein Widget), Wetter-Vorhersage, Blitz-Zähler,
-Fahrzeugstatus (Anzahl je Wache), Anstehende Überprüfungen (Liste statt nur Zahl), BBK/NINA-Feed,
-Kachelmann-Wetter, Uhr/Datum, Notiz-Pinnwand (geräteübergreifend geteilter Freitext), Eigene Links,
-Hochwasserzentralen-Liste, DWD-Unwetter-Ticker und eine Gesamt-Statuszeile (Ein-Zeilen-Ampel über
-alle Quellen). Die neuen Listen-Widgets (Vorhersage/BBK/Hochwasser/Unwetter) speisen sich aus
-demselben, einmal pro Seitenaufruf geladenen `GET /api/datapoints` wie die Prioritäts-Leiste — kein
-zusätzlicher Request je Widget.
+Pegel-Liniendiagramm und Waldbrand-Trend (beide mehrfach möglich, je Station ein Widget, gemeinsame
+Verlaufs-Grafik aus `js/pegel-chart.js`), FIRMS-Hotspot-Karte (Mini-Karte statt Liste),
+Wetter-Vorhersage, Blitz-Zähler, Fahrzeugstatus (Anzahl je Wache), Anstehende Überprüfungen (Liste
+statt nur Zahl), BBK/NINA-Feed, Kachelmann-Wetter, Uhr/Datum, Notiz-Pinnwand (geräteübergreifend
+geteilter Freitext), Eigene Links, Hochwasserzentralen-Liste, DWD-Unwetter-Ticker und eine
+Gesamt-Statuszeile (Ein-Zeilen-Ampel über alle Quellen). Die Listen-Widgets (Vorhersage/BBK/
+Hochwasser/Unwetter) speisen sich aus demselben, einmal pro Seitenaufruf geladenen
+`GET /api/datapoints` wie die Prioritäts-Leiste — kein zusätzlicher Request je Widget.
+
+**Verlaufs-Widgets (Pegel/Waldbrand):** `datapoint_history` (Migration 013) wurde bewusst nur um
+`waldbrandindex` erweitert, nicht um `blitzortung` — Pegelstand und Waldbrandgefahrenindex sind
+beides wiederkehrende Messwerte je Station mit stabiler `external_id`, ein Blitzeinschlag dagegen ist
+ein Einzelereignis mit neuer `external_id` je Sichtung (kein "Verlauf" im Liniendiagramm-Sinn). Der
+Blitz-Zähler zeigt daher bewusst nur die aktuelle Anzahl, keinen Verlauf (siehe Kommentar in
+`backend/src/fetchers/normalize.js`, `HISTORY_SOURCES`).
 
 **Freies Raster statt fester Reihenfolge:** Position UND Größe jeder Kachel sind frei wählbar (Ziehen
 am Griff-Symbol ⠿, Größenändern an der Kachel-Ecke), umgesetzt mit
