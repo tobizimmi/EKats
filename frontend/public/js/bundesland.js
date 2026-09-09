@@ -100,6 +100,31 @@ function createNiederschlagsradarLayer() {
 
 // Haengt die Radar-Layer-Auswahl (Leaflet-eigenes Steuerelement, oben rechts auf der Karte) an -
 // gemeinsam von map.js und addon.js aufgerufen, damit beide Kartenarten dieselbe Bedienung haben.
+// Der Layer-Name ist unverifiziert (siehe createNiederschlagsradarLayer) - schlaegt er in der Praxis
+// fehl, bliebe die Karte sonst wortlos leer und der eigentliche Fehler (Layer-Name/Dienst) unsichtbar.
+// tileerror liefert bei einer WMS-ServiceException KEINEN HTTP-Fehlerstatus (die Antwort ist meist
+// ein HTTP-200-XML-Dokument, das der Browser nur als kaputtes Bild erkennt) - deshalb hier explizit
+// abgefangen statt sich auf eine sichtbare Netzwerk-Fehlermeldung zu verlassen.
 function addRadarLayerControl(map) {
-  L.control.layers(null, { 'Niederschlagsradar (DWD)': createNiederschlagsradarLayer() }, { collapsed: true }).addTo(map);
+  const radarLayer = createNiederschlagsradarLayer();
+  let noticeShown = false;
+  radarLayer.on('tileerror', (event) => {
+    console.error(
+      '[bundesland] Niederschlagsradar-Kachel fehlgeschlagen - Layer-Name "dwd:Niederschlagsradar" evtl. ' +
+        'falsch/veraltet. Zur Diagnose die fehlgeschlagene URL direkt im Browser oeffnen (liefert bei ' +
+        'falschem Namen eine WMS-ServiceException als XML) oder GetCapabilities pruefen: ' +
+        'https://maps.dwd.de/geoserver/dwd/wms?service=WMS&version=1.3.0&request=GetCapabilities',
+      event?.tile?.src
+    );
+    if (noticeShown) return;
+    noticeShown = true;
+    const notice = L.control({ position: 'bottomleft' });
+    notice.onAdd = () => {
+      const div = L.DomUtil.create('div', 'radar-error-notice');
+      div.textContent = 'Regenradar konnte nicht geladen werden (DWD-Kartendienst nicht erreichbar oder Layer-Name veraltet).';
+      return div;
+    };
+    notice.addTo(map);
+  });
+  L.control.layers(null, { 'Niederschlagsradar (DWD)': radarLayer }, { collapsed: true }).addTo(map);
 }
