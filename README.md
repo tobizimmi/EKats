@@ -873,7 +873,10 @@ nutzen will, muss sie im Vorlagen-Editor selbst ergänzen.
 ## Individuelles Dashboard (Phase 6, Raster-Umbau: Nutzerwunsch nach freier Position/Größe)
 
 `dashboard.html` ("Mein Dashboard" in der Seitenleiste) ergänzt die feste Karten-Ansicht
-(`index.html`, unverändert) um einen Baukasten aus aktuell 18 Widget-Typen: Karte
+(`index.html`, unverändert) um einen Baukasten aus aktuell 19 Widget-Typen (davon einer,
+Audit-Log-Feed, nur für die Rolle `admin` im „Widget hinzufügen"-Dialog sichtbar — clientseitig
+gefiltert über ein `adminOnly`-Flag im Widget-Katalog, der Endpunkt selbst ist ohnehin
+serverseitig `requireRole('admin')`-geschützt): Karte
 (nicht-interaktive Mini-Karte aller Objekte), Prioritäts-Leiste, Objekt-Übersicht, DWD-Wetterbild,
 Pegel-Liniendiagramm und Waldbrand-Trend (beide mehrfach möglich, je Station ein Widget, gemeinsame
 Verlaufs-Grafik aus `js/pegel-chart.js`), FIRMS-Hotspot-Karte (Mini-Karte statt Liste),

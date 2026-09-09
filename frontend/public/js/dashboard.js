@@ -43,6 +43,7 @@ const WIDGET_CATALOG = {
   'hochwasser-liste': { label: 'Hochwasserzentralen', icon: '🌊', singleton: true, w: 4, h: 3, minW: 3, minH: 2 },
   'unwetter-ticker': { label: 'DWD-Unwetter-Ticker', icon: '⛈️', singleton: true, w: 4, h: 3, minW: 3, minH: 2 },
   'status-zeile': { label: 'Gesamt-Statuszeile', icon: '📊', singleton: true, w: 12, h: 1, minW: 6, minH: 1 },
+  'audit-feed': { label: 'Audit-Log-Feed', icon: '📜', singleton: true, w: 5, h: 3, minW: 4, minH: 2, adminOnly: true },
 };
 
 const DEFAULT_WIDGETS = [
@@ -64,6 +65,7 @@ const dash = {
   datapoints: [],
   leafletMaps: {}, // widgetId -> Leaflet-Map-Instanz, fuer invalidateSize() nach Resize
   timers: [], // laufende setInterval-IDs (Uhr-Widget), vor jedem Neuaufbau geleert
+  userRole: null, // fuer adminOnly-Widgets (siehe availableWidgetTypes())
 };
 
 function isOverdueLocal(obj) {
@@ -584,6 +586,71 @@ function renderStatusZeileWidget(container) {
   container.appendChild(row);
 }
 
+// Nur fuer Admin sichtbar (siehe adminOnly-Flag in WIDGET_CATALOG und availableWidgetTypes()) -
+// zeigt dieselben Aktionen wie admin.html > Audit-Log, kompakt als Feed statt Tabelle.
+const AUDIT_ACTION_LABELS = {
+  'auth.account_locked': 'Konto gesperrt (zu viele Fehlversuche)',
+  'auth.password_reset_via_email': 'Passwort per E-Mail-Link zurückgesetzt',
+  'feature_access.set_roles': 'Feature-Zugriff (Rollen) geändert',
+  'feature_access.set_user_override': 'Feature-Zugriff (Nutzer-Ausnahme) geändert',
+  'object.delete': 'Objekt gelöscht',
+  'object_field_definition.create': 'Zusatzfeld angelegt',
+  'object_field_definition.delete': 'Zusatzfeld gelöscht',
+  'objects.import': 'Objekte importiert (JSON)',
+  'objects.import_feuerwehrapp': 'Objekte importiert (feuerwehr-app)',
+  'pdf_template.delete': 'PDF-Vorlage gelöscht',
+  'pdf_template.save': 'PDF-Vorlage gespeichert',
+  'smtp_settings.update': 'SMTP-Einstellungen geändert',
+  'user.create': 'Nutzer angelegt',
+  'user.delete': 'Nutzer gelöscht',
+  'user.password_change': 'Passwort geändert',
+  'user.password_reset_by_admin': 'Passwort durch Admin zurückgesetzt',
+  'user.role_change': 'Rolle geändert',
+  'user.self_delete': 'Eigenes Konto gelöscht',
+};
+
+function formatAuditEntry(entry) {
+  const label = AUDIT_ACTION_LABELS[entry.action] || entry.action;
+  const target = entry.target_type ? ` (${entry.target_type}${entry.target_id ? ' #' + entry.target_id : ''})` : '';
+  return `${label}${target}`;
+}
+
+async function renderAuditFeedWidget(container) {
+  container.innerHTML = '<p class="muted">Lade…</p>';
+  let entries;
+  try {
+    entries = await api.get('/audit-log');
+  } catch (err) {
+    container.innerHTML = '<p class="error-message">Audit-Log konnte nicht geladen werden.</p>';
+    return;
+  }
+  if (entries.length === 0) {
+    container.innerHTML = '<p class="muted">Noch keine Einträge.</p>';
+    return;
+  }
+  const ul = document.createElement('ul');
+  ul.className = 'plain-list weather-item-list';
+  entries.slice(0, 10).forEach((entry) => {
+    const li = document.createElement('li');
+    const main = document.createElement('div');
+    main.className = 'item-main';
+    main.textContent = formatAuditEntry(entry);
+    const meta = document.createElement('div');
+    meta.className = 'item-meta';
+    meta.textContent = `${entry.actor_email || 'System'} · ${formatTimestamp(entry.created_at)}`;
+    li.appendChild(main);
+    li.appendChild(meta);
+    ul.appendChild(li);
+  });
+  container.innerHTML = '';
+  container.appendChild(ul);
+  const link = document.createElement('a');
+  link.href = 'admin.html';
+  link.className = 'widget-link';
+  link.textContent = 'Vollständiges Audit-Log →';
+  container.appendChild(link);
+}
+
 // --- Raster (gridstack.js) -----------------------------------------------------------------------
 
 function buildWidgetCardElement(widget, catalogEntry) {
@@ -683,6 +750,9 @@ function renderWidgetContent(widget, body) {
     case 'status-zeile':
       renderStatusZeileWidget(body);
       break;
+    case 'audit-feed':
+      renderAuditFeedWidget(body);
+      break;
     default:
       body.textContent = 'Unbekannter Widget-Typ.';
   }
@@ -755,7 +825,9 @@ function renderWidgets() {
 
 function availableWidgetTypes() {
   const present = new Set(dash.widgets.map((w) => w.type));
-  return Object.entries(WIDGET_CATALOG).filter(([type, entry]) => !entry.singleton || !present.has(type));
+  return Object.entries(WIDGET_CATALOG).filter(
+    ([type, entry]) => (!entry.singleton || !present.has(type)) && (!entry.adminOnly || dash.userRole === 'admin')
+  );
 }
 
 // Laedt (einmalig, gecacht in dash[cacheKey]) die aktuellen Stationen einer Quelle in ein <select> -
@@ -840,6 +912,7 @@ function initAddWidgetDialog() {
 async function initDashboard() {
   const user = await initHeader();
   if (!user) return;
+  dash.userRole = user.role;
 
   try {
     dash.wehr = await api.get('/wehr');
