@@ -966,20 +966,24 @@ Die ursprüngliche Überlegung war, DWDs **RADOLAN/RADVOR**-Rohdaten
 eigene Projektion) — das wäre deutlich aufwändiger als jeder bestehende Connector gewesen.
 **Einfacherer, umgesetzter Weg**: DWD stellt dieselben Radardaten bereits fertig als Kartenschicht
 über den öffentlichen GeoServer bereit (`https://maps.dwd.de/geoserver/dwd/wms`, Layer
-`dwd:Niederschlagsradar`) — kein eigenes Dekodieren nötig, nur ein Leaflet-`L.tileLayer.wms(...)`
-als zuschaltbarer Overlay (`js/bundesland.js`, `createNiederschlagsradarLayer()` +
+`dwd:RX-Produkt`) — kein eigenes Dekodieren nötig, nur ein Leaflet-`L.tileLayer.wms(...)` als
+zuschaltbarer Overlay (`js/bundesland.js`, `createNiederschlagsradarLayer()` +
 `addRadarLayerControl()`, auf Dashboard und allen Addon-Kartenseiten über das Leaflet-eigene
 Layer-Steuerelement oben rechts erreichbar, Standard AUS). Die Bewegungsrichtung von Niederschlag/
 Gewittern ist dadurch direkt auf der Karte sichtbar, ohne die Zellverfolgung selbst zu berechnen.
 
-**Verifikationsstand**: Der Layer-Name `dwd:Niederschlagsradar` stammt aus einer von DWDs eigenem
-GeoServer erzeugten GetMap-Vorschau-URL, ist also kein geratener Name — `maps.dwd.de` ist aus dieser
-Entwicklungsumgebung aber nicht erreichbar, ein Live-Rendering-Test war deshalb nicht möglich. Sollte
-der Layer in Produktion keine Kacheln liefern, per `GET
-https://maps.dwd.de/geoserver/dwd/wms?service=WMS&version=1.3.0&request=GetCapabilities` den
-tatsächlichen Layer-Namen prüfen und in `createNiederschlagsradarLayer()` anpassen — schlägt der
-Name fehl, bleibt nur die Kartenschicht leer, kein Fehler und keine Beeinträchtigung der übrigen
-Lage-Daten.
+**Verifikationsstand**: Der erste Versuch (`dwd:Niederschlagsradar`, aus einer vermuteten GetMap-
+Vorschau-URL) ist in Produktion nachweislich gescheitert (per `tileerror`-Diagnose vom Nutzer
+bestätigt). Der jetzige Name `dwd:RX-Produkt` stammt aus einer tatsächlich funktionierenden
+Drittanbieter-Integration (github.com/Turbo87/ogn-web-viewer, Issue #4) gegen denselben Dienst,
+ist also deutlich verlässlicher, aber weiterhin nicht selbst live gegengeprüft — `maps.dwd.de` ist
+aus dieser Entwicklungsumgebung nicht erreichbar. Schlägt auch dieser Name fehl, erscheint dank
+des `tileerror`-Handlers ein sichtbarer Hinweis direkt auf der Karte statt einer wortlos leeren
+Kachelfläche, und die Browser-Konsole loggt die exakte fehlgeschlagene GetMap-URL — diese direkt
+öffnen liefert eine WMS-ServiceException mit dem tatsächlich erwarteten Layer-Namen. Alternativ per
+`GET https://maps.dwd.de/geoserver/dwd/wms?service=WMS&version=1.3.0&request=GetCapabilities` den
+kompletten Katalog prüfen. Schlägt der Name fehl, bleibt ohnehin nur die Kartenschicht leer, kein
+Fehler und keine Beeinträchtigung der übrigen Lage-Daten.
 
 ## Bekannte V1-Vereinfachungen
 

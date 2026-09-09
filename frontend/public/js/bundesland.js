@@ -83,14 +83,21 @@ function createDatapointLayer(dp) {
 
 // DWD-Niederschlagsradar als optionaler WMS-Overlay - macht die Zugrichtung von Niederschlag/Gewitter
 // direkt auf der Karte sichtbar, nicht nur als Einzel-Warnung. Von map.js (Dashboard) und addon.js
-// (Themenseiten) genutzt. Layer-Name "dwd:Niederschlagsradar" stammt aus einer von DWDs eigenem
-// GeoServer generierten GetMap-Vorschau-URL (siehe README, Abschnitt "Gewitterzug/Niederschlags-
-// bewegung") - im Entwicklungs-Sandbox nicht gegenpruefbar, da maps.dwd.de dort blockiert ist. Bewusst als
-// zuschaltbarer Overlay (Standard AUS): schlaegt der Layer-Name doch fehl, bleiben nur Kacheln aus,
-// kein Fehler und keine Beeintraechtigung der eigentlichen Lage-Daten.
+// (Themenseiten) genutzt.
+//
+// ZWEITER VERSUCH beim Layer-Namen: "dwd:Niederschlagsradar" (aus einer vermuteten GetMap-Vorschau-
+// URL) ist in Produktion live gescheitert (per tileerror-Diagnose unten vom Nutzer bestaetigt, siehe
+// README). Jetzt "dwd:RX-Produkt" - stammt aus einer tatsaechlich funktionierenden Drittanbieter-
+// Integration (github.com/Turbo87/ogn-web-viewer, Issue #4, OpenLayers-Code mit genau diesem
+// Layer-Namen gegen denselben Dienst), also deutlich verlaesslicher als der erste Versuch, aber
+// WEITERHIN NICHT selbst live gegengeprueft (maps.dwd.de bleibt aus der Entwicklungsumgebung
+// blockiert). Sollte auch dieser Name scheitern, zeigt der tileerror-Handler unten die Diagnose-URL -
+// direkt im Browser geoeffnet liefert eine WMS-ServiceException mit dem tatsaechlich erwarteten Namen.
+// Bewusst als zuschaltbarer Overlay (Standard AUS): schlaegt der Layer-Name doch fehl, bleiben nur
+// Kacheln aus, kein Fehler und keine Beeintraechtigung der eigentlichen Lage-Daten.
 function createNiederschlagsradarLayer() {
   return L.tileLayer.wms('https://maps.dwd.de/geoserver/dwd/wms', {
-    layers: 'dwd:Niederschlagsradar',
+    layers: 'dwd:RX-Produkt',
     format: 'image/png',
     transparent: true,
     opacity: 0.6,
