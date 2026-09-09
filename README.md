@@ -170,7 +170,7 @@ systemctl restart ekats           # Neustart, z.B. nach manueller .env-Änderung
 | NASA FIRMS | Satelliten-Hotspots Waldbrand | ja, kostenloser MAP_KEY | alle 45 Min. |
 | DWD Waldbrandgefahrenindex | Flächige Gefahreneinschätzung je Station | nein | 1×/Tag |
 | warnung.bund.de (BBK/NINA) | Bevölkerungswarnungen (MoWaS/DWD/LHP/BIWAPP/KATWARN/Polizei) | nein | alle 15 Min. |
-| Kachelmannwetter/Meteologix | Zusätzliche, optionale Wetterwarnungen (kostenpflichtig, siehe unten) | ja, `KACHELMANN_API_KEY` | alle 30 Min. |
+| Kachelmannwetter/Meteologix | Zusätzliches, optionales aktuelles Wetter (kostenpflichtig, siehe unten — keine Warnungen/Radar, dazu bietet die API nichts) | ja, `KACHELMANN_API_KEY` | alle 30 Min. |
 | Bright Sky (DWD-Vorhersage) | Echte Wettervorhersage (Temperatur/Niederschlag/Wind), keine Warnung | nein | stündlich |
 | Blitzortung.org | Live-Blitzeinschläge (Gewitterzug) | nein | Live-Stream (kein Intervall) |
 
@@ -745,15 +745,19 @@ sperrbar (und dort die einzige Quelle, die ohne aktive Freigabe geschlossen blei
   nur ein Eintrag in der bestehenden Quellen-Zuordnung plus die Aufnahme in
   `WEATHER_SOURCE_ORDER` (`js/weather-overview.js`), analog zu `dwd_unwetter`.
 
-**Wichtiger Verifikationshinweis:** Die genaue Endpunkt-URL, das Antwortformat und das
-Authentifizierungsschema der Kachelmann-Business-API sind **nicht verifiziert** — Meteologix/
-Kachelmannwetter veröffentlicht seine kommerzielle API-Dokumentation nicht öffentlich zugänglich,
-und ein Test-Zugang war aus dieser Entwicklungsumgebung nicht erreichbar. Der Connector ist nach
-dem gleichen Muster wie `hochwasserzentralen.js` gebaut: die komplette Infrastruktur (Zugriffs-
-prüfung, Scheduler-Integration, Datenmodell, Severity-Einordnung, Anzeige) ist real und getestet,
-aber der eigentliche HTTP-Request/das Parsing (`fetchJson(...${BASE_URL}/warnings/live...`) beruht
-auf einer plausiblen, aber nicht bestätigten Annahme über die API-Form — vor Produktivbetrieb mit
-einem echten API-Key gegen `npm run fetch -- kachelmann` prüfen und ggf. anpassen.
+**Verifikationsstand (Stand: Nutzer hat inzwischen einen echten Kachelmann-„Public API"-Zugang):**
+Der Nutzer hat die interaktive Swagger-Doku (`api.kachelmannwetter.com/v02/_doc.html`) als
+HTML-/PDF-Export bereitgestellt (aus dieser Sandbox selbst nicht erreichbar). Daraus **verifiziert**:
+Basis-URL `https://api.kachelmannwetter.com/v02`, Auth-Header `X-API-Key`. Diese „Public API" deckt
+Stationsdaten, aktuelles Wetter, Vorhersagen und Astronomie ab — **keine Warnungen, kein
+Regenradar** (kommt in der kompletten Doku nicht vor). Das separate „Unwetteralarm Pro"-Produkt des
+Nutzers (`pro.meteologix.com`) ist ein reines Web-Dashboard ohne eigenen API-Zugang — Regenradar/
+Warnungen bleiben daher weiterhin über den bestehenden DWD-WMS-Layer abgedeckt, nicht über
+Kachelmann. Der Fetcher ruft entsprechend `fetchKachelmannCurrentWeather()` statt Warnungen ab
+(Endpunktpfad `.../weather/current/{lat}/{lon}` von der einzigen im Doku-Export im Detail gezeigten
+Operation abgeleitet, aber selbst **nicht verifiziert** — vor Produktivbetrieb mit dem echten
+API-Key gegen `npm run fetch -- kachelmann` prüfen; die Fehlermeldung bei falschem Pfad enthält
+einen fertigen `curl`-Befehl zum Gegenprüfen).
 
 Schema: `wehr_feature_role_access`, `user_feature_access`
 (`backend/sql/migrations/009_add_feature_access.sql`).

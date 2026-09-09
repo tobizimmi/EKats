@@ -10,7 +10,7 @@ const { fetchNasaFirms } = require('./fetchers/nasaFirms');
 const { fetchDwdWaldbrand } = require('./fetchers/dwdWaldbrand');
 const { importDwdStations } = require('./fetchers/dwdStationsImport');
 const { fetchBbkWarnungen } = require('./fetchers/bbkWarnungen');
-const { fetchKachelmannWarnings } = require('./fetchers/kachelmann');
+const { fetchKachelmannCurrentWeather } = require('./fetchers/kachelmann');
 const { fetchBrightskyForecast } = require('./fetchers/brightsky');
 
 // Jeder Job laeuft isoliert: schlaegt ein Fetcher fehl (z.B. Quelle down, Format geaendert),
@@ -62,7 +62,7 @@ function startScheduler() {
   cron.schedule(config.cron.waldbrandindex, () => runJob('waldbrandindex', fetchDwdWaldbrand));
   cron.schedule(config.cron.dwdStationsImport, () => runJob('dwd_stations_import', importDwdStations));
   cron.schedule(config.cron.bbkWarnungen, () => runJob('bbk_warnung', fetchBbkWarnungen));
-  cron.schedule(config.cron.kachelmann, () => runJob('kachelmann', fetchKachelmannWarnings));
+  cron.schedule(config.cron.kachelmann, () => runJob('kachelmann', fetchKachelmannCurrentWeather));
   cron.schedule(config.cron.wetterVorhersage, () => runJob('wetter_vorhersage', fetchBrightskyForecast));
   cron.schedule(config.cron.cleanup, () => runJob('cleanup', cleanupOldDatapoints));
 
@@ -81,7 +81,7 @@ module.exports = {
     waldbrandindex: fetchDwdWaldbrand,
     dwd_stations_import: importDwdStations,
     bbk_warnung: fetchBbkWarnungen,
-    kachelmann: fetchKachelmannWarnings,
+    kachelmann: fetchKachelmannCurrentWeather,
     wetter_vorhersage: fetchBrightskyForecast,
   },
 };

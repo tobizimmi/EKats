@@ -10,7 +10,7 @@ const SOURCE_LABELS = {
   firms: 'Feuer-Hotspot (NASA FIRMS)',
   waldbrandindex: 'Waldbrandgefahrenindex',
   bbk_warnung: 'Bevölkerungswarnung (BBK/NINA)',
-  kachelmann: 'Kachelmann-Warnung (Meteologix)',
+  kachelmann: 'Kachelmann – Aktuelles Wetter (Meteologix)',
   wetter_vorhersage: 'Wetter-Vorhersage (Bright Sky)',
   blitzortung: 'Blitzeinschlag (Blitzortung.org)',
 };
