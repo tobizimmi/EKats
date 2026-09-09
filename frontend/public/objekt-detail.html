@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Objekt – EKats</title>
   <link rel="stylesheet" href="vendor/leaflet/leaflet.css" />
+  <link rel="stylesheet" href="vendor/leaflet-geoman/leaflet-geoman.css" />
   <link rel="stylesheet" href="css/style.css" />
   <link rel="icon" href="icons/icon.svg" type="image/svg+xml" />
   <link rel="manifest" href="manifest.webmanifest" />
@@ -44,15 +45,35 @@
           <h2 class="section-title">Metadaten</h2>
           <div class="detail-grid" id="objekt-detail-meta"></div>
         </div>
+        <div class="card">
+          <div class="section-head-row">
+            <h2 class="section-title">Kartenskizze</h2>
+            <button type="button" id="object-sketch-edit-button" class="secondary" data-role="stab-only" hidden>
+              Skizze bearbeiten
+            </button>
+          </div>
+          <div id="object-sketch-preview" class="object-sketch-preview"></div>
+          <div id="object-sketch-editor" hidden>
+            <div class="object-sketch-toolbar" id="object-sketch-toolbar"></div>
+            <div id="object-sketch-map"></div>
+            <div class="dialog-actions">
+              <button type="button" id="object-sketch-cancel-button" class="secondary">Abbrechen</button>
+              <button type="button" id="object-sketch-save-button" class="primary">Skizze speichern</button>
+            </div>
+            <p class="error-message" id="object-sketch-error" role="alert"></p>
+          </div>
+        </div>
       </div>
     </div>
   </main>
 
   <script src="vendor/leaflet/leaflet.js"></script>
+  <script src="vendor/leaflet-geoman/leaflet-geoman.min.js"></script>
   <script src="js/api.js"></script>
   <script src="js/header.js"></script>
   <script src="js/severity.js"></script>
   <script src="js/sw-register.js"></script>
+  <script src="js/object-sketch.js"></script>
   <script src="js/objekt-detail-page.js"></script>
 </body>
 </html>

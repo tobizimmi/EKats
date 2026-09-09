@@ -67,7 +67,27 @@ function yesNoBadge(value) {
   return span;
 }
 
-function renderObjektDetail(obj) {
+// Formatiert einen Zusatzfeld-Wert passend zum field_type fuer die schreibgeschuetzte Anzeige -
+// gleiche Typliste wie loadCustomFieldsForDialog() in js/objects.js, hier aber nur lesend.
+function formatCustomFieldValue(def, value) {
+  if (def.field_type === 'boolean') {
+    return yesNoBadge(!!value);
+  }
+  if (value === undefined || value === null || value === '') {
+    return null;
+  }
+  if (def.field_type === 'date') {
+    const d = new Date(value);
+    return Number.isNaN(d.getTime()) ? value : d.toLocaleDateString('de-DE');
+  }
+  if (def.field_type === 'select') {
+    const opt = (def.options || []).find((o) => o.value === value);
+    return opt ? opt.label : value;
+  }
+  return value;
+}
+
+function renderObjektDetail(obj, customFieldDefs) {
   document.getElementById('objekt-detail-title').textContent = obj.name;
   document.getElementById('objekt-detail-subtitle').textContent =
     `#${obj.id} · ${OBJECT_CATEGORY_LABELS[obj.category] || obj.category}${obj.city ? ' · ' + obj.city : ''}`;
@@ -109,6 +129,19 @@ function renderObjektDetail(obj) {
     ])
   );
   container.appendChild(
+    detailSection('Gebäude- und Anlagentechnik (DIN 14095)', [
+      ['Löschwasserversorgung: Ergiebigkeit', obj.fire_water_supply_capacity_lpm ? `${obj.fire_water_supply_capacity_lpm} l/min` : null],
+      ['Löschwasserversorgung: Lage/Standort', obj.fire_water_supply_location],
+      ['Brandmeldeanlage vorhanden', yesNoBadge(obj.fire_alarm_system)],
+      ['Aufschaltstelle der Brandmeldeanlage', obj.fire_alarm_monitoring_station],
+      ['Max. Personenzahl', obj.occupant_count_max],
+      ['Aufzüge vorhanden', yesNoBadge(obj.elevators)],
+      ['Rauch-/Wärmeabzugsanlage vorhanden', yesNoBadge(obj.smoke_heat_exhaust_system)],
+      ['PV-/Batteriespeicheranlage vorhanden', yesNoBadge(obj.pv_battery_system)],
+      ['PV-/Batterie: Lage der Notabschaltung', obj.pv_battery_disconnect_location],
+    ])
+  );
+  container.appendChild(
     detailSection('Besonderheiten & Gefahren', [
       ['Besonderheiten', obj.special_features],
       ['Besondere Gefahren', obj.hazards],
@@ -127,6 +160,15 @@ function renderObjektDetail(obj) {
   );
   if (obj.notes) {
     container.appendChild(detailSection('Notizen', [['Sonstige Hinweise', obj.notes]]));
+  }
+  if (customFieldDefs && customFieldDefs.length > 0) {
+    const values = obj.custom_fields || {};
+    container.appendChild(
+      detailSection(
+        'Zusatzfelder',
+        customFieldDefs.map((def) => [def.label, formatCustomFieldValue(def, values[def.key])])
+      )
+    );
   }
 
   document.getElementById('objekt-detail-meta').innerHTML = '';
@@ -173,6 +215,65 @@ async function deleteObjekt(objId) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Kartenskizze (js/object-sketch.js) - gleiches Vorgehen wie im Objekt-Dialog (js/objects.js),
+// hier eigenstaendig nachgebildet, da diese Seite unabhaengig von index.html funktionieren muss.
+// ---------------------------------------------------------------------------
+
+let activeSketchEditor = null;
+
+async function loadObjektSketch(obj) {
+  const previewEl = document.getElementById('object-sketch-preview');
+  const editBtn = document.getElementById('object-sketch-edit-button');
+  document.getElementById('object-sketch-editor').hidden = true;
+  previewEl.hidden = false;
+
+  let sketchData = { geojson: null };
+  try {
+    sketchData = await api.get(`/objects/${obj.id}/sketch`);
+  } catch (err) {
+    // Vorschau bleibt leer, wenn das Laden fehlschlaegt - kein Blocker fuer den Rest der Seite.
+  }
+  renderObjectSketchPreview(previewEl, { lat: obj.lat, lon: obj.lon }, sketchData.geojson);
+  editBtn.onclick = () => openObjektSketchEditor(obj, sketchData.geojson);
+}
+
+function openObjektSketchEditor(obj, initialGeoJson) {
+  document.getElementById('object-sketch-preview').hidden = true;
+  document.getElementById('object-sketch-edit-button').hidden = true;
+  document.getElementById('object-sketch-editor').hidden = false;
+  document.getElementById('object-sketch-error').textContent = '';
+
+  activeSketchEditor = new ObjectSketchEditor({
+    toolbarEl: document.getElementById('object-sketch-toolbar'),
+    mapContainerEl: document.getElementById('object-sketch-map'),
+    errorEl: document.getElementById('object-sketch-error'),
+    objectId: obj.id,
+    center: { lat: obj.lat, lon: obj.lon },
+    initialGeoJson,
+  });
+}
+
+function closeObjektSketchEditor() {
+  if (activeSketchEditor) {
+    activeSketchEditor.destroy();
+    activeSketchEditor = null;
+  }
+  document.getElementById('object-sketch-editor').hidden = true;
+  document.getElementById('object-sketch-preview').hidden = false;
+  document.getElementById('object-sketch-edit-button').hidden = false;
+}
+
+async function saveObjektSketch() {
+  if (!activeSketchEditor) return;
+  const center = activeSketchEditor.center;
+  const geojson = sketchLayersToGeoJson(activeSketchEditor.sketchLayers);
+  const ok = await activeSketchEditor.save();
+  if (!ok) return;
+  closeObjektSketchEditor();
+  renderObjectSketchPreview(document.getElementById('object-sketch-preview'), center, geojson);
+}
+
 (async function bootstrapObjektDetailPage() {
   const user = await initHeader();
   if (!user) return;
@@ -198,7 +299,18 @@ async function deleteObjekt(objId) {
     return;
   }
 
-  renderObjektDetail(obj);
+  let customFieldDefs = [];
+  try {
+    customFieldDefs = await api.get('/object-fields');
+  } catch (err) {
+    customFieldDefs = [];
+  }
+
+  renderObjektDetail(obj, customFieldDefs);
   document.getElementById('objekt-detail-body').hidden = false;
   document.getElementById('objekt-detail-delete-button').addEventListener('click', () => deleteObjekt(obj.id));
+
+  await loadObjektSketch(obj);
+  document.getElementById('object-sketch-cancel-button').addEventListener('click', closeObjektSketchEditor);
+  document.getElementById('object-sketch-save-button').addEventListener('click', saveObjektSketch);
 })();

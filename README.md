@@ -552,12 +552,18 @@ Eigenständige Seite je Objekt (`objekt-detail.html?id=<id>`, erreichbar per Kli
 oder einen Kartenmarker auf `objekte.html`) statt eines Dialogs — Vorbild ist auch hier das
 ursprüngliche lokale Feuerwehr-Objektverwaltungstool des Nutzers: Kopfbereich mit Zurück-Link, Titel,
 „#id · Kategorie · Ort"-Unterzeile und Aktions-Buttons (PDF exportieren/Bearbeiten/Löschen), darunter
-zweispaltig links die gruppierten Themenblöcke (dieselben wie zuvor im Dialog), rechts eine
-interaktive Mini-Karte mit Marker sowie eine Metadaten-Karte (erstellt/zuletzt geändert). „Bearbeiten"
-verlinkt auf `index.html?object=<id>` — die Hauptkarte öffnet dieses Objekt beim Laden automatisch im
-Formular-Dialog (für Mitglied schreibgeschützt, sonst bearbeitbar), da Anlegen/Bearbeiten mit
-Kartenposition weiterhin dort verankert bleibt. Es gibt keinen Einzelobjekt-GET-Endpunkt — die
-(ohnehin kleine) Wehr-weite Objektliste wird geladen und das Objekt clientseitig herausgefiltert.
+zweispaltig links die gruppierten Themenblöcke — Stammdaten, Ansprechpartner, Planstatus,
+Gebäudedaten, **Gebäude- und Anlagentechnik (DIN 14095)** (Löschwasser-Ergiebigkeit/-Lage,
+Brandmeldeanlage + Aufschaltstelle, max. Personenzahl, Aufzüge, Rauch-/Wärmeabzugsanlage,
+PV-/Batteriespeicher + Notabschaltung), Besonderheiten & Gefahren, Überprüfung, optional Notizen und
+**Zusatzfelder** (wehr-eigene Custom-Felder aus `/object-fields`, schreibgeschützt formatiert nach
+`field_type`) — rechts eine interaktive Mini-Karte mit Marker, eine **Kartenskizze**-Karte (Vorschau +
+„Skizze bearbeiten", siehe unten) sowie eine Metadaten-Karte (erstellt/zuletzt geändert).
+„Bearbeiten" verlinkt auf `index.html?object=<id>` — die Hauptkarte öffnet dieses Objekt beim Laden
+automatisch im Formular-Dialog (für Mitglied schreibgeschützt, sonst bearbeitbar), da
+Anlegen/Bearbeiten mit Kartenposition weiterhin dort verankert bleibt. Es gibt keinen
+Einzelobjekt-GET-Endpunkt — die (ohnehin kleine) Wehr-weite Objektliste wird geladen und das Objekt
+clientseitig herausgefiltert.
 
 ### Objekt-Detailseite (`objekte.html`)
 
@@ -584,22 +590,37 @@ Werkzeuge:
 
 ### Kartenskizzen direkt am Objekt
 
-Im Objekt-Dialog (Karte) lässt sich zusätzlich zu den Anhängen eine **Kartenskizze** direkt in der
-App einzeichnen — mit einem Freihand-Stift und einer festen Symbolpalette (Zugang, Gefahrenbereich,
-Sammelplatz, Hydrant, Absperrung), angelehnt an gängige Einsatzplan-Piktogramme. Anders als ein
-hochgeladener Lageplan bleibt die Skizze **strukturiert bearbeitbar**: gespeichert wird sie als
-GeoJSON (`critical_object_map_sketch`, Migration 012) statt als Bild — Stiftlinien als
-`LineString`-Features, Symbole als `Point`-Features mit einer `symbolKey`-Eigenschaft. Eine
-schreibgeschützte Vorschau (dieselbe Komponente wie die Mini-Vorschau der Objekt-Detailseite, nur
-größer) zeigt die Skizze im Objekt, ein „Skizze bearbeiten"-Button öffnet den interaktiven Editor.
+Sowohl im Objekt-Dialog (Karte) als auch auf der eigenständigen Objekt-Detailseite
+(`objekt-detail.html`) lässt sich zusätzlich zu den Anhängen eine **Kartenskizze** direkt in der App
+einzeichnen. Werkzeuge:
+
+- **Freihand-Stift** und **Flächen** (Rechteck, freies Polygon, Kreis) in einer frei wählbaren Farbe
+  (natives `<input type="color">`, Vorgabe Feuerwehr-Rot `#b3261e`)
+- **Symbolpalette**, angelehnt an gängige Einsatzplan-Piktogramme: Zugang, Gefahrenbereich,
+  Sammelplatz, Hydrant, Absperrung, Fluchtweg, Stromabschaltung, Gasabsperrung, Brandmeldezentrale
+- **Freie Textbeschriftung** (Klick platziert einen Marker, Text wird abgefragt und als kleines
+  Label auf der Karte angezeigt)
+
+Anders als ein hochgeladener Lageplan bleibt die Skizze **strukturiert bearbeitbar**: gespeichert
+wird sie als GeoJSON (`critical_object_map_sketch`, Migration 012) statt als Bild — Stiftlinien und
+Flächen als `LineString`/`Polygon`-Features mit einer `color`-Eigenschaft, Symbole als
+`Point`-Features mit `symbolKey`, Kreise als `Point` mit `properties.shapeType: "circle"` +
+`radius` (Meter, da `L.Circle` selbst keinen GeoJSON-Radius kennt — wird beim Speichern manuell aus
+`layer.getRadius()` ergänzt), Textlabels als `Point` mit `properties.text`. Eine schreibgeschützte
+Vorschau (dieselbe Komponente an beiden Einbindungsorten) zeigt die Skizze, ein
+„Skizze bearbeiten"-Button öffnet den interaktiven Editor.
 
 Technisch auf [Leaflet-Geoman](https://github.com/geoman-io/leaflet-geoman) aufgebaut (Freie
 Version, MIT-Lizenz, lokal vendored unter `frontend/public/vendor/leaflet-geoman/` — Lizenztext
 liegt daneben) statt Geomans eigener Formen-Toolbar nutzt EKats nur `map.pm.enableDraw()`
-programmatisch, ausgelöst über die eigene, für Feuerwehrpläne zugeschnittene Symbolleiste. Kein
-Netzwerkzugriff nötig für die Zeichenfunktion selbst (nur die Kartenkacheln laden weiterhin von
-OpenStreetMap) — funktioniert daher auch bei eingeschränkter Konnektivität zur Karte, solange diese
-bereits einmal geladen wurde.
+programmatisch, ausgelöst über die eigene, für Feuerwehrpläne zugeschnittene Symbolleiste — auch die
+Textbeschriftung ist ein eigener Marker-Modus statt Geomans eingebautem `Text`-Werkzeug, damit die
+Serialisierung vollständig unter eigener Kontrolle bleibt. Die Farbe einer Form wird bewusst NACH
+dem Zeichnen per `layer.setStyle()` angewendet (nicht nur über Geomans Zeichen-Vorschau-Optionen),
+damit unabhängig vom Formtyp (Linie/Rechteck/Polygon/Kreis) eine einzige Stelle die Endfarbe
+bestimmt. Kein Netzwerkzugriff nötig für die Zeichenfunktion selbst (nur die Kartenkacheln laden
+weiterhin von OpenStreetMap) — funktioniert daher auch bei eingeschränkter Konnektivität zur Karte,
+solange diese bereits einmal geladen wurde.
 
 ### Export / Import
 
