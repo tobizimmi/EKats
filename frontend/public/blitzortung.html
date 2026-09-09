@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Blitzortung – EKats</title>
+  <link rel="stylesheet" href="vendor/leaflet/leaflet.css" />
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <meta name="theme-color" content="#14232f" />
+</head>
+<body data-addon-source="blitzortung">
+  <div id="app-sidebar-root"></div>
+  <main>
+    <div class="dashboard-grid">
+      <div id="map"></div>
+      <div class="card stack">
+        <h2 class="section-title">Blitzortung</h2>
+        <p class="muted" id="list-updated"></p>
+        <p class="error-message" id="addon-error" role="alert"></p>
+        <div id="addon-table-container"></div>
+        <div class="detail-panel" id="detail-panel" hidden>
+          <h3 class="section-title">Details</h3>
+          <dl id="detail-content"></dl>
+        </div>
+      </div>
+    </div>
+    <p class="attribution">
+      Quelle: Blitzortung.org - kostenloses Community-Blitzortungsnetz. Live-Datenstrom statt
+      periodischer Abfrage, deshalb kein "zuletzt aktualisiert"-Zeitstempel wie bei den übrigen
+      Quellen; ein Blitzeinschlag bleibt 30 Minuten sichtbar. Nur interne Nutzung innerhalb dieser
+      Wehr-Installation, keine öffentliche Weiterverbreitung (siehe Nutzungsbedingungen des
+      Anbieters).
+    </p>
+  </main>
+  <script src="vendor/leaflet/leaflet.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/header.js"></script>
+  <script src="js/severity.js"></script>
+  <script src="js/sw-register.js"></script>
+  <script src="js/gebiet-info.js"></script>
+  <script src="js/detail.js"></script>
+  <script src="js/bundesland.js"></script>
+  <script src="js/data-table.js"></script>
+  <script src="js/addon.js"></script>
+</body>
+</html>

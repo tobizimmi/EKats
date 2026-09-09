@@ -41,6 +41,9 @@ const SOURCE_EXTRA_COLUMNS = {
     { key: 'wind', label: 'Wind (km/h)', default: true, get: (dp) => dp.payload?.windSpeedKmh ?? '–' },
   ],
   kachelmann: [],
+  // "Wert" (Basisspalte) zeigt bereits die Ortungsgenauigkeit in Metern (value_numeric/unit) - hier
+  // nur das payload-Feld, das die Basisspalten nicht abdecken.
+  blitzortung: [{ key: 'polarity', label: 'Polarität', default: false, get: (dp) => dp.payload?.polarity ?? '–' }],
 };
 
 function columnsForSource(source) {

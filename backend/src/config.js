@@ -43,6 +43,13 @@ const config = {
   kachelmannApiKey: process.env.KACHELMANN_API_KEY || '',
   kachelmannRadiusKm: parseFloat(process.env.KACHELMANN_RADIUS_KM || '50'),
 
+  // Blitzortung.org (kostenloses Community-Blitzortungsnetz, siehe fetchers/blitzortung.js) - anders
+  // als die uebrigen Quellen ein dauerhaft offener WebSocket statt eines periodischen HTTP-Abrufs,
+  // daher per eigenem Schalter deaktivierbar (z.B. falls ausgehende WebSocket-Verbindungen auf dem
+  // Produktivserver per Firewall blockiert sind).
+  blitzortungEnabled: process.env.BLITZORTUNG_ENABLED !== 'false',
+  blitzortungRadiusKm: parseFloat(process.env.BLITZORTUNG_RADIUS_KM || '75'),
+
   smtp: {
     host: process.env.SMTP_HOST || '',
     port: parseInt(process.env.SMTP_PORT || '587', 10),

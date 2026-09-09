@@ -16,6 +16,7 @@ const VALID_SOURCES = [
   'bbk_warnung',
   'kachelmann',
   'wetter_vorhersage',
+  'blitzortung',
 ];
 
 // GET /api/datapoints?source=pegelonline&since=2026-01-01T00:00:00Z

@@ -271,6 +271,7 @@ const FEATURE_LABELS = {
   bbk_warnung: 'Bevölkerungswarnungen (BBK/NINA)',
   kachelmann: 'Kachelmann/Meteologix',
   wetter_vorhersage: 'Wetter-Vorhersage (Bright Sky)',
+  blitzortung: 'Blitzortung (Blitzortung.org)',
 };
 const FEATURE_ROLES = ['admin', 'stab', 'mitglied'];
 

@@ -26,6 +26,7 @@ const FEATURE_KEYS = [
   'bbk_warnung',
   'kachelmann',
   'wetter_vorhersage',
+  'blitzortung',
 ];
 
 function assertKnownFeature(key, res) {

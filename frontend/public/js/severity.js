@@ -12,6 +12,7 @@ const SOURCE_LABELS = {
   bbk_warnung: 'Bevölkerungswarnung (BBK/NINA)',
   kachelmann: 'Kachelmann-Warnung (Meteologix)',
   wetter_vorhersage: 'Wetter-Vorhersage (Bright Sky)',
+  blitzortung: 'Blitzeinschlag (Blitzortung.org)',
 };
 
 // Gemeinsame Farbskala fuer Karten-Marker, genutzt vom Dashboard (map.js) und den
@@ -45,6 +46,10 @@ function severityScore(dp) {
     }
     case 'pegelonline':
       return dp.severity && dp.severity !== 'unbekannt' ? 1 : 0;
+    // Ein einzelner Blitzeinschlag hat keine amtliche Gefahrenstufe wie eine Warnung, ist aber als
+    // Hinweis auf ein nahes Gewitter mehr als "unauffaellig" - feste mittlere Dringlichkeit.
+    case 'blitzortung':
+      return 2;
     default:
       return 0;
   }

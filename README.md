@@ -172,9 +172,11 @@ systemctl restart ekats           # Neustart, z.B. nach manueller .env-Änderung
 | warnung.bund.de (BBK/NINA) | Bevölkerungswarnungen (MoWaS/DWD/LHP/BIWAPP/KATWARN/Polizei) | nein | alle 15 Min. |
 | Kachelmannwetter/Meteologix | Zusätzliche, optionale Wetterwarnungen (kostenpflichtig, siehe unten) | ja, `KACHELMANN_API_KEY` | alle 30 Min. |
 | Bright Sky (DWD-Vorhersage) | Echte Wettervorhersage (Temperatur/Niederschlag/Wind), keine Warnung | nein | stündlich |
+| Blitzortung.org | Live-Blitzeinschläge (Gewitterzug) | nein | Live-Stream (kein Intervall) |
 
 Intervalle über die `FETCH_*_CRON`-Variablen in `.env` änderbar. Jeder Fetcher läuft isoliert
-(`src/scheduler.js`): schlägt eine Quelle fehl, laufen die anderen normal weiter.
+(`src/scheduler.js`): schlägt eine Quelle fehl, laufen die anderen normal weiter. Blitzortung.org ist
+die einzige Ausnahme von diesem Cron-Muster — siehe eigener Abschnitt unten.
 
 **warnung.bund.de (BBK)** ist der offizielle Warnaggregator hinter der NINA-App und bündelt sechs
 Warnsysteme in einer einzigen, kostenlosen, unauthentifizierten API — darunter amtliche
@@ -636,6 +638,52 @@ einem echten API-Key gegen `npm run fetch -- kachelmann` prüfen und ggf. anpass
 
 Schema: `wehr_feature_role_access`, `user_feature_access`
 (`backend/sql/migrations/009_add_feature_access.sql`).
+
+## Blitzortung.org (Live-Gewitterzug)
+
+Neunte Datenquelle, ursprünglich im Konzeptpapier "Einsatzleiter-Portal 2.0" (Phase 2) vorgeschlagen
+und dort zunächst offen geblieben: `backend/src/fetchers/blitzortung.js` bindet das kostenlose,
+gemeinnützige Community-Blitzortungsnetz Blitzortung.org an, um "wohin zieht das Gewitter gerade"
+sichtbar zu machen — ohne RADOLAN-Binärformat parsen zu müssen (siehe „Geplant: Wetter-Entwicklung"
+unten für den Hintergrund, warum das bisher nicht direkt über DWD-Rohdaten ging).
+
+**Technisch eine Ausnahme unter den zehn Quellen:** Blitzortung.org bietet keine periodisch
+abrufbare HTTP-API, sondern einen dauerhaft offenen WebSocket-Livestream einzelner
+Blitzeinschläge. Statt eines `FETCH_*_CRON`-Jobs läuft deshalb eine einzelne, lang laufende
+Verbindung mit automatischem Reconnect (inkl. Verbindungs-Timeout, falls ein Netzwerkproblem die
+Verbindung stillschweigend haengen laesst statt sie aktiv abzulehnen), gestartet einmal beim
+Server-Start (`index.js`, `startBlitzortungStream()`) statt über `scheduler.js`. Abschaltbar über
+`BLITZORTUNG_ENABLED=false` in `.env` (z.B. falls ausgehende WebSocket-Verbindungen auf dem
+Produktivserver per Firewall blockiert sind).
+
+**Gebietsfilterung schon bei der Aufnahme, nicht erst bei der Abfrage:** Das globale Netz liefert
+während aktiver Gewitterlagen potenziell tausende Einschläge pro Minute weltweit — ungefiltert
+würde `live_datapoint` explodieren. Nur Einschläge innerhalb `BLITZORTUNG_RADIUS_KM` (Standard 75
+km) um mindestens einen Wehr-Kartenmittelpunkt werden gespeichert, dieselbe Grundidee wie
+`FIRMS_RADIUS_KM` bei NASA FIRMS, nur am Empfang statt an der Abfrage-URL. Jeder Einschlag bleibt
+zusätzlich nur 30 Minuten als "gültig" markiert (`valid_until`) und verschwindet danach von selbst
+aus der Lage-Übersicht, ohne auf den nächtlichen Cleanup-Job warten zu müssen — ein einzelner
+Blitzeinschlag ist für die Gewitterzug-Anzeige nur kurzfristig relevant.
+
+**Verifikationsstand:** Das Protokoll (vier gleichwertige Server
+`wss://ws{1,5,6,7}.blitzortung.org:3000/`, Subscribe-Nachricht `{"time":0}`, reines JSON ohne
+zusätzliche Kompression) ist gegen die aktiv gepflegte, quelloffene Referenzimplementierung
+[SimonSchick/BlitzortungAPI](https://github.com/SimonSchick/BlitzortungAPI) abgeglichen, aber
+**nicht live gegen den echten Server getestet** — blitzortung.org ist wie alle Drittanbieter-Hosts
+in der Entwicklungsumgebung nicht erreichbar. Ein zusätzlicher, dort dokumentierter Vorbehalt: das
+Zeitfeld (`time`) ist eine Nanosekunden-Unix-Epoche, die den verlustfrei darstellbaren
+JS-Number-Bereich sprengt — die Umrechnung nutzt `BigInt`, was einen als String übertragenen Wert
+exakt handhabt; kommt der Wert stattdessen als JSON-Zahl, ist er bereits vor der Verarbeitung durch
+`JSON.parse()` gerundet (technisch nicht mehr reparierbar, aber auch keine Verschlechterung
+gegenüber dem Ist-Zustand). Unerwartete Nachrichtenformen werden laut geloggt statt still
+falsch verarbeitet (`handleMessage()`), nach demselben Muster wie bei Kachelmann/Bright Sky.
+
+**Nutzungsbedingungen:** Blitzortung.org untersagt die Weitergabe an Dritte über einen eigenen
+öffentlichen Endpunkt (nur über einen selbst betriebenen Server). EKats zeigt die Daten
+ausschließlich innerhalb der eigenen, per Login geschützten Wehr-Installation an — keine
+öffentliche Weiterverbreitung, damit für den internen Gebrauch einer einzelnen Wehr unkritisch.
+
+Kein neues Schema nötig — nutzt die bestehende `live_datapoint`-Tabelle wie die übrigen Quellen.
 
 ## PDF-Vorlagen (HTML-Templates, Chromium-Rendering)
 

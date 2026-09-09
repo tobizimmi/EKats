@@ -10,7 +10,7 @@
 // data-role="admin-only" nur fuer 'admin'.
 const ROLE_LABELS = { admin: 'Admin', stab: 'Stab', mitglied: 'Mitglied' };
 
-// Gruppierte Navigation: haelt die Themenseiten (aktuell acht, siehe README "Datenquellen") optisch
+// Gruppierte Navigation: haelt die Themenseiten (aktuell neun, siehe README "Datenquellen") optisch
 // zusammengefasst statt als lange flache Kette - deswegen war eine Seitenleiste noetig, keine
 // Kopfzeile mehr. "kachelmann.html"/"wetter-vorhersage.html"/"objekte.html" sind neue Seiten
 // (Konzept Teil 2, Baustein B).
@@ -33,6 +33,7 @@ const NAV_GROUPS = [
       { href: 'firms.html', label: 'Feuer-Hotspots', icon: '🔥' },
       { href: 'bbk-warnungen.html', label: 'Bevölkerungswarnungen', icon: '📣' },
       { href: 'kachelmann.html', label: 'Kachelmann', icon: '☁️' },
+      { href: 'blitzortung.html', label: 'Blitzortung', icon: '⚡' },
     ],
   },
   {
