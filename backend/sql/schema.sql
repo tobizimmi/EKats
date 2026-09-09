@@ -10,6 +10,13 @@ CREATE TABLE IF NOT EXISTS wehr (
     bounding_box GEOMETRY(POLYGON, 4326), -- eigenes Zustaendigkeitsgebiet
     center_lat DOUBLE PRECISION,          -- Kartenmittelpunkt beim ersten Laden (Vereinfachung V1)
     center_lon DOUBLE PRECISION,
+    -- SMTP-Konfiguration im Admin-Bereich statt nur .env (Migration 014). smtp_pass_encrypted ist
+    -- AES-256-GCM-verschluesselt (utils/crypto.js) - siehe dort. NULL-Felder fallen auf .env zurueck.
+    smtp_host TEXT,
+    smtp_port INTEGER,
+    smtp_user TEXT,
+    smtp_pass_encrypted TEXT,
+    smtp_from TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
@@ -350,3 +357,15 @@ CREATE TABLE IF NOT EXISTS datapoint_history (
 
 CREATE INDEX IF NOT EXISTS idx_datapoint_history_lookup
     ON datapoint_history(source, external_id, fetched_at);
+
+-- Passwort-vergessen-Selbstbedienung (Migration 014): siehe Migration 014 fuer Details im Kommentar.
+CREATE TABLE IF NOT EXISTS password_reset_token (
+    id BIGSERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES app_user(id) ON DELETE CASCADE,
+    token_hash TEXT NOT NULL UNIQUE,
+    expires_at TIMESTAMPTZ NOT NULL,
+    used_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_password_reset_token_user ON password_reset_token(user_id);

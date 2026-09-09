@@ -319,6 +319,20 @@ Regel/Datapoint/Kanal-Kombination löst wegen `alert_log` nur einmal aus (siehe
 ist neu (Phase 1 des Einsatzleiter-Portal-Konzepts) und wird bislang nur über die Prioritäts-Leiste
 und die Lage-Liste angezeigt, nicht über Push/E-Mail.
 
+### SMTP-Konfiguration
+
+Für den E-Mail-Kanal (Alarm-Mails hier sowie die Passwort-vergessen-Links, siehe „Sicherheit &
+Datenschutz“) lässt sich SMTP entweder klassisch über `.env` (`SMTP_HOST`/`SMTP_PORT`/`SMTP_USER`/
+`SMTP_PASS`/`SMTP_FROM`) **oder** je Wehr im Admin-Bereich (Abschnitt „SMTP-Konfiguration“)
+hinterlegen — ein in der DB gesetztes Feld überschreibt den `.env`-Wert nur für dieses Feld, leere
+Felder fallen weiterhin auf `.env` zurück. Das Passwort wird AES-256-GCM-verschlüsselt gespeichert
+(`utils/crypto.js`, Schlüssel per `scrypt` aus `JWT_SECRET` abgeleitet — kein zusätzliches Secret in
+`.env` nötig) und nie im Klartext an das Frontend zurückgegeben (nur ob eines gesetzt ist). Ein
+„Test-E-Mail an mich senden“-Button im Admin-Bereich verschickt sofort eine Testmail an den
+anfordernden Admin, um die Konfiguration ohne Umweg über eine echte Warnung zu prüfen.
+`notifications/mailer.js` baut den `nodemailer`-Transporter je Versand frisch auf (kein Caching) —
+eine Admin-Änderung wirkt dadurch sofort, ohne Server-Neustart.
+
 ## Zuständigkeitsgebiet (Landkreis + Nachbarlandkreise)
 
 Im Admin-Bereich („Wehr-Einstellungen“) legt der Admin den **Heimat-Landkreis** der Wehr fest
@@ -716,9 +730,19 @@ Schema: `datapoint_history` (`backend/sql/migrations/013_add_datapoint_history.s
   Konto-Lockout (5 Fehlversuche sperren ein einzelnes Konto 15 Minuten, unabhängig von der IP) —
   schützt sowohl vor Angriffen von einer IP als auch vor verteilten Versuchen auf ein Konto.
 - **Passwort ändern**: Self-Service unter „Einstellungen“ (erfordert aktuelles Passwort, meldet alle
-  *anderen* Sitzungen ab) sowie Admin-Reset in der Nutzerverwaltung (setzt ein neues Passwort direkt,
-  meldet alle Sitzungen des Zielkontos ab) — es gibt (noch) keinen E-Mail-basierten
-  Self-Service-Reset (siehe „Bekannte V1-Vereinfachungen“).
+  *anderen* Sitzungen ab), Admin-Reset in der Nutzerverwaltung (setzt ein neues Passwort direkt,
+  meldet alle Sitzungen des Zielkontos ab) sowie **Passwort-vergessen per E-Mail-Link**
+  (`forgot-password.html` → `POST /api/auth/forgot-password`, siehe eigener Abschnitt unten) für den
+  Fall, dass kein Admin erreichbar ist.
+- **Passwort-vergessen-Selbstbedienung**: `POST /api/auth/forgot-password` (E-Mail) antwortet
+  **immer identisch**, egal ob die E-Mail als Konto existiert — sonst ließe sich per Rückmeldung
+  erraten, welche Adressen registriert sind (User-Enumeration-Oracle). Existiert ein Konto, wird ein
+  einmaliger, 1 Stunde gültiger Token erzeugt und **nur als SHA-256-Hash** in `password_reset_token`
+  gespeichert (nie im Klartext) und per E-Mail als Link zu `reset-password.html?token=…` verschickt;
+  `POST /api/auth/reset-password` prüft Hash + Ablauf + Einmalig-Verwendung, setzt bei Erfolg das
+  Passwort (bcrypt) und zählt `token_version` hoch (meldet alle bestehenden Sitzungen ab, dieselbe
+  Konsequenz wie beim Admin-Reset). Rate-limitiert wie der Login (`/api/auth/forgot-password` und
+  `/reset-password` teilen sich ein Limit von 5 Anfragen/15 Min. je IP).
 - **Produktions-Startup-Guard** (`backend/src/config.js`): der Server verweigert den Start, wenn
   `NODE_ENV=production` und `JWT_SECRET` fehlt/zu kurz ist (< 32 Zeichen) oder noch den
   Entwicklungs-Default trägt — verhindert den häufigsten Fehlkonfigurationsfall (vergessenes
@@ -864,9 +888,6 @@ eigenen Parser pruefen.
   Login/Dashboard gehen von genau einer Wehr aus (siehe Abschnitt 6 der `CLAUDE.md` zu Modul 3).
 - **NASA FIRMS** nutzt einen einzigen globalen `MAP_KEY` (nicht pro Nutzer) und einen festen Radius
   (`FIRMS_RADIUS_KM`) um den Wehr-Kartenmittelpunkt.
-- **Kein E-Mail-basierter Passwort-Self-Service-Reset**: Passwort ändern erfordert entweder das
-  aktuelle Passwort (Self-Service) oder ein Admin-Konto (Reset in der Nutzerverwaltung) - es gibt
-  keinen "Passwort vergessen"-Link mit E-Mail-Versand.
 - **Kein 2FA/TOTP**: Für eine höhere Absicherung von Admin-Konten wäre eine
   Zwei-Faktor-Authentifizierung sinnvoll, ist aber noch nicht umgesetzt.
 - Siehe außerdem den Abschnitt „Verifikationsstand der Fetcher“ oben.

@@ -1,10 +1,13 @@
+const crypto = require('crypto');
 const express = require('express');
 const bcrypt = require('bcrypt');
 const rateLimit = require('express-rate-limit');
 const { z } = require('zod');
+const config = require('../config');
 const { query } = require('../db');
 const { signToken, setAuthCookie, clearAuthCookie, requireAuth } = require('../middleware/auth');
 const { logAudit } = require('../audit');
+const { sendMail } = require('../notifications/mailer');
 
 const router = express.Router();
 
@@ -98,6 +101,124 @@ router.post('/login', loginLimiter, async (req, res, next) => {
         wehrName: user.wehr_name,
       },
     });
+  } catch (err) {
+    return next(err);
+  }
+});
+
+// Passwort-vergessen-Selbstbedienung (Feature-Paritaet mit dem Schwesterprojekt FKatInfo, dort
+// password_reset.php): bisher konnte ein ausgesperrter Nutzer nur einen Admin um einen Reset
+// bitten (POST /api/users/:id/reset-password). Antwort ist bewusst IMMER identisch, egal ob die
+// E-Mail existiert - sonst liesse sich per Rueckmeldung erraten, welche E-Mail-Adressen als Konto
+// registriert sind (User-Enumeration-Oracle), dieselbe Begruendung wie in FKatInfo.
+const forgotPasswordLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { ok: false, error: 'Zu viele Anfragen. Bitte spaeter erneut versuchen.' },
+});
+
+const RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1 Stunde
+// Immer identische Antwort, unabhaengig davon ob die E-Mail existiert (siehe Kommentar oben) - der
+// eigentliche Hinweistext dazu steht bewusst nur im Frontend (js/forgot-password.js), nicht hier,
+// damit die API-Antwortform mit allen anderen Endpunkten ({ok, data}) konsistent bleibt.
+const GENERIC_FORGOT_PASSWORD_RESPONSE = { ok: true, data: null };
+
+const forgotPasswordSchema = z.object({ email: z.string().email() });
+
+router.post('/forgot-password', forgotPasswordLimiter, async (req, res, next) => {
+  try {
+    const parsed = forgotPasswordSchema.safeParse(req.body);
+    if (!parsed.success) {
+      // Auch bei ungueltigem Format die generische Antwort - ein 400 wuerde verraten, dass genau
+      // diese Eingabe kein gueltiges E-Mail-Format hatte, aendert aber nichts an der eigentlichen
+      // Enumeration-Frage und ist reine Formvalidierung, kein Sicherheitsrisiko fuer sich.
+      return res.json(GENERIC_FORGOT_PASSWORD_RESPONSE);
+    }
+    const { email } = parsed.data;
+
+    const { rows } = await query('SELECT id, email, wehr_id FROM app_user WHERE email = $1', [email]);
+    const user = rows[0];
+    if (user) {
+      const rawToken = crypto.randomBytes(32).toString('hex');
+      const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+      const expiresAt = new Date(Date.now() + RESET_TOKEN_TTL_MS);
+
+      // Vorherige, noch nicht eingeloeste Tokens dieses Nutzers entwerten - immer nur der neueste
+      // Link soll funktionieren.
+      await query('DELETE FROM password_reset_token WHERE user_id = $1 AND used_at IS NULL', [user.id]);
+      await query(
+        'INSERT INTO password_reset_token (user_id, token_hash, expires_at) VALUES ($1, $2, $3)',
+        [user.id, tokenHash, expiresAt]
+      );
+
+      const resetUrl = `${config.baseUrl}/reset-password.html?token=${rawToken}`;
+      try {
+        await sendMail({
+          to: user.email,
+          subject: 'EKats: Passwort zuruecksetzen',
+          text:
+            `Zum Zuruecksetzen deines EKats-Passworts folge diesem Link (gueltig 1 Stunde):\n\n${resetUrl}\n\n` +
+            'Falls du das nicht angefordert hast, ignoriere diese E-Mail einfach.',
+          wehrId: user.wehr_id,
+        });
+      } catch (err) {
+        console.error('[auth] Reset-E-Mail-Versand fehlgeschlagen:', err.message);
+      }
+    }
+
+    return res.json(GENERIC_FORGOT_PASSWORD_RESPONSE);
+  } catch (err) {
+    return next(err);
+  }
+});
+
+const resetPasswordSchema = z.object({
+  token: z.string().min(1),
+  newPassword: z.string().min(8, 'Passwort muss mindestens 8 Zeichen haben.'),
+});
+
+router.post('/reset-password', forgotPasswordLimiter, async (req, res, next) => {
+  try {
+    const parsed = resetPasswordSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ ok: false, error: parsed.error.issues[0].message });
+    }
+    const { token, newPassword } = parsed.data;
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+
+    const { rows } = await query(
+      `SELECT prt.id, prt.user_id, u.email, u.wehr_id
+       FROM password_reset_token prt
+       JOIN app_user u ON u.id = prt.user_id
+       WHERE prt.token_hash = $1 AND prt.used_at IS NULL AND prt.expires_at > now()`,
+      [tokenHash]
+    );
+    const tokenRow = rows[0];
+    if (!tokenRow) {
+      return res.status(400).json({ ok: false, error: 'Link ungueltig oder abgelaufen. Bitte erneut anfordern.' });
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 12);
+    await query(
+      'UPDATE app_user SET password_hash = $1, token_version = token_version + 1, failed_login_count = 0, locked_until = NULL WHERE id = $2',
+      [passwordHash, tokenRow.user_id]
+    );
+    await query('UPDATE password_reset_token SET used_at = now() WHERE id = $1', [tokenRow.id]);
+
+    await logAudit({
+      wehrId: tokenRow.wehr_id,
+      actorUserId: tokenRow.user_id,
+      actorEmail: tokenRow.email,
+      action: 'auth.password_reset_via_email',
+      targetType: 'app_user',
+      targetId: tokenRow.user_id,
+      details: {},
+      ip: req.ip,
+    });
+
+    return res.json({ ok: true, data: null });
   } catch (err) {
     return next(err);
   }

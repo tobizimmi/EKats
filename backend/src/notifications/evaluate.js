@@ -64,7 +64,7 @@ async function evaluateAlertsForSource(source, datapointRows) {
 
   const { rows: rules } = await query(
     `SELECT ar.id, ar.user_id, ar.target_ref, ar.threshold_key, ar.threshold_value,
-            ar.channel_push, ar.channel_email, u.email, w.center_lat, w.center_lon
+            ar.channel_push, ar.channel_email, u.email, w.id AS wehr_id, w.center_lat, w.center_lon
      FROM alert_rule ar
      JOIN app_user u ON u.id = ar.user_id
      JOIN wehr w ON w.id = u.wehr_id
@@ -107,7 +107,7 @@ async function evaluateAlertsForSource(source, datapointRows) {
           if (channel === 'push') {
             await sendPushToUser(rule.user_id, { title: subject, body: text, source, datapointId: dp.id });
           } else if (channel === 'email') {
-            await sendMail({ to: rule.email, subject, text });
+            await sendMail({ to: rule.email, subject, text, wehrId: rule.wehr_id });
           }
         } catch (err) {
           console.error(`[alerts] Versand (${channel}) fuer Regel ${rule.id} fehlgeschlagen:`, err.message);

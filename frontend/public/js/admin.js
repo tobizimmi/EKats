@@ -403,6 +403,21 @@ async function loadPdfTemplate() {
   }
 }
 
+async function loadSmtpSettings() {
+  const errorEl = document.getElementById('smtp-error');
+  errorEl.textContent = '';
+  try {
+    const data = await api.get('/smtp-settings');
+    document.getElementById('smtp-host').value = data.host || '';
+    document.getElementById('smtp-port').value = data.port || '';
+    document.getElementById('smtp-user').value = data.user || '';
+    document.getElementById('smtp-from').value = data.from || '';
+    document.getElementById('smtp-pass-hint').textContent = data.hasPassword ? '(gesetzt)' : '(nicht gesetzt)';
+  } catch (err) {
+    errorEl.textContent = err.message;
+  }
+}
+
 (async function bootstrapAdmin() {
   const user = await initHeader();
   if (!user) return;
@@ -414,6 +429,7 @@ async function loadPdfTemplate() {
   document.getElementById('admin-content').hidden = false;
 
   await loadWehr();
+  await loadSmtpSettings();
   await loadUsers(user.id);
   await loadStations();
   await loadVehicles();
@@ -468,6 +484,49 @@ async function loadPdfTemplate() {
       });
       renderNeighborLandkreise(updated);
     } catch (err) {
+      errorEl.textContent = err.message;
+    }
+  });
+
+  document.getElementById('smtp-form').addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const errorEl = document.getElementById('smtp-error');
+    const statusEl = document.getElementById('smtp-status');
+    errorEl.textContent = '';
+    statusEl.textContent = '';
+    const host = document.getElementById('smtp-host').value.trim();
+    const port = document.getElementById('smtp-port').value;
+    const smtpUser = document.getElementById('smtp-user').value.trim();
+    const pass = document.getElementById('smtp-pass').value;
+    const from = document.getElementById('smtp-from').value.trim();
+    try {
+      // Leeres Passwortfeld = unveraendert lassen (kein "pass"-Feld im Body), damit ein
+      // gespeichertes Passwort nicht bei jedem Speichern der uebrigen Felder geloescht wird.
+      await api.put('/smtp-settings', {
+        host: host || null,
+        port: port ? Number(port) : null,
+        user: smtpUser || null,
+        ...(pass ? { pass } : {}),
+        from: from || null,
+      });
+      document.getElementById('smtp-pass').value = '';
+      statusEl.textContent = 'Gespeichert.';
+      await loadSmtpSettings();
+    } catch (err) {
+      errorEl.textContent = err.message;
+    }
+  });
+
+  document.getElementById('smtp-test-button').addEventListener('click', async () => {
+    const errorEl = document.getElementById('smtp-error');
+    const statusEl = document.getElementById('smtp-status');
+    errorEl.textContent = '';
+    statusEl.textContent = 'Sende Test-E-Mail…';
+    try {
+      await api.post('/smtp-settings/test');
+      statusEl.textContent = `Test-E-Mail an ${user.email} verschickt.`;
+    } catch (err) {
+      statusEl.textContent = '';
       errorEl.textContent = err.message;
     }
   });

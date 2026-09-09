@@ -49,6 +49,43 @@
       </div>
 
       <div class="card">
+        <h2 class="section-title">SMTP-Konfiguration (E-Mail-Versand)</h2>
+        <p class="muted">
+          Für Alarm-E-Mails (Benachrichtigungsregeln) und Passwort-vergessen-Links. Leere Felder
+          fallen auf die Werte aus der <code>.env</code>-Datei des Servers zurück - diese Einstellungen
+          hier sind optional und überschreiben <code>.env</code> nur, wenn gesetzt.
+        </p>
+        <form id="smtp-form" class="form-row">
+          <label>
+            <span>SMTP-Host</span>
+            <input id="smtp-host" type="text" placeholder="smtp.beispiel.de" />
+          </label>
+          <label>
+            <span>Port</span>
+            <input id="smtp-port" type="number" min="1" max="65535" placeholder="587" />
+          </label>
+          <label>
+            <span>Benutzername</span>
+            <input id="smtp-user" type="text" autocomplete="off" />
+          </label>
+          <label>
+            <span>Passwort <span id="smtp-pass-hint" class="muted"></span></span>
+            <input id="smtp-pass" type="password" autocomplete="new-password" placeholder="unverändert lassen" />
+          </label>
+          <label>
+            <span>Absender (From)</span>
+            <input id="smtp-from" type="text" placeholder="EKats &lt;no-reply@beispiel.de&gt;" />
+          </label>
+          <div class="form-row">
+            <button type="submit" class="primary">Speichern</button>
+            <button type="button" class="secondary" id="smtp-test-button">Test-E-Mail an mich senden</button>
+          </div>
+        </form>
+        <p class="error-message" id="smtp-error" role="alert"></p>
+        <p class="muted" id="smtp-status" role="status"></p>
+      </div>
+
+      <div class="card">
         <h2 class="section-title">Wachen</h2>
         <form id="station-form" class="form-row">
           <label>
