@@ -171,6 +171,7 @@ systemctl restart ekats           # Neustart, z.B. nach manueller .env-Änderung
 | DWD Waldbrandgefahrenindex | Flächige Gefahreneinschätzung je Station | nein | 1×/Tag |
 | warnung.bund.de (BBK/NINA) | Bevölkerungswarnungen (MoWaS/DWD/LHP/BIWAPP/KATWARN/Polizei) | nein | alle 15 Min. |
 | Kachelmannwetter/Meteologix | Zusätzliche, optionale Wetterwarnungen (kostenpflichtig, siehe unten) | ja, `KACHELMANN_API_KEY` | alle 30 Min. |
+| Bright Sky (DWD-Vorhersage) | Echte Wettervorhersage (Temperatur/Niederschlag/Wind), keine Warnung | nein | stündlich |
 
 Intervalle über die `FETCH_*_CRON`-Variablen in `.env` änderbar. Jeder Fetcher läuft isoliert
 (`src/scheduler.js`): schlägt eine Quelle fehl, laufen die anderen normal weiter.
@@ -235,6 +236,13 @@ einer offiziellen ARS-Spezifikation), und (2) das genaue Antwortformat des Detai
 trotzdem mit Titel/Dringlichkeit/Kreis nutzbar (siehe Kommentar am Dateianfang). Vor
 Produktivbetrieb `npm run fetch -- bbk_warnung` prüfen.
 
+**Der siebte Connector, `brightsky.js` (Wetter-Vorhersage), ist ebenfalls NICHT live verifiziert** —
+`api.brightsky.dev` war aus dieser Entwicklungsumgebung nicht erreichbar. Implementiert gegen die
+öffentlich dokumentierte, stabile Bright-Sky-API-Konvention (kostenlos, kein API-Key, `/weather`-
+Endpunkt mit `lat`/`lon`/`date`, liefert DWD-Stationsmessungen und MOSMIX-Vorhersagen) — siehe
+Kommentar am Dateianfang für die genaue Quellenlage. Vor Produktivbetrieb
+`npm run fetch -- wetter_vorhersage` prüfen.
+
 **Live-Abruf gegen die echten Behörden-APIs konnte aus derselben Netzwerkrichtlinien-Einschränkung
 in dieser Entwicklungsumgebung generell nicht getestet werden** (auch für die verifizierten
 Connectors nicht) — bitte nach dem ersten Deploy einmal `npm run fetch -- <quelle>` pro Quelle
@@ -242,22 +250,55 @@ manuell laufen lassen und die Logs/`live_datapoint`-Tabelle prüfen.
 
 ### Addon-Seiten je Datenquelle
 
-Jede Datenquelle hat zusätzlich zum kombinierten Dashboard eine eigene Seite mit Mini-Karte +
-Liste, gefiltert auf genau diese Quelle (analog zur Objekt-Übersicht):
+Jede Datenquelle hat zusätzlich zum kombinierten Dashboard eine eigene, tiefere Seite mit
+Mini-Karte + durchsuch-/filterbarer Tabelle (analog zur Objekt-Übersicht):
 
 | Seite | Quelle |
 |---|---|
 | `dwd-unwetter.html` | DWD-Unwetterwarnungen |
+| `wetter-vorhersage.html` | Wetter-Vorhersage (Bright Sky) |
 | `pegelonline.html` | Pegelstände (PEGELONLINE) |
 | `hochwasserzentralen.html` | Landespegel (Hochwasserzentralen) |
 | `waldbrandindex.html` | Waldbrandgefahrenindex |
 | `firms.html` | Feuer-Hotspots (NASA FIRMS) |
 | `bbk-warnungen.html` | Bevölkerungswarnungen (BBK/NINA) |
+| `kachelmann.html` | Kachelmann/Meteologix |
 
 Nur das **Dashboard** (`index.html`) zeigt weiterhin alle Quellen (inkl. kritische Objekte)
-gemeinsam auf einer Karte mit Layer-Toggles. Die Addon-Seiten teilen sich ein gemeinsames Skript
-(`js/addon.js`) — welche Quelle eine Seite anzeigt, steht im `data-addon-source`-Attribut auf
-`<body>` (nicht als Inline-`<script>`, das würde an der Content-Security-Policy scheitern).
+gemeinsam auf einer Karte mit Layer-Toggles — bewusst schlank gehalten (nur Priorität, Karte,
+Übersicht), damit jede Quelle für die Detailarbeit ihre eigene, tiefere Seite behält (Konzept Teil
+2: „Dashboard bleibt schlank, Themenseiten werden mächtiger"). `wetter_vorhersage` ist dabei die
+einzige Quelle, die **nicht** im kombinierten Dashboard/Karte erscheint — sie liefert dutzende
+stündliche Werte je Wehr (Zeitreihe an einem Punkt, kein raumliches Einzelereignis) und würde die
+Lage-Übersicht nur zumüllen; `GET /api/datapoints` ohne `source`-Filter blendet sie serverseitig
+aus (siehe `backend/src/routes/datapoints.js`).
+
+Die Addon-Seiten teilen sich ein gemeinsames Skript (`js/addon.js`) — welche Quelle eine Seite
+anzeigt, steht im `data-addon-source`-Attribut auf `<body>` (nicht als Inline-`<script>`, das würde
+an der Content-Security-Policy scheitern). Die eigentliche Tabelle stammt aus der gemeinsamen
+Komponente `js/data-table.js` (siehe „Generische Tabellen-Komponente" unten).
+
+### Seitenleisten-Navigation
+
+Mit acht Themenseiten plus Objekt-Übersicht, Einstellungen und Admin wurde die bisherige
+horizontale Kopfzeile zu voll — sie ist einer gruppierten Seitenleiste gewichen (Übersicht /
+Datenquellen / Objekte / Verwaltung), am Desktop dauerhaft sichtbar links, am Mobiltelefon
+standardmäßig eingeklappt und über ein Menü-Symbol aufklappbar. `js/header.js` rendert die
+komplette Seitenleiste in ein leeres `<div id="app-sidebar-root"></div>` — jede Seite trägt dafür
+nur noch diesen einen Platzhalter statt eines mehrzeiligen Navigations-Blocks, ein gemeinsames
+„Include" ohne eigenes Templating-System.
+
+### Generische Tabellen-Komponente
+
+`js/data-table.js` stellt Suche, Spalten-Ein-/Ausblenden und CSV-Export bereit — genutzt von allen
+Themenseiten (mit quellenspezifischen Zusatzspalten aus tatsächlich verifizierten `payload`-Feldern
+der jeweiligen Fetcher, siehe `backend/src/fetchers/*.js`) und von der neuen Objekt-Detailseite.
+Die Spalten-Sichtbarkeit wird **serverseitig** über `/api/user-preferences/:key` gespeichert
+(`user_preference`-Tabelle, Migration 011) — geräteübergreifend nutzbar, mit
+„Spalten zurücksetzen"-Button (löscht die gespeicherte Einstellung, die Seite fällt auf ihre
+eingebauten Standardspalten zurück). Derselbe Endpunkt ist als generischer Key-Value-Speicher
+angelegt, damit spätere Phasen (z.B. ein persönliches Dashboard-Layout) ihn mitnutzen können, ohne
+eine weitere Tabelle zu brauchen.
 
 ## Benachrichtigungen (Schwellenwerte)
 
@@ -445,6 +486,43 @@ Ein zweiter Tab neben der Lage-Übersicht („Objekte“) zeigt alle Objekte der
 mit Volltextsuche (Name/Adresse), Kategorie-Filter, Sortierung (Name/Kategorie/Fälligkeit) und
 einem Schnellfilter „Nur überfällige“. Ein Klick auf einen Listeneintrag öffnet denselben
 Objekt-Dialog wie ein Klick auf den Kartenmarker.
+
+### Objekt-Detailseite (`objekte.html`)
+
+Eigenständige, tiefere Ansicht zusätzlich zur Karte (die für Anlegen/Bearbeiten mit Kartenposition
+weiterhin allein zuständig bleibt) — nutzt dieselbe generische Tabellen-Komponente wie die
+Themenseiten, mit allen Standard- und wehr-eigenen Zusatzfeldern als frei wählbaren Spalten. Vier
+Werkzeuge:
+
+- **„Nur überfällige"-Ansicht** — dieselbe Überfälligkeits-Logik wie die Dashboard-Liste, hier als
+  eigener Umschalter statt Checkbox.
+- **Massenbearbeitung** — mehrere Objekte per Checkbox auswählen und in einem Rutsch das
+  Überprüfungsintervall setzen (`Promise.all` über die bestehende `PATCH /api/objects/:id`-Route,
+  kein neuer Bulk-Endpunkt nötig).
+- **Karten-Mini-Vorschau je Zeile** — ein kleiner, nicht-interaktiver Leaflet-Ausschnitt direkt in
+  der Tabellenzeile statt nur Adresstext.
+- **Sammel-PDF-Export** — Datenblätter aller ausgewählten (oder, ohne Auswahl, aller aktuell
+  gefilterten) Objekte werden sequentiell als einzelne PDFs heruntergeladen (bewusst nacheinander
+  statt parallel, damit der Browser das nicht als Popup-Flut blockiert).
+
+### Kartenskizzen direkt am Objekt
+
+Im Objekt-Dialog (Karte) lässt sich zusätzlich zu den Anhängen eine **Kartenskizze** direkt in der
+App einzeichnen — mit einem Freihand-Stift und einer festen Symbolpalette (Zugang, Gefahrenbereich,
+Sammelplatz, Hydrant, Absperrung), angelehnt an gängige Einsatzplan-Piktogramme. Anders als ein
+hochgeladener Lageplan bleibt die Skizze **strukturiert bearbeitbar**: gespeichert wird sie als
+GeoJSON (`critical_object_map_sketch`, Migration 012) statt als Bild — Stiftlinien als
+`LineString`-Features, Symbole als `Point`-Features mit einer `symbolKey`-Eigenschaft. Eine
+schreibgeschützte Vorschau (dieselbe Komponente wie die Mini-Vorschau der Objekt-Detailseite, nur
+größer) zeigt die Skizze im Objekt, ein „Skizze bearbeiten"-Button öffnet den interaktiven Editor.
+
+Technisch auf [Leaflet-Geoman](https://github.com/geoman-io/leaflet-geoman) aufgebaut (Freie
+Version, MIT-Lizenz, lokal vendored unter `frontend/public/vendor/leaflet-geoman/` — Lizenztext
+liegt daneben) statt Geomans eigener Formen-Toolbar nutzt EKats nur `map.pm.enableDraw()`
+programmatisch, ausgelöst über die eigene, für Feuerwehrpläne zugeschnittene Symbolleiste. Kein
+Netzwerkzugriff nötig für die Zeichenfunktion selbst (nur die Kartenkacheln laden weiterhin von
+OpenStreetMap) — funktioniert daher auch bei eingeschränkter Konnektivität zur Karte, solange diese
+bereits einmal geladen wurde.
 
 ### Export
 

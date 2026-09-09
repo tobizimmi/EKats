@@ -714,6 +714,73 @@ router.get('/:id/datasheet/pdf', async (req, res, next) => {
 });
 
 // ---------------------------------------------------------------------------
+// Kartenskizzen (Konzept Teil 2, Migration 012): mit Stift/Symbolen direkt am Objekt eingezeichnete
+// Kartenausschnitte. Als GeoJSON gespeichert (nicht als Bild) - bleibt dadurch spaeter bearbeitbar.
+// Eine Zeile je Objekt, PUT ersetzt den Inhalt komplett (kein Versionsverlauf fuer V1 noetig).
+// ---------------------------------------------------------------------------
+
+const EMPTY_SKETCH = { type: 'FeatureCollection', features: [] };
+
+router.get('/:id/sketch', async (req, res, next) => {
+  try {
+    const object = await loadOwnedObject(req.params.id, req.user.wehrId);
+    if (!object) return res.status(404).json({ ok: false, error: 'Objekt nicht gefunden.' });
+
+    const { rows } = await query(
+      'SELECT geojson, updated_at FROM critical_object_map_sketch WHERE critical_object_id = $1',
+      [req.params.id]
+    );
+    return res.json({ ok: true, data: rows[0] || { geojson: EMPTY_SKETCH, updated_at: null } });
+  } catch (err) {
+    return next(err);
+  }
+});
+
+// Grosszuegig, aber begrenzt (300 KB) - eine Skizze mit vielen Strichen/Symbolen soll moeglich sein,
+// ohne dass die Spalte unbegrenzt wachsen kann.
+const sketchSchema = z.object({
+  geojson: z
+    .object({ type: z.literal('FeatureCollection'), features: z.array(z.any()) })
+    .refine((v) => JSON.stringify(v).length <= 300000, { message: 'Kartenskizze ist zu groß (max. 300 KB).' }),
+});
+
+router.put('/:id/sketch', requireRole('stab', 'admin'), async (req, res, next) => {
+  try {
+    const object = await loadOwnedObject(req.params.id, req.user.wehrId);
+    if (!object) return res.status(404).json({ ok: false, error: 'Objekt nicht gefunden.' });
+
+    const parsed = sketchSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ ok: false, error: parsed.error.issues[0].message });
+    }
+
+    const { rows } = await query(
+      `INSERT INTO critical_object_map_sketch (critical_object_id, geojson, updated_by)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (critical_object_id) DO UPDATE SET
+         geojson = EXCLUDED.geojson, updated_by = EXCLUDED.updated_by, updated_at = now()
+       RETURNING geojson, updated_at`,
+      [req.params.id, JSON.stringify(parsed.data.geojson), req.user.id]
+    );
+    return res.json({ ok: true, data: rows[0] });
+  } catch (err) {
+    return next(err);
+  }
+});
+
+router.delete('/:id/sketch', requireRole('stab', 'admin'), async (req, res, next) => {
+  try {
+    const object = await loadOwnedObject(req.params.id, req.user.wehrId);
+    if (!object) return res.status(404).json({ ok: false, error: 'Objekt nicht gefunden.' });
+
+    await query('DELETE FROM critical_object_map_sketch WHERE critical_object_id = $1', [req.params.id]);
+    return res.json({ ok: true, data: null });
+  } catch (err) {
+    return next(err);
+  }
+});
+
+// ---------------------------------------------------------------------------
 // Datei-Anhaenge (Lageplaene/Grundrisse)
 // ---------------------------------------------------------------------------
 

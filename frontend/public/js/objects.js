@@ -14,6 +14,7 @@ const OBJECT_CATEGORY_LABELS = {
 
 let objectsCanEdit = false;
 let editingObjectId = null;
+let activeSketchEditor = null;
 let pendingLatLon = null;
 let vehiclesCache = [];
 let stationsCache = [];
@@ -127,8 +128,70 @@ async function openObjectDialog(mode, object) {
       `<a class="button-link" href="api/objects/${object.id}/datasheet/pdf">PDF: Objekt-Datenblatt</a>`;
     await loadVehiclesAndStations();
     updateTaskTargetOptions();
-    await Promise.all([loadTasksForDialog(object.id), loadAttachmentsForDialog(object.id)]);
+    await Promise.all([loadTasksForDialog(object.id), loadAttachmentsForDialog(object.id), loadObjectSketchForDialog(object, mode)]);
   }
+}
+
+// ---------------------------------------------------------------------------
+// Kartenskizze (Konzept Teil 2, Baustein B - siehe js/object-sketch.js)
+// ---------------------------------------------------------------------------
+
+async function loadObjectSketchForDialog(object, mode) {
+  const previewEl = document.getElementById('object-sketch-preview');
+  const editBtn = document.getElementById('object-sketch-edit-button');
+  document.getElementById('object-sketch-editor').hidden = true;
+  previewEl.hidden = false;
+  if (activeSketchEditor) {
+    activeSketchEditor.destroy();
+    activeSketchEditor = null;
+  }
+
+  let sketchData = { geojson: null };
+  try {
+    sketchData = await api.get(`/objects/${object.id}/sketch`);
+  } catch (err) {
+    // Vorschau bleibt leer, wenn das Laden fehlschlaegt - kein Blocker fuer den restlichen Dialog.
+  }
+  renderObjectSketchPreview(previewEl, { lat: object.lat, lon: object.lon }, sketchData.geojson);
+
+  editBtn.hidden = mode === 'view';
+  editBtn.onclick = () => openObjectSketchEditor(object, sketchData.geojson);
+}
+
+function openObjectSketchEditor(object, initialGeoJson) {
+  document.getElementById('object-sketch-preview').hidden = true;
+  document.getElementById('object-sketch-edit-button').hidden = true;
+  document.getElementById('object-sketch-editor').hidden = false;
+  document.getElementById('object-sketch-error').textContent = '';
+
+  activeSketchEditor = new ObjectSketchEditor({
+    toolbarEl: document.getElementById('object-sketch-toolbar'),
+    mapContainerEl: document.getElementById('object-sketch-map'),
+    errorEl: document.getElementById('object-sketch-error'),
+    objectId: object.id,
+    center: { lat: object.lat, lon: object.lon },
+    initialGeoJson,
+  });
+}
+
+function closeObjectSketchEditor() {
+  if (activeSketchEditor) {
+    activeSketchEditor.destroy();
+    activeSketchEditor = null;
+  }
+  document.getElementById('object-sketch-editor').hidden = true;
+  document.getElementById('object-sketch-preview').hidden = false;
+  document.getElementById('object-sketch-edit-button').hidden = false;
+}
+
+async function saveObjectSketch() {
+  if (!activeSketchEditor) return;
+  const center = activeSketchEditor.center;
+  const geojson = sketchLayersToGeoJson(activeSketchEditor.sketchLayers);
+  const ok = await activeSketchEditor.save();
+  if (!ok) return;
+  closeObjectSketchEditor();
+  renderObjectSketchPreview(document.getElementById('object-sketch-preview'), center, geojson);
 }
 
 // ---------------------------------------------------------------------------
@@ -614,6 +677,17 @@ function initObjectsUi(user) {
   document.getElementById('object-task-target-type').addEventListener('change', updateTaskTargetOptions);
   document.getElementById('object-task-add-button').addEventListener('click', addTaskToCurrentObject);
   document.getElementById('object-attachment-upload-button').addEventListener('click', uploadAttachmentToCurrentObject);
+  document.getElementById('object-sketch-cancel-button').addEventListener('click', closeObjectSketchEditor);
+  document.getElementById('object-sketch-save-button').addEventListener('click', saveObjectSketch);
+  // Native <dialog>-"close"-Event feuert unabhaengig davon, WIE geschlossen wurde (Abbrechen-Klick,
+  // Esc-Taste, Formular-Submit mit method="dialog") - zuverlaessiger Ort, um eine evtl. offene
+  // Leaflet-Editor-Instanz aufzuraeumen, statt jeden einzelnen Schliessen-Pfad einzeln abzudecken.
+  document.getElementById('object-dialog').addEventListener('close', () => {
+    if (activeSketchEditor) {
+      activeSketchEditor.destroy();
+      activeSketchEditor = null;
+    }
+  });
 
   const addButton = document.getElementById('add-object-button');
   if (!objectsCanEdit) {

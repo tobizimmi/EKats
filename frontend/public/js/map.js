@@ -4,6 +4,12 @@
 const OBJECT_LAYER_KEY = 'objects';
 const GEBIET_LAYER_KEY = 'gebiet';
 
+// wetter_vorhersage liefert dutzende stuendliche Werte je Wehr (Zeitreihe an einem Punkt, kein
+// raeumliches Ereignis wie die uebrigen Quellen) und wird vom Backend bereits aus der kombinierten
+// Ansicht ausgeschlossen (siehe datapoints.js) - ohne diese Ausnahme bliebe hier nur ein staendig
+// leerer, verwirrender Layer-Toggle uebrig. Eigene Themenseite: wetter-vorhersage.html.
+const MAP_EXCLUDED_SOURCES = ['wetter_vorhersage'];
+
 let map;
 let layerGroups = {};
 let markersByDatapointId = new Map();
@@ -21,9 +27,11 @@ function initMap(center) {
     attribution: '&copy; OpenStreetMap-Mitwirkende',
   }).addTo(map);
 
-  Object.keys(SOURCE_LABELS).forEach((source) => {
-    layerGroups[source] = L.layerGroup().addTo(map);
-  });
+  Object.keys(SOURCE_LABELS)
+    .filter((source) => !MAP_EXCLUDED_SOURCES.includes(source))
+    .forEach((source) => {
+      layerGroups[source] = L.layerGroup().addTo(map);
+    });
   layerGroups[OBJECT_LAYER_KEY] = L.layerGroup().addTo(map);
   layerGroups[GEBIET_LAYER_KEY] = L.layerGroup().addTo(map);
 
@@ -56,6 +64,7 @@ function buildLayerToggles() {
     [OBJECT_LAYER_KEY]: 'Kritische Objekte',
     [GEBIET_LAYER_KEY]: 'Zuständigkeitsgebiet',
   };
+  MAP_EXCLUDED_SOURCES.forEach((source) => delete allLayers[source]);
   Object.entries(allLayers).forEach(([source, label]) => {
     const id = `layer-toggle-${source}`;
     const wrapper = document.createElement('label');

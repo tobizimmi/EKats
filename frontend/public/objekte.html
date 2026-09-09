@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Objekt-Übersicht – EKats</title>
+  <link rel="stylesheet" href="vendor/leaflet/leaflet.css" />
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <meta name="theme-color" content="#14232f" />
+</head>
+<body>
+  <div id="app-sidebar-root"></div>
+  <main>
+    <div class="card stack">
+      <h2 class="section-title">Objekt-Übersicht</h2>
+      <p class="muted">
+        Alle kritischen Objekte der Wehr mit frei wählbaren Spalten, Massenbearbeitung und
+        Sammel-PDF-Export. Anlegen und Bearbeiten mit Kartenposition weiterhin über die
+        <a href="./">Karte</a>.
+      </p>
+
+      <div class="form-row">
+        <button type="button" id="objekte-overdue-toggle" class="secondary">Nur überfällige</button>
+        <button type="button" id="objekte-pdf-export" class="secondary">Sammel-PDF-Export</button>
+      </div>
+
+      <div id="objekte-bulk-bar" class="card" hidden style="background: var(--bg); margin: 0.75rem 0;">
+        <div class="form-row" style="align-items: end;">
+          <span id="objekte-bulk-count" class="muted"></span>
+          <label>
+            <span>Überprüfungsintervall setzen (Monate)</span>
+            <input type="number" id="objekte-bulk-interval" min="1" step="1" />
+          </label>
+          <button type="button" id="objekte-bulk-apply" class="primary">Auf Auswahl anwenden</button>
+          <button type="button" id="objekte-bulk-clear" class="secondary">Auswahl aufheben</button>
+        </div>
+        <p class="error-message" id="objekte-bulk-error" role="alert"></p>
+      </div>
+
+      <div id="objekte-table-container"></div>
+    </div>
+  </main>
+
+  <dialog id="objekte-detail-dialog" class="app-dialog">
+    <h3 id="objekte-detail-title" class="section-title">Objekt</h3>
+    <dl id="objekte-detail-content"></dl>
+    <div class="dialog-actions">
+      <a id="objekte-detail-map-link" href="./" class="button-link">Auf der Karte öffnen</a>
+      <button type="button" id="objekte-detail-close" class="secondary">Schließen</button>
+    </div>
+  </dialog>
+
+  <script src="vendor/leaflet/leaflet.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/header.js"></script>
+  <script src="js/severity.js"></script>
+  <script src="js/sw-register.js"></script>
+  <script src="js/data-table.js"></script>
+  <script src="js/objekte-page.js"></script>
+</body>
+</html>

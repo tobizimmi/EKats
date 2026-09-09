@@ -11,6 +11,7 @@ const SOURCE_LABELS = {
   waldbrandindex: 'Waldbrandgefahrenindex',
   bbk_warnung: 'Bevölkerungswarnung (BBK/NINA)',
   kachelmann: 'Kachelmann-Warnung (Meteologix)',
+  wetter_vorhersage: 'Wetter-Vorhersage (Bright Sky)',
 };
 
 // Gemeinsame Farbskala fuer Karten-Marker, genutzt vom Dashboard (map.js) und den

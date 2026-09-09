@@ -10,6 +10,7 @@ const ADDON_REFRESH_INTERVAL_MS = 60 * 1000;
 
 let addonMap;
 let addonMarkersById = new Map();
+let addonTable;
 
 function initAddonMap(center) {
   addonMap = L.map('map', { zoomControl: true }).setView(
@@ -56,13 +57,23 @@ window.selectDatapoint = function selectDatapoint(dp) {
 };
 
 async function loadAndRenderAddonDatapoints() {
+  const errorEl = document.getElementById('addon-error');
   try {
     const datapoints = await api.get(`/datapoints?source=${ADDON_SOURCE}`);
+    errorEl.textContent = '';
     renderAddonMap(datapoints);
-    renderList(datapoints);
+    addonTable.setData(datapoints);
+    document.getElementById('list-updated').textContent = `Stand: ${new Date().toLocaleTimeString('de-DE')}`;
     return datapoints;
   } catch (err) {
     console.error('[addon] Datenpunkte konnten nicht geladen werden:', err);
+    // 403 = Feature-Zugriffssteuerung (aktuell Kachelmann, ab Phase 5 potenziell jede Quelle, siehe
+    // backend/src/utils/featureAccess.js) - ohne diese Unterscheidung wirkt die Seite bei fehlender
+    // Freigabe nur "kaputt" statt verstaendlich, warum sie leer bleibt.
+    errorEl.textContent =
+      err.status === 403
+        ? 'Kein Zugriff auf diese Datenquelle - bei Bedarf im Admin-Bereich freischalten lassen.'
+        : 'Daten konnten nicht geladen werden. Bitte später erneut versuchen.';
     return null;
   }
 }
@@ -73,6 +84,16 @@ async function loadAndRenderAddonDatapoints() {
 
   initAddonMap(user.wehrCenter);
   registerServiceWorker();
+
+  // Spalten-Sichtbarkeit wird je Quelle unter einem eigenen Schluessel gespeichert
+  // (Konzept Teil 2, Baustein D - siehe backend/src/routes/userPreferences.js).
+  addonTable = new DataTable({
+    containerEl: document.getElementById('addon-table-container'),
+    prefKey: `columns:${ADDON_SOURCE}`,
+    source: ADDON_SOURCE,
+    onRowClick: (dp) => window.selectDatapoint(dp),
+  });
+  await addonTable.init();
 
   await loadBundeslandFeatures();
   await loadLandkreisFeatures();

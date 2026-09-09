@@ -51,50 +51,157 @@ a {
   color: inherit;
 }
 
-header.app-header {
+/* Seitenleisten-Navigation (Konzept Teil 2, Baustein A) - ersetzt die fruehere horizontale
+   Kopfzeile, die bei acht Themenseiten zu voll wurde. Wird von js/header.js in ein leeres
+   <div id="app-sidebar-root"> gerendert; body.has-sidebar (ebenfalls von header.js gesetzt)
+   grenzt den Platz-Einzug auf Seiten ein, die tatsaechlich eine Seitenleiste haben. */
+body.has-sidebar {
+  padding-left: 240px;
+}
+
+.app-sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 240px;
   background: var(--header-bg);
   color: var(--header-text);
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0.75rem 1.25rem;
-  position: sticky;
-  top: 0;
+  flex-direction: column;
   z-index: 500;
-  gap: 1rem;
-  flex-wrap: wrap;
+  overflow-y: auto;
 }
 
-header.app-header .brand {
+.sidebar-brand {
   font-weight: 700;
   font-size: 1.1rem;
+  padding: 1rem 1.1rem;
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  flex-shrink: 0;
 }
 
-header.app-header nav {
+.sidebar-nav {
+  flex: 1;
+  padding: 0 0.6rem;
+}
+
+.sidebar-group {
+  margin-bottom: 1rem;
+}
+
+.sidebar-group-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: rgba(255, 255, 255, 0.5);
+  padding: 0.4rem 0.5rem 0.3rem;
+}
+
+.sidebar-link {
   display: flex;
-  gap: 1rem;
   align-items: center;
-  flex-wrap: wrap;
-}
-
-header.app-header nav a,
-header.app-header nav button {
+  gap: 0.6rem;
   color: var(--header-text);
   text-decoration: none;
-  font: inherit;
-  background: none;
-  border: 1px solid transparent;
-  padding: 0.35rem 0.6rem;
+  padding: 0.5rem 0.6rem;
   border-radius: 6px;
+  font-size: 0.92rem;
+}
+
+.sidebar-link:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.sidebar-link.active {
+  background: rgba(255, 255, 255, 0.16);
+  font-weight: 600;
+}
+
+.sidebar-link-icon {
+  font-size: 1rem;
+  width: 1.2em;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.sidebar-footer {
+  padding: 0.9rem 1.1rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.sidebar-footer #header-user {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.sidebar-footer button {
+  color: var(--header-text);
+  background: none;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  padding: 0.4rem 0.6rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font: inherit;
+}
+
+.sidebar-footer button:hover {
+  border-color: rgba(255, 255, 255, 0.6);
+}
+
+.sidebar-toggle {
+  display: none;
+  position: fixed;
+  top: 0.7rem;
+  left: 0.7rem;
+  z-index: 600;
+  background: var(--header-bg);
+  color: var(--header-text);
+  border: none;
+  border-radius: 8px;
+  width: 2.4rem;
+  height: 2.4rem;
+  font-size: 1.2rem;
   cursor: pointer;
 }
 
-header.app-header nav a:hover,
-header.app-header nav button:hover {
-  border-color: rgba(255, 255, 255, 0.3);
+.sidebar-overlay {
+  display: none;
+}
+
+/* Unter 900px (gleicher Bruchpunkt wie .dashboard-grid) wird die Seitenleiste zum einklappbaren
+   Overlay statt eines dauerhaft sichtbaren linken Balkens. */
+@media (max-width: 900px) {
+  body.has-sidebar {
+    padding-left: 0;
+  }
+  .app-sidebar {
+    width: 260px;
+    transform: translateX(-100%);
+    transition: transform 0.2s ease;
+  }
+  .app-sidebar.open {
+    transform: translateX(0);
+  }
+  .sidebar-toggle {
+    display: block;
+  }
+  .sidebar-overlay.visible {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+    z-index: 499;
+  }
+  body.has-sidebar main {
+    padding-top: 3.6rem;
+  }
 }
 
 main {
@@ -488,6 +595,116 @@ table.data-table td {
 .muted {
   color: var(--text-muted);
   font-size: 0.85rem;
+}
+
+/* Generische Tabellen-Komponente (Konzept Teil 2, Baustein B), siehe js/data-table.js. */
+.data-table-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.data-table-search {
+  min-width: 160px;
+  flex: 1;
+}
+
+.data-table-colpicker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-left: auto;
+}
+
+.data-table-chip {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 0.25rem 0.65rem;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
+.data-table-chip input {
+  width: auto;
+}
+
+.table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.table-wrap table.data-table {
+  min-width: 480px;
+}
+
+.data-table-row-clickable {
+  cursor: pointer;
+}
+
+.data-table-row-clickable:hover {
+  background: var(--bg);
+}
+
+/* Karten-Mini-Vorschau je Tabellenzeile (objekte.html), siehe js/objekte-page.js. */
+.object-minimap-cell {
+  padding: 0.25rem !important;
+}
+
+.object-minimap {
+  width: 120px;
+  height: 60px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+}
+
+/* Kartenskizzen-Editor am Objekt (Konzept Teil 2, Baustein B), siehe js/object-sketch.js. */
+.object-sketch-preview {
+  margin-bottom: 0.5rem;
+}
+
+.object-sketch-preview-map {
+  width: 100%;
+  height: 220px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+
+.object-sketch-empty-hint {
+  margin-top: 0.4rem;
+}
+
+.object-sketch-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: 0.6rem;
+}
+
+#object-sketch-map {
+  width: 100%;
+  height: 320px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  margin-bottom: 0.6rem;
+}
+
+.object-sketch-symbol-wrap {
+  background: none;
+  border: none;
+}
+
+.object-sketch-symbol-icon {
+  font-size: 1.3rem;
+  line-height: 28px;
+  text-align: center;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5));
 }
 
 .badge {

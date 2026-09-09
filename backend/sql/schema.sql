@@ -317,3 +317,22 @@ CREATE TABLE IF NOT EXISTS pdf_template (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     UNIQUE(wehr_id, document_type)
 );
+
+-- Selbst verwaltbare Nutzer-Einstellungen (Migration 011): Spalten-Sichtbarkeit je Themenseite,
+-- spaeter das persoenliche Dashboard-Layout. Siehe Migration 011 fuer Details im Kommentar.
+CREATE TABLE IF NOT EXISTS user_preference (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES app_user(id) ON DELETE CASCADE,
+    pref_key TEXT NOT NULL,
+    value JSONB NOT NULL,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE(user_id, pref_key)
+);
+
+-- Kartenskizzen direkt am Objekt (Migration 012): siehe Migration 012 fuer Details im Kommentar.
+CREATE TABLE IF NOT EXISTS critical_object_map_sketch (
+    critical_object_id INTEGER PRIMARY KEY REFERENCES critical_object(id) ON DELETE CASCADE,
+    geojson JSONB NOT NULL DEFAULT '{"type":"FeatureCollection","features":[]}'::jsonb,
+    updated_by INTEGER REFERENCES app_user(id) ON DELETE SET NULL,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);

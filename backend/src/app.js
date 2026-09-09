@@ -23,6 +23,7 @@ const bundeslaenderRoutes = require('./routes/bundeslaender');
 const objectFieldsRoutes = require('./routes/objectFields');
 const featureAccessRoutes = require('./routes/featureAccess');
 const pdfTemplatesRoutes = require('./routes/pdfTemplates');
+const userPreferencesRoutes = require('./routes/userPreferences');
 
 function createApp() {
   const app = express();
@@ -107,6 +108,7 @@ function createApp() {
   app.use('/api/object-fields', objectFieldsRoutes);
   app.use('/api/feature-access', featureAccessRoutes);
   app.use('/api/pdf-templates', pdfTemplatesRoutes);
+  app.use('/api/user-preferences', userPreferencesRoutes);
 
   app.use('/api', notFoundHandler);
 

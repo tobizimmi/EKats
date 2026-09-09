@@ -68,6 +68,9 @@ const config = {
     dwdStationsImport: process.env.FETCH_DWD_STATIONS_IMPORT_CRON || '0 4 * * 1',
     bbkWarnungen: process.env.FETCH_BBK_WARNUNGEN_CRON || '*/15 * * * *',
     kachelmann: process.env.FETCH_KACHELMANN_CRON || '*/30 * * * *',
+    // Stuendlich reicht fuer eine Vorhersage (MOSMIX aktualisiert selbst nur ein paar Mal taeglich) -
+    // haeltsich damit bewusst zurueck gegenueber dem kostenlosen oeffentlichen Bright-Sky-Dienst.
+    wetterVorhersage: process.env.FETCH_WETTER_VORHERSAGE_CRON || '0 * * * *',
     cleanup: process.env.CLEANUP_CRON || '30 3 * * *',
   },
 

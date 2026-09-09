@@ -15,6 +15,7 @@ const VALID_SOURCES = [
   'waldbrandindex',
   'bbk_warnung',
   'kachelmann',
+  'wetter_vorhersage',
 ];
 
 // GET /api/datapoints?source=pegelonline&since=2026-01-01T00:00:00Z
@@ -45,8 +46,16 @@ router.get('/', requireAuth, async (req, res, next) => {
     if (source) {
       params.push(source);
       conditions.push(`source = $${params.length}`);
-    } else if (!kachelmannAllowed) {
-      conditions.push(`source != 'kachelmann'`);
+    } else {
+      // Ungefilterte Abfrage speist die kombinierte Lage-Uebersicht (Karte, Lage-Liste, Prioritaets-
+      // Leiste) - wetter_vorhersage liefert dutzende stuendliche Werte je Wehr (Zeitreihe, kein
+      // Einzelereignis wie die uebrigen Quellen) und wuerde diese Ansicht nur zumuellen. Bewusst
+      // ausschliesslich ueber die eigene Themenseite (?source=wetter_vorhersage) und spaeter
+      // Dashboard-Widgets (Phase 6) abrufbar, nie Teil der Kombi-Ansicht.
+      conditions.push(`source != 'wetter_vorhersage'`);
+      if (!kachelmannAllowed) {
+        conditions.push(`source != 'kachelmann'`);
+      }
     }
     if (since) {
       params.push(since);

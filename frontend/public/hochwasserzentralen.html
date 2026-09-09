@@ -11,29 +11,15 @@
   <meta name="theme-color" content="#14232f" />
 </head>
 <body data-addon-source="hochwasserzentralen">
-  <header class="app-header">
-    <div class="brand">🚒 EKats Lagedashboard</div>
-    <nav>
-      <a href="./">Karte</a>
-      <a href="dwd-unwetter.html">Wetter</a>
-      <a href="pegelonline.html">Pegel</a>
-      <a href="hochwasserzentralen.html">Hochwasser</a>
-      <a href="waldbrandindex.html">Waldbrand</a>
-      <a href="firms.html">Feuer</a>
-      <a href="bbk-warnungen.html">Warnungen</a>
-      <a href="settings.html">Einstellungen</a>
-      <a href="admin.html" data-role="admin-only" hidden>Admin</a>
-      <span id="header-user" class="muted"></span>
-      <button id="logout-button" type="button">Abmelden</button>
-    </nav>
-  </header>
+  <div id="app-sidebar-root"></div>
   <main>
     <div class="dashboard-grid">
       <div id="map"></div>
       <div class="card stack">
         <h2 class="section-title">Landespegel (Hochwasserzentralen)</h2>
         <p class="muted" id="list-updated"></p>
-        <ul class="situation-list" id="situation-list"></ul>
+        <p class="error-message" id="addon-error" role="alert"></p>
+        <div id="addon-table-container"></div>
         <div class="detail-panel" id="detail-panel" hidden>
           <h3 class="section-title">Details</h3>
           <dl id="detail-content"></dl>
@@ -48,9 +34,9 @@
   <script src="js/severity.js"></script>
   <script src="js/sw-register.js"></script>
   <script src="js/gebiet-info.js"></script>
-  <script src="js/list.js"></script>
   <script src="js/detail.js"></script>
   <script src="js/bundesland.js"></script>
+  <script src="js/data-table.js"></script>
   <script src="js/addon.js"></script>
 </body>
 </html>
