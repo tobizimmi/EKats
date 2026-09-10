@@ -1009,6 +1009,12 @@ Lesen für alle Rollen, Anlegen/Status ändern/Löschen nur für `stab`/`admin` 
 Einsatztagebuch/`critical_object`). API: `GET/POST/PATCH/DELETE /api/uebergabeprotokoll`, `GET`
 filterbar über `?status=offen|erledigt`.
 
+**Überarbeitung:** Ursprünglich ließ sich ein Punkt nur abhaken oder löschen — ein Tippfehler war
+nur über Löschen+Neuanlegen korrigierbar (verliert dabei den Ersteller/Zeitstempel). Jetzt lässt
+sich der Text direkt inline bearbeiten ("Bearbeiten"-Button ersetzt Text+Fußzeile durch ein
+Eingabefeld mit Speichern/Abbrechen, `PATCH` mit nur `message` — der Status bleibt dabei
+unangetastet).
+
 ## Checklisten/SOPs
 
 `checklisten.html` ("Einsatzführung" in der Seitenleiste) rundet das "Später"-Paket ab: hinterlegbare
@@ -1028,6 +1034,16 @@ offen, auch `mitglied` — ein eigener Endpunkt ohne Rollen-Gate
 (`PATCH /api/checklists/items/:id`). API: `GET/POST/PATCH/DELETE /api/checklists`,
 `PATCH /api/checklists/items/:id` (Haken), `POST /api/checklists/:id/reset` (alle Haken einer Vorlage
 zurücksetzen, wieder `stab`/`admin`-only).
+
+**Überarbeitung:** Das Backend unterstützte von Anfang an `PATCH /api/checklists/:id` zum Ändern
+einer bestehenden Vorlage, das Frontend bot dafür aber keine Bedienung — eine Vorlage ließ sich nur
+anlegen, zurücksetzen oder löschen, nicht nachträglich umbenennen/umkategorisieren/die Punkteliste
+anpassen (nur über Löschen+komplettes Neuanlegen, das verliert die bisherigen Abhak-Zeitstempel
+unnötig). Jetzt öffnet ein "Bearbeiten"-Button je Vorlage dasselbe Formular vorbefüllt im
+Bearbeiten-Modus (Titel/Button-Beschriftung wechseln, "Bearbeitung abbrechen" erscheint — dasselbe
+Muster wie beim Einsatztagebuch-Formular). Weiterhin bewusst **volle Punktelisten-Ersetzung** beim
+Speichern (kein granulares Einzel-Punkt-Umsortieren) — ein deutlich sichtbarer Hinweistext im
+Formular macht das während der Bearbeitung klar, statt es stillschweigend voraussetzen.
 
 ## Individuelles Dashboard (Phase 6, Raster-Umbau: Nutzerwunsch nach freier Position/Größe)
 

@@ -7,7 +7,7 @@
 // self.registration.scope loesen relative URLs relativ zu self.location auf. So funktioniert
 // dieselbe sw.js unveraendert egal ob die App an der Domain-Root oder einem Unterpfad
 // (z.B. https://zimmimail.de/EKats/) haengt - siehe README "Deployment".
-const CACHE_NAME = 'ekats-shell-v38';
+const CACHE_NAME = 'ekats-shell-v39';
 // Offline-Kartenkacheln (js/offline-tiles.js, Admin-Bereich "Gebiet herunterladen"): bewusst ein
 // EIGENER, von CACHE_NAME komplett getrennter Cache-Bucket - der Name bleibt konstant über
 // App-Updates hinweg (kein "-vNN"-Zaehler wie bei CACHE_NAME), damit ein einmal heruntergeladenes

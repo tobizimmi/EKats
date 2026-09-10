@@ -836,6 +836,19 @@ table.data-table td {
   gap: 0.4rem;
 }
 
+/* Inline-Bearbeitung eines Uebergabeprotokoll-Punkts (js/uebergabeprotokoll.js) - ersetzt Text +
+   Fusszeile durch dieses Eingabefeld, solange der Punkt in Bearbeitung ist. */
+.tagebuch-entry-edit-textarea {
+  width: 100%;
+  font: inherit;
+  padding: 0.4rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+  resize: vertical;
+}
+
 .checkbox-inline {
   display: flex;
   align-items: center;

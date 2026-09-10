@@ -3,7 +3,7 @@
 // (js/einsatztagebuch.js, gleiches Grundmuster) zwei getrennte Listen statt einer Zeitleiste, weil
 // hier "was steht noch aus" die eigentliche Frage ist, nicht "was geschah wann".
 
-const uebergabe = { currentUser: null };
+const uebergabe = { currentUser: null, entries: [], editingEntryId: null };
 
 async function toggleStatus(entry) {
   const nextStatus = entry.status === 'offen' ? 'erledigt' : 'offen';
@@ -25,9 +25,62 @@ async function deleteEntry(id) {
   }
 }
 
+// Bearbeitung passiert Inline direkt in der Zeile (statt ueber ein separates Formular wie bei
+// Checklisten) - ein Uebergabepunkt ist ein einzelnes Freitextfeld, dafuer lohnt sich kein Umschalten
+// zu einer entfernten Formular-Karte. editingEntryId steuert, welche der (bereits geladenen)
+// uebergabe.entries gerade als Eingabefeld statt als Text gerendert wird.
+function startEditEntry(id) {
+  uebergabe.editingEntryId = id;
+  renderEntries(uebergabe.entries);
+}
+
+function cancelEditEntry() {
+  uebergabe.editingEntryId = null;
+  renderEntries(uebergabe.entries);
+}
+
+async function saveEntryEdit(id, message) {
+  const errorEl = document.getElementById('uebergabe-list-error');
+  errorEl.textContent = '';
+  const trimmed = message.trim();
+  if (!trimmed) return;
+  try {
+    await api.patch(`/uebergabeprotokoll/${id}`, { message: trimmed });
+    uebergabe.editingEntryId = null;
+    await loadEntries();
+  } catch (err) {
+    errorEl.textContent = err.message;
+  }
+}
+
 function renderEntry(entry, canWrite) {
   const el = document.createElement('div');
   el.className = 'tagebuch-entry';
+
+  if (canWrite && uebergabe.editingEntryId === entry.id) {
+    const textarea = document.createElement('textarea');
+    textarea.className = 'tagebuch-entry-edit-textarea';
+    textarea.rows = 2;
+    textarea.maxLength = 4000;
+    textarea.value = entry.message;
+    el.appendChild(textarea);
+
+    const editActions = document.createElement('div');
+    editActions.className = 'tagebuch-entry-actions';
+    const saveBtn = document.createElement('button');
+    saveBtn.type = 'button';
+    saveBtn.className = 'primary';
+    saveBtn.textContent = 'Speichern';
+    saveBtn.addEventListener('click', () => saveEntryEdit(entry.id, textarea.value));
+    const cancelBtn = document.createElement('button');
+    cancelBtn.type = 'button';
+    cancelBtn.className = 'secondary';
+    cancelBtn.textContent = 'Abbrechen';
+    cancelBtn.addEventListener('click', cancelEditEntry);
+    editActions.append(saveBtn, cancelBtn);
+    el.appendChild(editActions);
+    return el;
+  }
 
   const message = document.createElement('div');
   message.className = 'tagebuch-entry-message';
@@ -52,12 +105,17 @@ function renderEntry(entry, canWrite) {
     toggleBtn.className = 'secondary';
     toggleBtn.textContent = entry.status === 'offen' ? 'Als erledigt markieren' : 'Wieder öffnen';
     toggleBtn.addEventListener('click', () => toggleStatus(entry));
+    const editBtn = document.createElement('button');
+    editBtn.type = 'button';
+    editBtn.className = 'secondary';
+    editBtn.textContent = 'Bearbeiten';
+    editBtn.addEventListener('click', () => startEditEntry(entry.id));
     const deleteBtn = document.createElement('button');
     deleteBtn.type = 'button';
     deleteBtn.className = 'secondary';
     deleteBtn.textContent = 'Löschen';
     deleteBtn.addEventListener('click', () => deleteEntry(entry.id));
-    actions.append(toggleBtn, deleteBtn);
+    actions.append(toggleBtn, editBtn, deleteBtn);
     footer.appendChild(actions);
   }
   el.appendChild(footer);
@@ -65,6 +123,7 @@ function renderEntry(entry, canWrite) {
 }
 
 function renderEntries(entries) {
+  uebergabe.entries = entries;
   const offenContainer = document.getElementById('uebergabe-offen');
   const erledigtContainer = document.getElementById('uebergabe-erledigt');
   offenContainer.innerHTML = '';

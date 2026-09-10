@@ -13,7 +13,7 @@
   <div id="app-sidebar-root"></div>
   <main class="stack">
     <div class="card" data-role="stab-only" hidden>
-      <h2 class="section-title">Neue Checkliste</h2>
+      <h2 class="section-title" id="checklist-form-title">Neue Checkliste</h2>
       <form id="checklist-form" class="form-row">
         <label>
           <span>Name</span>
@@ -27,9 +27,14 @@
           <span>Punkte (eine Zeile je Punkt)</span>
           <textarea id="checklist-items" rows="5" placeholder="Erster Punkt&#10;Zweiter Punkt&#10;..." required></textarea>
         </label>
+        <p class="muted" id="checklist-edit-hint" hidden>
+          Achtung: Beim Speichern wird die komplette Punkteliste ersetzt - bereits gesetzte Haken
+          gehen dabei verloren (Reihenfolge/Text zählen, nicht die einzelne Zeile).
+        </p>
         <p class="error-message" id="checklist-form-error" role="alert"></p>
         <div class="dialog-actions">
-          <button type="submit" class="primary">Checkliste anlegen</button>
+          <button type="submit" class="primary" id="checklist-submit-button">Checkliste anlegen</button>
+          <button type="button" class="secondary" id="checklist-cancel-edit-button" hidden>Bearbeitung abbrechen</button>
         </div>
       </form>
     </div>

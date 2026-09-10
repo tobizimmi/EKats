@@ -3,7 +3,30 @@
 // Liste von Einträgen, sondern Vorlagen mit geschachtelten Punkten - deshalb eigene Render-Logik
 // statt Wiederverwendung der generischen DataTable.
 
-const checklisten = { currentUser: null };
+const checklisten = { currentUser: null, editingId: null };
+
+function resetChecklistForm() {
+  checklisten.editingId = null;
+  document.getElementById('checklist-form-title').textContent = 'Neue Checkliste';
+  document.getElementById('checklist-submit-button').textContent = 'Checkliste anlegen';
+  document.getElementById('checklist-cancel-edit-button').hidden = true;
+  document.getElementById('checklist-edit-hint').hidden = true;
+  document.getElementById('checklist-form').reset();
+  document.getElementById('checklist-form-error').textContent = '';
+}
+
+function startEditTemplate(template) {
+  checklisten.editingId = template.id;
+  document.getElementById('checklist-form-title').textContent = `Checkliste bearbeiten (#${template.id})`;
+  document.getElementById('checklist-submit-button').textContent = 'Änderung speichern';
+  document.getElementById('checklist-cancel-edit-button').hidden = false;
+  document.getElementById('checklist-edit-hint').hidden = false;
+  document.getElementById('checklist-name').value = template.name;
+  document.getElementById('checklist-category').value = template.category || '';
+  document.getElementById('checklist-items').value = template.items.map((i) => i.text).join('\n');
+  document.getElementById('checklist-form-error').textContent = '';
+  document.getElementById('checklist-name').scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
 
 async function toggleItem(item) {
   try {
@@ -80,6 +103,11 @@ function renderTemplate(template, canManage) {
   if (canManage) {
     const actions = document.createElement('div');
     actions.className = 'tagebuch-entry-actions';
+    const editBtn = document.createElement('button');
+    editBtn.type = 'button';
+    editBtn.className = 'secondary';
+    editBtn.textContent = 'Bearbeiten';
+    editBtn.addEventListener('click', () => startEditTemplate(template));
     const resetBtn = document.createElement('button');
     resetBtn.type = 'button';
     resetBtn.className = 'secondary';
@@ -90,7 +118,7 @@ function renderTemplate(template, canManage) {
     deleteBtn.className = 'secondary';
     deleteBtn.textContent = 'Löschen';
     deleteBtn.addEventListener('click', () => deleteTemplate(template));
-    actions.append(resetBtn, deleteBtn);
+    actions.append(editBtn, resetBtn, deleteBtn);
     card.appendChild(actions);
   }
 
@@ -131,13 +159,19 @@ function initChecklistForm() {
     if (!name || items.length === 0) return;
 
     try {
-      await api.post('/checklists', { name, category: category || null, items });
-      form.reset();
+      if (checklisten.editingId) {
+        await api.patch(`/checklists/${checklisten.editingId}`, { name, category: category || null, items });
+      } else {
+        await api.post('/checklists', { name, category: category || null, items });
+      }
+      resetChecklistForm();
       await loadChecklists();
     } catch (err) {
       errorEl.textContent = err.message;
     }
   });
+
+  document.getElementById('checklist-cancel-edit-button').addEventListener('click', resetChecklistForm);
 }
 
 async function bootstrapChecklistenPage() {
