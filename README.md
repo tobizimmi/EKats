@@ -932,10 +932,27 @@ Lesen für alle Rollen, Anlegen/Ändern/Löschen nur für `stab`/`admin` (dassel
 API: `GET/POST/PATCH/DELETE /api/einsatztagebuch`, `GET` filterbar über `?since=&until=` (ISO-Zeit,
 filtert auf `entry_time`). Kein PDF-Export in dieser ersten Ausbaustufe.
 
+## Übergabeprotokoll
+
+`uebergabeprotokoll.html` ("Einsatzführung" in der Seitenleiste, neben dem Einsatztagebuch) deckt
+den zweiten Punkt aus dem "Später"-Roadmap-Paket ab: eine strukturierte Schichtübergabe statt eines
+rein chronologischen Logs. Jeder Punkt (`uebergabe_eintrag`, Migration 019) hat genau zwei Zustände —
+`offen`/`erledigt` — und die Seite zeigt zwei getrennte Listen ("Offene Punkte" oben, "Erledigt"
+darunter), damit eine übernehmende Schicht auf einen Blick sieht, was noch aussteht. Ein Punkt lässt
+sich abhaken und bei Bedarf wieder öffnen; ein Wechsel auf `erledigt` setzt automatisch
+`resolved_by`/`resolved_at`, ein Zurückwechseln löscht diese Felder wieder, statt einen veralteten
+Stand stehen zu lassen. Technisch bewusst dasselbe Grundmuster wie beim Einsatztagebuch (ein
+durchlaufender Bestand je Wehr statt eigener "Schicht"-Datensätze mit Beginn/Ende) — der einzige
+fachliche Unterschied ist der Status statt eines reinen Zeitstempels.
+
+Lesen für alle Rollen, Anlegen/Status ändern/Löschen nur für `stab`/`admin` (identisches Muster wie
+Einsatztagebuch/`critical_object`). API: `GET/POST/PATCH/DELETE /api/uebergabeprotokoll`, `GET`
+filterbar über `?status=offen|erledigt`.
+
 ## Individuelles Dashboard (Phase 6, Raster-Umbau: Nutzerwunsch nach freier Position/Größe)
 
 `dashboard.html` ("Mein Dashboard" in der Seitenleiste) ergänzt die feste Karten-Ansicht
-(`index.html`, unverändert) um einen Baukasten aus aktuell 19 Widget-Typen (davon einer,
+(`index.html`, unverändert) um einen Baukasten aus aktuell 21 Widget-Typen (davon einer,
 Audit-Log-Feed, nur für die Rolle `admin` im „Widget hinzufügen"-Dialog sichtbar — clientseitig
 gefiltert über ein `adminOnly`-Flag im Widget-Katalog, der Endpunkt selbst ist ohnehin
 serverseitig `requireRole('admin')`-geschützt): Karte
@@ -944,9 +961,9 @@ Pegel-Liniendiagramm und Waldbrand-Trend (beide mehrfach möglich, je Station ei
 Verlaufs-Grafik aus `js/pegel-chart.js`), FIRMS-Hotspot-Karte (Mini-Karte statt Liste),
 Wetter-Vorhersage, Blitz-Zähler, Fahrzeugstatus (Anzahl je Wache), Anstehende Überprüfungen (Liste
 statt nur Zahl), BBK/NINA-Feed, Kachelmann-Wetter, Uhr/Datum, Notiz-Pinnwand (geräteübergreifend
-geteilter Freitext), Eigene Links, Hochwasserzentralen-Liste, DWD-Unwetter-Ticker und eine
+geteilter Freitext), Eigene Links, Hochwasserzentralen-Liste, DWD-Unwetter-Ticker, Erdbeben-Liste (EMSC) und eine
 Gesamt-Statuszeile (Ein-Zeilen-Ampel über alle Quellen). Die Listen-Widgets (Vorhersage/BBK/
-Hochwasser/Unwetter) speisen sich aus demselben, einmal pro Seitenaufruf geladenen
+Hochwasser/Unwetter/Erdbeben) speisen sich aus demselben, einmal pro Seitenaufruf geladenen
 `GET /api/datapoints` wie die Prioritäts-Leiste — kein zusätzlicher Request je Widget.
 
 **Verlaufs-Widgets (Pegel/Waldbrand):** `datapoint_history` (Migration 013) wurde bewusst nur um

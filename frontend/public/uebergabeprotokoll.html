@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Übergabeprotokoll – EKats</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <meta name="theme-color" content="#14232f" />
+</head>
+<body>
+  <div id="app-sidebar-root"></div>
+  <main class="stack">
+    <div class="card" data-role="stab-only" hidden>
+      <h2 class="section-title">Neuer Punkt</h2>
+      <form id="uebergabe-form" class="form-row">
+        <label class="form-row-full">
+          <span>Was ist offen / zu übergeben?</span>
+          <textarea id="uebergabe-message" rows="2" maxlength="4000" required></textarea>
+        </label>
+        <p class="error-message" id="uebergabe-form-error" role="alert"></p>
+        <div class="dialog-actions">
+          <button type="submit" class="primary">Punkt hinzufügen</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="card">
+      <h2 class="section-title">Offene Punkte</h2>
+      <p class="muted">
+        Was die nächste Schicht wissen/übernehmen muss. Sichtbar für alle, anlegen/abhaken nur für
+        Stab/Admin.
+      </p>
+      <p class="error-message" id="uebergabe-list-error" role="alert"></p>
+      <div id="uebergabe-offen" class="stack"></div>
+    </div>
+
+    <div class="card">
+      <h2 class="section-title">Erledigt</h2>
+      <div id="uebergabe-erledigt" class="stack"></div>
+    </div>
+  </main>
+
+  <script src="js/api.js"></script>
+  <script src="js/header.js"></script>
+  <script src="js/severity.js"></script>
+  <script src="js/sw-register.js"></script>
+  <script src="js/uebergabeprotokoll.js"></script>
+</body>
+</html>

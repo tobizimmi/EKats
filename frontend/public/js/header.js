@@ -43,7 +43,10 @@ const NAV_GROUPS = [
   },
   {
     label: 'Einsatzführung',
-    items: [{ href: 'einsatztagebuch.html', label: 'Einsatztagebuch', icon: '📓' }],
+    items: [
+      { href: 'einsatztagebuch.html', label: 'Einsatztagebuch', icon: '📓' },
+      { href: 'uebergabeprotokoll.html', label: 'Übergabeprotokoll', icon: '🔄' },
+    ],
   },
   {
     label: 'Verwaltung',
