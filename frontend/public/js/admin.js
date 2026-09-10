@@ -491,6 +491,70 @@ async function loadSmtpSettings() {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Offline-Kartenkacheln (js/offline-tiles.js)
+// ---------------------------------------------------------------------------
+
+function initOfflineTilesUi() {
+  const statusEl = document.getElementById('offline-tiles-status');
+  const errorEl = document.getElementById('offline-tiles-error');
+
+  offlineTileCacheSize().then((count) => {
+    if (count > 0) statusEl.textContent = `${count} Kacheln bereits offline verfügbar.`;
+  });
+
+  document.getElementById('offline-tiles-form').addEventListener('submit', async (event) => {
+    event.preventDefault();
+    errorEl.textContent = '';
+    const lat = Number(document.getElementById('wehr-lat').value);
+    const lon = Number(document.getElementById('wehr-lon').value);
+    if (!lat || !lon) {
+      errorEl.textContent = 'Kein Kartenmittelpunkt für die Wehr hinterlegt (siehe oben).';
+      return;
+    }
+    const radiusKm = Number(document.getElementById('offline-tiles-radius').value);
+    const [minZoom, maxZoom] = document.getElementById('offline-tiles-zoom').value.split('-').map(Number);
+
+    // Harte Obergrenze zusaetzlich zu den bereits engen UI-Grenzen (Radius max. 15 km, Zoom max. 15)
+    // - schuetzt vor Massen-Downloads gegen die OSM-Tile-Nutzungsrichtlinie (siehe Hinweistext oben),
+    // auch falls jemand die Eingabefelder per DevTools manipuliert.
+    const estimate = computeTileList(lat, lon, radiusKm, minZoom, maxZoom).length;
+    if (estimate > 2500) {
+      errorEl.textContent = `${estimate} Kacheln waeren zu viele fuer diese Funktion (Grenze: 2500) - bitte Radius oder Zoomstufen verkleinern.`;
+      return;
+    }
+    if (estimate > 800 && !confirm(`${estimate} Kacheln werden heruntergeladen - das kann mehrere Minuten dauern. Fortfahren?`)) {
+      return;
+    }
+
+    const submitBtn = event.target.querySelector('button[type="submit"]');
+    submitBtn.disabled = true;
+    try {
+      const result = await downloadOfflineTiles({
+        lat,
+        lon,
+        radiusKm,
+        minZoom,
+        maxZoom,
+        onProgress: (done, total, failed) => {
+          statusEl.textContent = `Lade Kacheln: ${done}/${total}${failed ? ` (${failed} fehlgeschlagen)` : ''}`;
+        },
+      });
+      statusEl.textContent = `Fertig: ${result.total - result.failed}/${result.total} Kacheln offline verfügbar${result.failed ? ` (${result.failed} fehlgeschlagen, z.B. durch fehlende Netzverbindung)` : ''}.`;
+    } catch (err) {
+      errorEl.textContent = err.message;
+    } finally {
+      submitBtn.disabled = false;
+    }
+  });
+
+  document.getElementById('offline-tiles-clear-button').addEventListener('click', async () => {
+    if (!confirm('Alle offline heruntergeladenen Kartenkacheln löschen?')) return;
+    await clearOfflineTiles();
+    statusEl.textContent = 'Offline-Kacheln gelöscht.';
+  });
+}
+
 (async function bootstrapAdmin() {
   const user = await initHeader();
   if (!user) return;
@@ -541,6 +605,8 @@ async function loadSmtpSettings() {
       errorEl.textContent = err.message;
     }
   });
+
+  initOfflineTilesUi();
 
   document.getElementById('wehr-form').addEventListener('submit', async (event) => {
     event.preventDefault();

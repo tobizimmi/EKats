@@ -7,7 +7,14 @@
 // self.registration.scope loesen relative URLs relativ zu self.location auf. So funktioniert
 // dieselbe sw.js unveraendert egal ob die App an der Domain-Root oder einem Unterpfad
 // (z.B. https://zimmimail.de/EKats/) haengt - siehe README "Deployment".
-const CACHE_NAME = 'ekats-shell-v37';
+const CACHE_NAME = 'ekats-shell-v38';
+// Offline-Kartenkacheln (js/offline-tiles.js, Admin-Bereich "Gebiet herunterladen"): bewusst ein
+// EIGENER, von CACHE_NAME komplett getrennter Cache-Bucket - der Name bleibt konstant über
+// App-Updates hinweg (kein "-vNN"-Zaehler wie bei CACHE_NAME), damit ein einmal heruntergeladenes
+// Gebiet nicht bei jedem Deploy verloren geht. Muss mit der gleichnamigen Konstante in
+// js/offline-tiles.js uebereinstimmen (kein gemeinsames Modul zwischen Seiten-Skript und
+// Service-Worker-Scope moeglich).
+const TILE_CACHE_NAME = 'ekats-tiles-v1';
 const APP_SHELL = [
   './',
   'login.html',
@@ -55,6 +62,7 @@ const APP_SHELL = [
   'js/uebergabeprotokoll.js',
   'js/checklisten.js',
   'js/hydranten-karte.js',
+  'js/offline-tiles.js',
   'js/priority-bar.js',
   'js/dashboard.js',
   'js/addon.js',
@@ -88,7 +96,11 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches
       .keys()
-      .then((keys) => Promise.all(keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))))
+      .then((keys) =>
+        Promise.all(
+          keys.filter((key) => key !== CACHE_NAME && key !== TILE_CACHE_NAME).map((key) => caches.delete(key))
+        )
+      )
       .then(() => self.clients.claim())
   );
 });
@@ -101,13 +113,22 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Fremdorigin-Requests (Kartenkacheln von tile.openstreetmap.org) NICHT abfangen: ein fetch()
-  // AUS dem Service Worker heraus unterliegt der connect-src-Direktive der CSP (nicht img-src, das
-  // gilt nur fuer den regulaeren <img>-Ladepfad) - tile.openstreetmap.org steht bewusst nicht in
-  // connect-src, wurde also von jedem fetch() hier drin geblockt und die Karte blieb grau. Durch
-  // "return" ohne respondWith() laedt der Browser die Kachel ganz normal selbst (regulaerer
-  // img-src-Pfad) - das entspricht ohnehin der dokumentierten Absicht, Kartenkacheln nicht
-  // vorab zwischenzuspeichern.
+  // Kartenkacheln (tile.openstreetmap.org): cache-first NUR aus dem expliziten Offline-Download-
+  // Bucket (TILE_CACHE_NAME, siehe js/offline-tiles.js) - liegt eine Kachel dort (weil sie ueber
+  // "Gebiet herunterladen" im Admin-Bereich vorab geladen wurde), wird sie direkt bedient, auch
+  // offline. Liegt sie NICHT dort, faellt das normale fetch() durch (kein automatisches Nachladen
+  // ins Cache) - das ist weiterhin der Live-Zustand von vorher, nur fuer vorab heruntergeladene
+  // Gebiete zusaetzlich offline-faehig. connect-src der CSP musste dafuer tile.openstreetmap.org
+  // erlauben (siehe app.js) - vorher blockierte das jeden fetch() hierher (frueherer Bug: "Karte
+  // bleibt grau"), img-src deckte nur den regulaeren <img>-Ladepfad ab.
+  if (url.hostname === 'tile.openstreetmap.org') {
+    event.respondWith(
+      caches.open(TILE_CACHE_NAME).then((cache) => cache.match(event.request).then((cached) => cached || fetch(event.request)))
+    );
+    return;
+  }
+
+  // Sonstige Fremdorigin-Requests NICHT abfangen - der Browser laedt sie ganz normal selbst.
   if (url.origin !== self.location.origin) {
     return;
   }

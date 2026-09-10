@@ -56,7 +56,13 @@ function createApp() {
           // "Koordinaten aus Adresse ermitteln", siehe js/objects.js) - reiner Lookup-Request direkt
           // vom Browser, kein Tracking/Skript. Gleiche Nominatim-Instanz, gleiches Nutzungsmuster wie
           // beim urspruenglichen Feuerwehr-Objektverwaltungstool, das diese Funktion inspiriert hat.
-          connectSrc: ["'self'", 'https://nominatim.openstreetmap.org'],
+          // tile.openstreetmap.org: war bisher nur unter imgSrc erlaubt (normaler <img>-Kartenkachel-
+          // Ladepfad) - fuer Offline-Kartenkacheln (js/offline-tiles.js, Admin-Bereich "Gebiet
+          // herunterladen") braucht sowohl die Seite selbst (fetch() beim Vorab-Download) als auch der
+          // Service Worker (cache-first-Bedienung bereits heruntergeladener Kacheln, siehe sw.js)
+          // programmatischen fetch()-Zugriff auf denselben, bereits vertrauten Host - kein neuer
+          // Drittanbieter, nur ein zusaetzlicher Zugriffsweg auf dieselben Bild-URLs.
+          connectSrc: ["'self'", 'https://nominatim.openstreetmap.org', 'https://tile.openstreetmap.org'],
           workerSrc: ["'self'"],
           manifestSrc: ["'self'"],
           // blob: fuer die PDF-Vorlagen-Live-Vorschau im Admin-Bereich (Konzept Teil 3): das Blob

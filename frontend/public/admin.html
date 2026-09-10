@@ -49,6 +49,44 @@
       </div>
 
       <div class="card">
+        <h2 class="section-title">Offline-Kartenkacheln</h2>
+        <p class="muted">
+          Kartenkacheln werden im laufenden Betrieb bewusst nicht zwischengespeichert (immer aktuell,
+          siehe <code>sw.js</code>). Für den Feld-Einsatz mit schlechter Verbindung lässt sich hier
+          gezielt ein <strong>kleines, begrenztes</strong> Gebiet um den Wehr-Kartenmittelpunkt vorab
+          herunterladen - diese Kacheln bleiben danach auch offline verfügbar, unabhängig vom
+          normalen Live-Verhalten der Karte.
+        </p>
+        <p class="muted">
+          <strong>Bewusst eng begrenzt:</strong> Die <a href="https://operations.osmfoundation.org/policies/tiles/" target="_blank" rel="noopener">Tile-Nutzungsrichtlinie von OpenStreetMap</a>
+          untersagt automatisiertes Massen-Herunterladen von Kacheln über den öffentlichen Dienst -
+          Radius und Zoomstufen sind hier deshalb absichtlich klein gehalten (max. 15 km, max. Zoom
+          15). Für größere Gebiete oder häufigere Nutzung sollte stattdessen ein eigener
+          Kartenkachel-Proxy/-Cache betrieben werden, nicht diese Funktion in großem Umfang.
+        </p>
+        <form id="offline-tiles-form" class="form-row">
+          <label>
+            <span>Radius um Kartenmittelpunkt (km)</span>
+            <input id="offline-tiles-radius" type="number" min="1" max="15" step="1" value="5" required />
+          </label>
+          <label>
+            <span>Zoomstufen</span>
+            <select id="offline-tiles-zoom">
+              <option value="12-13">Übersicht (Zoom 12–13, wenig Speicher)</option>
+              <option value="12-14" selected>Standard (Zoom 12–14)</option>
+              <option value="12-15">Detailliert (Zoom 12–15, mehr Speicher)</option>
+            </select>
+          </label>
+          <div class="dialog-actions">
+            <button type="submit" class="primary">Gebiet herunterladen</button>
+            <button type="button" class="secondary" id="offline-tiles-clear-button">Offline-Kacheln löschen</button>
+          </div>
+        </form>
+        <p class="muted" id="offline-tiles-status"></p>
+        <p class="error-message" id="offline-tiles-error" role="alert"></p>
+      </div>
+
+      <div class="card">
         <h2 class="section-title">SMTP-Konfiguration (E-Mail-Versand)</h2>
         <p class="muted">
           Für Alarm-E-Mails (Benachrichtigungsregeln) und Passwort-vergessen-Links. Leere Felder
@@ -364,6 +402,7 @@
   <script src="js/api.js"></script>
   <script src="js/header.js"></script>
   <script src="js/severity.js"></script>
+  <script src="js/offline-tiles.js"></script>
   <script src="js/admin.js"></script>
 </body>
 </html>

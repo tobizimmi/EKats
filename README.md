@@ -642,6 +642,39 @@ und Serialisierung sind dadurch für beide Anwendungsfälle exakt identisch. API
 Größenlimit (großzügiger als die 300 KB je Objektskizze, da eine wehrweite Karte deutlich mehr Punkte
 enthalten kann).
 
+### Offline-Kartenkacheln
+
+Im Admin-Bereich ("Offline-Kartenkacheln") lässt sich ein begrenztes Gebiet um den
+Wehr-Kartenmittelpunkt gezielt für die Offline-Nutzung vorab herunterladen — für den Feld-Einsatz
+mit schlechter Verbindung, **ohne** das bisherige Live-Verhalten der Karte zu verändern
+(Kartenkacheln bleiben im normalen Betrieb weiterhin bewusst ungecacht, siehe `sw.js`-Kommentar
+oben in diesem Dokument bzw. dort im Code).
+
+**Eigener, dauerhafter Cache-Bucket:** `js/offline-tiles.js` lädt die Kacheln des gewählten Gebiets
+(Radius + Zoomstufen) per `fetch()` und legt sie in einem eigenen Cache-Storage-Bucket ab
+(`ekats-tiles-v1`) — bewusst getrennt vom App-Shell-Cache (`ekats-shell-vNN`) und ohne
+Versionszähler, damit ein einmal heruntergeladenes Gebiet nicht bei jedem Deploy verloren geht
+(`sw.js` schließt diesen Bucket explizit von der Cache-Bereinigung beim Aktivieren aus). `sw.js`
+bedient `tile.openstreetmap.org`-Anfragen danach **cache-first ausschließlich aus diesem Bucket**:
+liegt eine Kachel dort, wird sie sofort (auch offline) ausgeliefert; liegt sie nicht dort, läuft die
+Anfrage normal ans Netz — kein automatisches Nachladen ins Cache beim gewöhnlichen Kartenbrowsen.
+
+**CSP-Anpassung nötig:** `tile.openstreetmap.org` stand bisher nur unter `img-src` (regulärer
+`<img>`-Ladepfad). Sowohl der Vorab-Download (`fetch()` von der Seite) als auch die
+cache-first-Bedienung im Service Worker brauchen zusätzlich `connect-src` — ohne diese Erweiterung
+wäre genau der ursprüngliche "Karte bleibt grau"-Bug (siehe `sw.js`-Kommentar zum `reportUri`) erneut
+aufgetreten, nur diesmal für den neuen Anwendungsfall statt für automatisches Caching.
+
+**Bewusst eng begrenzt (OSM-Tile-Nutzungsrichtlinie):** Die
+[Tile-Nutzungsrichtlinie von OpenStreetMap](https://operations.osmfoundation.org/policies/tiles/)
+untersagt automatisiertes Massen-Herunterladen über den kostenlosen öffentlichen Kachel-Dienst. Die
+UI begrenzt Radius (max. 15 km) und Zoomstufen (max. Zoom 15) deshalb absichtlich eng (maximal ca.
+2200 Kacheln bei Ausreizung beider Grenzen), `admin.js` verweigert zusätzlich serverseitig unabhängig
+von den UI-Grenzen jede Anfrage über 2500 Kacheln und wartet 50&nbsp;ms zwischen echten Downloads
+(nicht bei bereits gecachten Treffern) statt die Anfragen im Bulk abzufeuern. Für größere Gebiete oder
+häufigere Nutzung wird in der UI ausdrücklich empfohlen, stattdessen einen eigenen
+Kartenkachel-Proxy/-Cache zu betreiben statt diese Funktion in großem Umfang zu nutzen.
+
 ### Export / Import
 
 Im Admin-Bereich („Objektdaten-Export/-Import“) lassen sich alle Objekte der eigenen Wehr inkl.
@@ -1193,8 +1226,10 @@ Der Service Worker (`frontend/public/sw.js`) cached die App-Shell (HTML/CSS/JS/L
 erfolgreich geladene Datenstand wird zusätzlich in IndexedDB gespeichert
 (`frontend/public/js/offline.js`); bei Verbindungsverlust erscheint ein deutlich sichtbarer Hinweis
 mit Zeitstempel des letzten Standes. Kein voller Offline-Betrieb mit Sync (das ist Modul 2 für den
-Fahrzeugeinsatz) — API-Aufrufe gehen immer live ans Netz, Kartenkacheln werden nicht vorab
-zwischengespeichert.
+Fahrzeugeinsatz) — API-Aufrufe gehen immer live ans Netz, Kartenkacheln werden im laufenden Betrieb
+nicht automatisch zwischengespeichert. Einzige Ausnahme: ein explizit im Admin-Bereich vorab
+heruntergeladenes Gebiet (siehe „Offline-Kartenkacheln" oben) bleibt gezielt offline verfügbar, ohne
+dass sich am automatischen Verhalten sonst etwas ändert.
 
 ## Wetter-Entwicklung (Windrichtung/-geschwindigkeit, Gewitterzug, Warnungen als Fläche)
 
