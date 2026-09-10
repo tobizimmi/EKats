@@ -949,6 +949,26 @@ Lesen für alle Rollen, Anlegen/Status ändern/Löschen nur für `stab`/`admin` 
 Einsatztagebuch/`critical_object`). API: `GET/POST/PATCH/DELETE /api/uebergabeprotokoll`, `GET`
 filterbar über `?status=offen|erledigt`.
 
+## Checklisten/SOPs
+
+`checklisten.html` ("Einsatzführung" in der Seitenleiste) rundet das "Später"-Paket ab: hinterlegbare
+Standard-Einsatz-Regeln je Objekttyp/Szenario, gemeinsam abhakbar. Zwei schlanke Tabellen
+(`checklist_template`/`checklist_item`, Migration 020) statt eines vollen "Einsatz-Lauf"-Konzepts mit
+eigener Instanz je Benutzung — eine Checkliste ist ein gemeinsam sichtbarer, gemeinsam abhakbarer
+Arbeitsstand je Wehr (kein Journal vergangener Durchläufe), der sich per "Zurücksetzen" für den
+nächsten Einsatz/die nächste Übung wieder leeren lässt.
+
+**Zwei unterschiedliche Berechtigungsstufen innerhalb desselben Moduls:** Anlegen/Ändern/Löschen einer
+Vorlage (Name, Objekttyp/Szenario, komplette Punkteliste) ist Admin-Konfiguration und bleibt
+`stab`/`admin` vorbehalten — die komplette Punkteliste wird dabei transaktional ersetzt
+(`DELETE`+`INSERT` in einer Transaktion über `withTransaction()`), das ist robuster als granulare
+Einzel-Punkt-Endpunkte fürs Umsortieren/Hinzufügen/Entfernen. Das **Abhaken einzelner Punkte**
+dagegen ist die eigentliche operative Nutzung während eines Einsatzes und bewusst für **alle** Rollen
+offen, auch `mitglied` — ein eigener Endpunkt ohne Rollen-Gate
+(`PATCH /api/checklists/items/:id`). API: `GET/POST/PATCH/DELETE /api/checklists`,
+`PATCH /api/checklists/items/:id` (Haken), `POST /api/checklists/:id/reset` (alle Haken einer Vorlage
+zurücksetzen, wieder `stab`/`admin`-only).
+
 ## Individuelles Dashboard (Phase 6, Raster-Umbau: Nutzerwunsch nach freier Position/Größe)
 
 `dashboard.html` ("Mein Dashboard" in der Seitenleiste) ergänzt die feste Karten-Ansicht

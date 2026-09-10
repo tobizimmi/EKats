@@ -46,6 +46,7 @@ const NAV_GROUPS = [
     items: [
       { href: 'einsatztagebuch.html', label: 'Einsatztagebuch', icon: '📓' },
       { href: 'uebergabeprotokoll.html', label: 'Übergabeprotokoll', icon: '🔄' },
+      { href: 'checklisten.html', label: 'Checklisten/SOPs', icon: '✅' },
     ],
   },
   {

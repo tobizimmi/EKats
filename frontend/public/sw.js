@@ -7,7 +7,7 @@
 // self.registration.scope loesen relative URLs relativ zu self.location auf. So funktioniert
 // dieselbe sw.js unveraendert egal ob die App an der Domain-Root oder einem Unterpfad
 // (z.B. https://zimmimail.de/EKats/) haengt - siehe README "Deployment".
-const CACHE_NAME = 'ekats-shell-v35';
+const CACHE_NAME = 'ekats-shell-v36';
 const APP_SHELL = [
   './',
   'login.html',
@@ -32,6 +32,7 @@ const APP_SHELL = [
   'objekt-detail.html',
   'einsatztagebuch.html',
   'uebergabeprotokoll.html',
+  'checklisten.html',
   'css/style.css',
   'js/api.js',
   'js/severity.js',
@@ -51,6 +52,7 @@ const APP_SHELL = [
   'js/object-sketch.js',
   'js/einsatztagebuch.js',
   'js/uebergabeprotokoll.js',
+  'js/checklisten.js',
   'js/priority-bar.js',
   'js/dashboard.js',
   'js/addon.js',

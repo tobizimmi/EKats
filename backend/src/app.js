@@ -28,6 +28,7 @@ const smtpSettingsRoutes = require('./routes/smtpSettings');
 const fetcherHealthRoutes = require('./routes/fetcherHealth');
 const einsatztagebuchRoutes = require('./routes/einsatztagebuch');
 const uebergabeprotokollRoutes = require('./routes/uebergabeprotokoll');
+const checklistsRoutes = require('./routes/checklists');
 
 function createApp() {
   const app = express();
@@ -128,6 +129,7 @@ function createApp() {
   app.use('/api/fetcher-health', fetcherHealthRoutes);
   app.use('/api/einsatztagebuch', einsatztagebuchRoutes);
   app.use('/api/uebergabeprotokoll', uebergabeprotokollRoutes);
+  app.use('/api/checklists', checklistsRoutes);
 
   app.use('/api', notFoundHandler);
 

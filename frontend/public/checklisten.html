@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Checklisten/SOPs – EKats</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <meta name="theme-color" content="#14232f" />
+</head>
+<body>
+  <div id="app-sidebar-root"></div>
+  <main class="stack">
+    <div class="card" data-role="stab-only" hidden>
+      <h2 class="section-title">Neue Checkliste</h2>
+      <form id="checklist-form" class="form-row">
+        <label>
+          <span>Name</span>
+          <input id="checklist-name" type="text" maxlength="200" required />
+        </label>
+        <label>
+          <span>Objekttyp/Szenario (optional)</span>
+          <input id="checklist-category" type="text" maxlength="100" placeholder="z.B. Gefahrgut, Schule" />
+        </label>
+        <label class="form-row-full">
+          <span>Punkte (eine Zeile je Punkt)</span>
+          <textarea id="checklist-items" rows="5" placeholder="Erster Punkt&#10;Zweiter Punkt&#10;..." required></textarea>
+        </label>
+        <p class="error-message" id="checklist-form-error" role="alert"></p>
+        <div class="dialog-actions">
+          <button type="submit" class="primary">Checkliste anlegen</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="card">
+      <h2 class="section-title">Checklisten/SOPs</h2>
+      <p class="muted">
+        Hinterlegte Standard-Einsatz-Regeln je Objekttyp/Szenario - gemeinsam sichtbar und abhakbar
+        für alle. Anlegen/Ändern/Löschen nur für Stab/Admin.
+      </p>
+      <p class="error-message" id="checklist-list-error" role="alert"></p>
+      <div id="checklist-list" class="stack"></div>
+    </div>
+  </main>
+
+  <script src="js/api.js"></script>
+  <script src="js/header.js"></script>
+  <script src="js/severity.js"></script>
+  <script src="js/sw-register.js"></script>
+  <script src="js/checklisten.js"></script>
+</body>
+</html>
