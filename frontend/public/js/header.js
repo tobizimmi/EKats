@@ -34,6 +34,7 @@ const NAV_GROUPS = [
       { href: 'bbk-warnungen.html', label: 'Bevölkerungswarnungen', icon: '📣' },
       { href: 'kachelmann.html', label: 'Kachelmann', icon: '☁️' },
       { href: 'blitzortung.html', label: 'Blitzortung', icon: '⚡' },
+      { href: 'erdbeben.html', label: 'Erdbeben', icon: '🌍' },
     ],
   },
   {

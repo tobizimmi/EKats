@@ -42,6 +42,11 @@ const SOURCE_EXTRA_COLUMNS = {
   // "Wert" (Basisspalte) zeigt bereits die Ortungsgenauigkeit in Metern (value_numeric/unit) - hier
   // nur das payload-Feld, das die Basisspalten nicht abdecken.
   blitzortung: [{ key: 'polarity', label: 'Polarität', default: false, get: (dp) => dp.payload?.polarity ?? '–' }],
+  erdbeben: [
+    { key: 'depth', label: 'Tiefe (km)', default: true, get: (dp) => dp.payload?.depthKm ?? '–' },
+    { key: 'region', label: 'Region', default: true, get: (dp) => dp.payload?.region || '–' },
+    { key: 'magType', label: 'Magnitudentyp', default: false, get: (dp) => dp.payload?.magType || '–' },
+  ],
 };
 
 function columnsForSource(source) {

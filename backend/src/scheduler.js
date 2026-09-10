@@ -13,6 +13,7 @@ const { importDwdStations } = require('./fetchers/dwdStationsImport');
 const { fetchBbkWarnungen } = require('./fetchers/bbkWarnungen');
 const { fetchKachelmannCurrentWeather } = require('./fetchers/kachelmann');
 const { fetchBrightskyForecast } = require('./fetchers/brightsky');
+const { fetchErdbeben } = require('./fetchers/erdbeben');
 
 // Jeder Job laeuft isoliert: schlaegt ein Fetcher fehl (z.B. Quelle down, Format geaendert),
 // sollen die anderen vier trotzdem normal weiterlaufen.
@@ -68,6 +69,7 @@ function startScheduler() {
   cron.schedule(config.cron.bbkWarnungen, () => runJob('bbk_warnung', fetchBbkWarnungen));
   cron.schedule(config.cron.kachelmann, () => runJob('kachelmann', fetchKachelmannCurrentWeather));
   cron.schedule(config.cron.wetterVorhersage, () => runJob('wetter_vorhersage', fetchBrightskyForecast));
+  cron.schedule(config.cron.erdbeben, () => runJob('erdbeben', fetchErdbeben));
   cron.schedule(config.cron.cleanup, () => runJob('cleanup', cleanupOldDatapoints));
 
   console.log('[scheduler] Cron-Jobs registriert:', config.cron);
@@ -87,5 +89,6 @@ module.exports = {
     bbk_warnung: fetchBbkWarnungen,
     kachelmann: fetchKachelmannCurrentWeather,
     wetter_vorhersage: fetchBrightskyForecast,
+    erdbeben: fetchErdbeben,
   },
 };

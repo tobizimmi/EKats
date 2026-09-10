@@ -44,6 +44,7 @@ const WIDGET_CATALOG = {
   'unwetter-ticker': { label: 'DWD-Unwetter-Ticker', icon: '⛈️', singleton: true, w: 4, h: 3, minW: 3, minH: 2 },
   'status-zeile': { label: 'Gesamt-Statuszeile', icon: '📊', singleton: true, w: 12, h: 1, minW: 6, minH: 1 },
   'audit-feed': { label: 'Audit-Log-Feed', icon: '📜', singleton: true, w: 5, h: 3, minW: 4, minH: 2, adminOnly: true },
+  'erdbeben-liste': { label: 'Erdbeben (EMSC)', icon: '🌍', singleton: true, w: 4, h: 3, minW: 3, minH: 2 },
 };
 
 const DEFAULT_WIDGETS = [
@@ -386,6 +387,12 @@ function renderHochwasserListeWidget(container) {
   });
 }
 
+function renderErdbebenListeWidget(container) {
+  renderDatapointListWidget(container, 'erdbeben', {
+    emptyText: 'Keine Erdbeben im konfigurierten Zeitfenster/Umkreis.',
+  });
+}
+
 // Aktuelles Wetter (Kachelmann) ist - anders als die uebrigen Quellen - eine einzelne Momentaufnahme
 // je Wehr-Standort statt einer Liste von Einzelmeldungen (siehe backend/src/fetchers/kachelmann.js),
 // daher eigene Darstellung statt renderDatapointListWidget().
@@ -565,6 +572,7 @@ const STATUS_ZEILE_SOURCES = [
   'firms',
   'blitzortung',
   'kachelmann',
+  'erdbeben',
 ];
 
 function renderStatusZeileWidget(container) {
@@ -716,6 +724,9 @@ function renderWidgetContent(widget, body) {
       break;
     case 'firms-map':
       renderFirmsMapWidget(body, widget);
+      break;
+    case 'erdbeben-liste':
+      renderErdbebenListeWidget(body);
       break;
     case 'wetter-vorhersage':
       renderWetterVorhersageWidget(body);

@@ -8,6 +8,7 @@
 //   hochwasserzentralen -> 'meldestufe'     (threshold_value 0-4, target_ref optional = Namens-Teilstring)
 //   waldbrandindex      -> 'gefahrenstufe'  (threshold_value 1-5, target_ref optional = Bundesland-Code)
 //   firms               -> 'radius_km'      (threshold_value km um den Wehr-Kartenmittelpunkt)
+//   erdbeben            -> 'magnitude'      (threshold_value Mindest-Magnitude, kein target_ref)
 
 const { query } = require('../db');
 const { haversineKm } = require('../utils/geo');
@@ -54,6 +55,8 @@ function checkThreshold(source, dp, rule, wehrCenter) {
       const distance = haversineKm(wehrCenter.center_lat, wehrCenter.center_lon, dp.lat, dp.lon);
       return distance <= thresholdValue;
     }
+    case 'erdbeben':
+      return dp.value_numeric !== null && dp.value_numeric >= thresholdValue;
     default:
       return false;
   }

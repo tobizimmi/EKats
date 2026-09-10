@@ -173,6 +173,7 @@ systemctl restart ekats           # Neustart, z.B. nach manueller .env-Änderung
 | Kachelmannwetter/Meteologix | Zusätzliches, optionales aktuelles Wetter (kostenpflichtig, siehe unten — keine Warnungen/Radar, dazu bietet die API nichts) | ja, `KACHELMANN_API_KEY` | alle 30 Min. |
 | Bright Sky (DWD-Vorhersage) | Echte Wettervorhersage (Temperatur/Niederschlag/Wind), keine Warnung | nein | stündlich |
 | Blitzortung.org | Live-Blitzeinschläge (Gewitterzug) | nein | Live-Stream (kein Intervall) |
+| EMSC/SeismicPortal | Erdbeben (Magnitude, Region, Tiefe) im Umkreis der Wehr | nein | alle 30 Min. |
 
 Intervalle über die `FETCH_*_CRON`-Variablen in `.env` änderbar. Jeder Fetcher läuft isoliert
 (`src/scheduler.js`): schlägt eine Quelle fehl, laufen die anderen normal weiter. Blitzortung.org ist
@@ -336,6 +337,7 @@ Konfigurierbar unter „Einstellungen“ (nur Rolle „Stab“). `threshold_key`
 | hochwasserzentralen | `meldestufe` | 0–4 | optional: Namens-Teilstring |
 | waldbrandindex | `gefahrenstufe` | 1–5 | optional: Bundesland-Code |
 | firms | `radius_km` | Kilometer um den Wehr-Kartenmittelpunkt | nicht verwendet |
+| erdbeben | `magnitude` | Mindest-Magnitude | nicht verwendet |
 
 PEGELONLINE liefert keine amtliche Meldestufe (nur eine grobe Einordnung relativ zu langjährigen
 Mittelwerten) — für eine echte Meldestufe die Hochwasserzentralen-Quelle nutzen. Jede
@@ -828,6 +830,49 @@ ausschließlich innerhalb der eigenen, per Login geschützten Wehr-Installation 
 öffentliche Weiterverbreitung, damit für den internen Gebrauch einer einzelnen Wehr unkritisch.
 
 Kein neues Schema nötig — nutzt die bestehende `live_datapoint`-Tabelle wie die übrigen Quellen.
+
+## Erdbeben (EMSC) + Recherche weiterer Quellen
+
+Zehnte Datenquelle, aus dem Roadmap-Paket "Später" (siehe Produkt-Review September 2026):
+`backend/src/fetchers/erdbeben.js` bindet den kostenlosen, unauthentifizierten
+FDSN-Event-Webservice des European-Mediterranean Seismological Centre
+(`seismicportal.eu`, derselbe Standard wie `earthquake.usgs.gov`) an — relevant für
+KatS-Vollständigkeit auch in einem seismisch wenig aktiven Land (Kavernen-/Bergbaugebiete,
+Grenzregionen). Abgefragt wird je Wehr ein Umkreis (`ERDBEBEN_RADIUS_KM`, Standard 300 km — bewusst
+größer als bei den übrigen Quellen, da stärkere Beben auch deutlich weiter entfernt gespürt werden),
+gefiltert auf mindestens `ERDBEBEN_MIN_MAGNITUDE` (Standard 2.0, filtert die häufigen Mikrobeben aus
+Bergbau/Kavernen) innerhalb eines rollierenden Zeitfensters `ERDBEBEN_LOOKBACK_DAYS` (Standard 30
+Tage). Ereignisse, die aus diesem Fenster herausaltern, verschwinden aus der "aktuellen Lage"
+(`expireStaleItems()`, dieselbe Logik wie bei NASA FIRMS) — die Zeile bleibt bis zur regulären
+Aufbewahrungsfrist erhalten, wird aber nicht mehr als aktiv angezeigt.
+
+**Verifikationsstand:** Endpunkt/Parameter/JSON-Schema sind über die öffentliche
+EMSC-CSEM/webservices101-Dokumentation verifiziert, aber **nicht live gegen den echten Server
+getestet** — ein Abruf aus der Entwicklungsumgebung liefert "HTTP 403 Forbidden", während `curl`
+gegen denselben Host von der hiesigen Egress-Firewall komplett verweigert wird; das 403 stammt damit
+mit hoher Wahrscheinlichkeit von der Netz-Policy dieser Umgebung, nicht von seismicportal.eu selbst,
+lässt sich von hier aber nicht abschließend unterscheiden. Vor Produktivbetrieb `npm run fetch --
+erdbeben` von einem Server mit normalem Internetzugang prüfen (gleiches Muster wie bei
+Kachelmann/BBK).
+
+**Recherchiert, aber bewusst nicht gebaut** (siehe Produkt-Review Abschnitt "Neue Datenquellen"):
+
+- **Radioaktivität (ODL, BfS-IMIS):** Es existiert ein offener WFS-Endpunkt
+  (`imis.bfs.de/ogc/opendata/...&typeName=opendata:odlinfo_odl_1h_latest&outputFormat=application/json`),
+  von Dritten nachweislich genutzt (siehe z.B. ein KNX-Forum-Plugin). Die offizielle BfS-Dokumentation
+  erwähnt an anderer Stelle aber auch eine Registrierung (Benutzername/Passwort) für den
+  Daten-Interface-Zugang — ob das nur eine separate, feiner aufgelöste Rohdatenschnittstelle betrifft
+  oder auch diesen "opendata"-Layer, ließ sich von hier aus nicht zweifelsfrei klären (der Host war
+  nicht erreichbar). Konsistent mit "erst verifizieren, dann bauen" (siehe Kachelmann-Historie) daher
+  zurückgestellt, bis das an einem echten Zugang geprüft werden kann.
+- **Straßensperrungen/Verkehr:** Der frühere "Mobilitäts Daten Marktplatz (MDM)" ist inzwischen in
+  "Mobilithek" aufgegangen — ein Portal für Datenaustausch zwischen Behörden/Anbietern, keine
+  einzelne, direkt konsumierbare bundesweite JSON-API für Straßensperrungen. Die Datenlandschaft ist
+  weiterhin pro Bundesland/Baulastträger fragmentiert (wie schon im Produkt-Review vermutet) — ein
+  Aufwand, der eine eigene, tiefere Recherche-Runde verdient, keinen spekulativen Fetcher gegen ein
+  unklares Zielformat.
+
+Kein neues Schema nötig — nutzt wie Blitzortung/FIRMS die bestehende `live_datapoint`-Tabelle.
 
 ## PDF-Vorlagen (HTML-Templates, Chromium-Rendering)
 

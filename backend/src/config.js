@@ -50,6 +50,15 @@ const config = {
   blitzortungEnabled: process.env.BLITZORTUNG_ENABLED !== 'false',
   blitzortungRadiusKm: parseFloat(process.env.BLITZORTUNG_RADIUS_KM || '75'),
 
+  // Erdbeben (EMSC/SeismicPortal, siehe fetchers/erdbeben.js) - groesserer Radius als bei den
+  // uebrigen Quellen, da staerkere Erdbeben auch deutlich ausserhalb des unmittelbaren Gebiets
+  // gespuert werden koennen. minmag=2.0 filtert die haeufigen Mikrobeben (Bergbau/Kavernen) auf ein
+  // fuer den Lagedienst noch relevantes Mass; lookbackDays begrenzt gleichzeitig die Abfrage UND
+  // (ueber expireStaleItems) wie lange ein Ereignis als "aktuell" gilt.
+  erdbebenRadiusKm: parseFloat(process.env.ERDBEBEN_RADIUS_KM || '300'),
+  erdbebenMinMagnitude: parseFloat(process.env.ERDBEBEN_MIN_MAGNITUDE || '2.0'),
+  erdbebenLookbackDays: parseInt(process.env.ERDBEBEN_LOOKBACK_DAYS || '30', 10),
+
   smtp: {
     host: process.env.SMTP_HOST || '',
     port: parseInt(process.env.SMTP_PORT || '587', 10),
@@ -75,6 +84,7 @@ const config = {
     dwdStationsImport: process.env.FETCH_DWD_STATIONS_IMPORT_CRON || '0 4 * * 1',
     bbkWarnungen: process.env.FETCH_BBK_WARNUNGEN_CRON || '*/15 * * * *',
     kachelmann: process.env.FETCH_KACHELMANN_CRON || '*/30 * * * *',
+    erdbeben: process.env.FETCH_ERDBEBEN_CRON || '*/30 * * * *',
     // Stuendlich reicht fuer eine Vorhersage (MOSMIX aktualisiert selbst nur ein paar Mal taeglich) -
     // haeltsich damit bewusst zurueck gegenueber dem kostenlosen oeffentlichen Bright-Sky-Dienst.
     wetterVorhersage: process.env.FETCH_WETTER_VORHERSAGE_CRON || '0 * * * *',

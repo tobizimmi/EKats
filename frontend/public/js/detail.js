@@ -41,6 +41,13 @@ function payloadEntries(dp) {
         ['Beschreibung', p.description],
         ['Verhaltenshinweise', p.instruction],
       ];
+    case 'erdbeben':
+      return [
+        ['Region', p.region],
+        ['Tiefe', p.depthKm !== null && p.depthKm !== undefined ? `${p.depthKm} km` : null],
+        ['Magnitudentyp', p.magType],
+        ['Netzwerk/Behörde', p.auth],
+      ];
     // degToCardinal() kommt aus js/wetter-vorhersage.js - dieser Fall greift nur auf
     // wetter-vorhersage.html, wo dieses Skript immer mitgeladen ist (siehe dortige Script-Reihenfolge).
     case 'wetter_vorhersage':

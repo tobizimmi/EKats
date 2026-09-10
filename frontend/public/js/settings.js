@@ -8,6 +8,7 @@ const THRESHOLD_META = {
   },
   waldbrandindex: { key: 'gefahrenstufe', label: 'Gefahrenstufe (1-5)', targetLabel: 'Bundesland-Code (optional)' },
   firms: { key: 'radius_km', label: 'Radius (km)', targetLabel: 'nicht verwendet' },
+  erdbeben: { key: 'magnitude', label: 'Magnitude (ab X)', targetLabel: 'nicht verwendet' },
 };
 
 function updateRuleFormLabels() {
@@ -16,8 +17,8 @@ function updateRuleFormLabels() {
   document.getElementById('rule-threshold-label').textContent = `Schwellenwert: ${meta.label}`;
   document.getElementById('rule-target-label').textContent = meta.targetLabel;
   const targetInput = document.getElementById('rule-target');
-  targetInput.disabled = source === 'firms';
-  if (source === 'firms') targetInput.value = '';
+  targetInput.disabled = source === 'firms' || source === 'erdbeben';
+  if (targetInput.disabled) targetInput.value = '';
 }
 
 async function loadRules() {

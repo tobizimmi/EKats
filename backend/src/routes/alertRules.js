@@ -22,9 +22,9 @@ router.get('/', async (req, res, next) => {
 });
 
 const ruleSchema = z.object({
-  source: z.enum(['dwd_unwetter', 'pegelonline', 'hochwasserzentralen', 'firms', 'waldbrandindex']),
+  source: z.enum(['dwd_unwetter', 'pegelonline', 'hochwasserzentralen', 'firms', 'waldbrandindex', 'erdbeben']),
   targetRef: z.string().trim().min(1).max(200).nullable().optional(),
-  thresholdKey: z.enum(['warnstufe', 'wasserstand_cm', 'meldestufe', 'gefahrenstufe', 'radius_km']),
+  thresholdKey: z.enum(['warnstufe', 'wasserstand_cm', 'meldestufe', 'gefahrenstufe', 'radius_km', 'magnitude']),
   thresholdValue: z.union([z.string(), z.number()]).transform((v) => String(v)),
   channelPush: z.boolean().optional().default(true),
   channelEmail: z.boolean().optional().default(false),

@@ -13,6 +13,7 @@ const SOURCE_LABELS = {
   kachelmann: 'Kachelmann – Aktuelles Wetter (Meteologix)',
   wetter_vorhersage: 'Wetter-Vorhersage (Bright Sky)',
   blitzortung: 'Blitzeinschlag (Blitzortung.org)',
+  erdbeben: 'Erdbeben (EMSC)',
 };
 
 // Gemeinsame Farbskala fuer Karten-Marker, genutzt vom Dashboard (map.js) und den
@@ -50,6 +51,10 @@ function severityScore(dp) {
     // Hinweis auf ein nahes Gewitter mehr als "unauffaellig" - feste mittlere Dringlichkeit.
     case 'blitzortung':
       return 2;
+    case 'erdbeben': {
+      const map = { gering: 1, mittel: 2, hoch: 3, extrem: 4 };
+      return map[dp.severity] ?? 0;
+    }
     default:
       return 0;
   }

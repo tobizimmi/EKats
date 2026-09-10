@@ -17,6 +17,7 @@ const VALID_SOURCES = [
   'kachelmann',
   'wetter_vorhersage',
   'blitzortung',
+  'erdbeben',
 ];
 
 // GET /api/datapoints?source=pegelonline&since=2026-01-01T00:00:00Z
