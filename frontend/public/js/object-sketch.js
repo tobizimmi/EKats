@@ -154,11 +154,16 @@ function renderObjectSketchPreview(containerEl, center, geojson) {
 // Dateikopf). `onSaved`/`onCancel` steuern den Wechsel zurueck in die Vorschau im Objekt-Dialog bzw.
 // auf der Objekt-Detailseite.
 class ObjectSketchEditor {
-  constructor({ toolbarEl, mapContainerEl, errorEl, objectId, center, initialGeoJson }) {
+  // saveUrl/clearConfirmText erlauben die Wiederverwendung fuer die wehrweite Hydrantenkarte
+  // (js/hydranten-karte.js): ohne diese Overrides bleibt das Verhalten fuer die bestehenden
+  // objektgebundenen Aufrufstellen unveraendert (saveUrl faellt auf /objects/:id/sketch zurueck).
+  constructor({ toolbarEl, mapContainerEl, errorEl, objectId, saveUrl, clearConfirmText, center, initialGeoJson }) {
     this.toolbarEl = toolbarEl;
     this.mapContainerEl = mapContainerEl;
     this.errorEl = errorEl;
     this.objectId = objectId;
+    this.saveUrl = saveUrl || `/objects/${objectId}/sketch`;
+    this.clearConfirmText = clearConfirmText || 'Wirklich die gesamte Kartenskizze dieses Objekts löschen?';
     this.center = center;
     this.sketchLayers = [];
     this.activeColor = OBJECT_SKETCH_DEFAULT_COLOR;
@@ -298,7 +303,7 @@ class ObjectSketchEditor {
     clearBtn.className = 'secondary';
     clearBtn.textContent = 'Alles löschen';
     clearBtn.addEventListener('click', () => {
-      if (!confirm('Wirklich die gesamte Kartenskizze dieses Objekts löschen?')) return;
+      if (!confirm(this.clearConfirmText)) return;
       this.sketchLayers.forEach(({ layer }) => this.map.removeLayer(layer));
       this.sketchLayers = [];
     });
@@ -309,7 +314,7 @@ class ObjectSketchEditor {
     this.errorEl.textContent = '';
     try {
       const geojson = sketchLayersToGeoJson(this.sketchLayers);
-      await api.put(`/objects/${this.objectId}/sketch`, { geojson });
+      await api.put(this.saveUrl, { geojson });
       return true;
     } catch (err) {
       this.errorEl.textContent = err.message;

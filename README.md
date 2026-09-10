@@ -624,6 +624,24 @@ bestimmt. Kein Netzwerkzugriff nötig für die Zeichenfunktion selbst (nur die K
 weiterhin von OpenStreetMap) — funktioniert daher auch bei eingeschränkter Konnektivität zur Karte,
 solange diese bereits einmal geladen wurde.
 
+### Wehr-weite Hydrantenkarte
+
+`hydranten.html` ("Objekte" in der Seitenleiste, neben der Objekt-Übersicht) erweitert dieselbe
+Kartenskizzen-Idee vom einzelnen Objekt auf das **gesamte Zuständigkeitsgebiet der Wehr** —
+Löschwasserversorgung (Hydranten, Löschteiche, Saugstellen) ist nicht an einzelne Objekte gebunden
+und gehört nicht in eine einzelne Objekt-Skizze. Technisch eine Zeile je Wehr statt je Objekt
+(`wehr_hydranten_karte`, Migration 021, sonst identisches Schema wie `critical_object_map_sketch`).
+
+**Derselbe Editor, andere Speicher-URL:** Statt den Kartenskizzen-Editor zu duplizieren, wurde
+`ObjectSketchEditor` (`js/object-sketch.js`) minimal generalisiert — ein optionaler `saveUrl`-Parameter
+überschreibt die sonst aus `objectId` abgeleitete Standard-URL (`/objects/:id/sketch`); die
+bestehenden Aufrufstellen (Objekt-Dialog, Objekt-Detailseite) übergeben weiterhin nur `objectId` und
+verhalten sich unverändert. Symbolpalette (inkl. eines eigenen "Hydrant"-Symbols 🚰), Zeichenwerkzeuge
+und Serialisierung sind dadurch für beide Anwendungsfälle exakt identisch. API:
+`GET/PUT/DELETE /api/hydranten-karte` (Lesen für alle Rollen, Schreiben nur `stab`/`admin`), 500 KB
+Größenlimit (großzügiger als die 300 KB je Objektskizze, da eine wehrweite Karte deutlich mehr Punkte
+enthalten kann).
+
 ### Export / Import
 
 Im Admin-Bereich („Objektdaten-Export/-Import“) lassen sich alle Objekte der eigenen Wehr inkl.

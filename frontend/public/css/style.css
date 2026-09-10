@@ -949,6 +949,18 @@ table.data-table td {
   margin-bottom: 0.6rem;
 }
 
+/* Wehr-weite Hydrantenkarte (js/hydranten-karte.js): eigene, groessere Kartenflaeche statt der
+   kompakten Objekt-Dialog-Masse oben - eine ganze Seite statt eines Dialog-Panels. */
+.hydranten-preview-map,
+#hydranten-map {
+  width: 100%;
+  height: 60vh;
+  min-height: 320px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  margin-bottom: 0.6rem;
+}
+
 .object-sketch-symbol-wrap {
   background: none;
   border: none;

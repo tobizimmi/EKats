@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Hydrantenkarte – EKats</title>
+  <link rel="stylesheet" href="vendor/leaflet/leaflet.css" />
+  <link rel="stylesheet" href="vendor/leaflet-geoman/leaflet-geoman.css" />
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <meta name="theme-color" content="#14232f" />
+</head>
+<body>
+  <div id="app-sidebar-root"></div>
+  <main class="stack">
+    <div class="card">
+      <div class="section-head-row">
+        <h2 class="section-title">Wehr-weite Hydranten-/Löschwasserkarte</h2>
+        <button type="button" class="primary" id="hydranten-edit-button" data-role="stab-only" hidden>
+          Bearbeiten
+        </button>
+      </div>
+      <p class="muted">
+        Hydranten, Löschteiche und Saugstellen im gesamten Zuständigkeitsgebiet - unabhängig von
+        einzelnen Objekten. Sichtbar für alle, bearbeitbar nur für Stab/Admin. Dieselben Werkzeuge wie
+        bei der Kartenskizze am Objekt.
+      </p>
+      <p class="muted" id="hydranten-updated"></p>
+      <p class="error-message" id="hydranten-error" role="alert"></p>
+
+      <div id="hydranten-preview"></div>
+
+      <div id="hydranten-editor" hidden>
+        <div id="hydranten-toolbar" class="object-sketch-toolbar"></div>
+        <div id="hydranten-map" class="object-sketch-editor-map"></div>
+        <div class="dialog-actions">
+          <button type="button" class="primary" id="hydranten-save-button">Speichern</button>
+          <button type="button" class="secondary" id="hydranten-cancel-button">Abbrechen</button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script src="vendor/leaflet/leaflet.js"></script>
+  <script src="vendor/leaflet-geoman/leaflet-geoman.min.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/header.js"></script>
+  <script src="js/sw-register.js"></script>
+  <script src="js/severity.js"></script>
+  <script src="js/object-sketch.js"></script>
+  <script src="js/hydranten-karte.js"></script>
+</body>
+</html>

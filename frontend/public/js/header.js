@@ -39,7 +39,10 @@ const NAV_GROUPS = [
   },
   {
     label: 'Objekte',
-    items: [{ href: 'objekte.html', label: 'Objekt-Übersicht', icon: '🏫' }],
+    items: [
+      { href: 'objekte.html', label: 'Objekt-Übersicht', icon: '🏫' },
+      { href: 'hydranten.html', label: 'Hydrantenkarte', icon: '🚰' },
+    ],
   },
   {
     label: 'Einsatzführung',
