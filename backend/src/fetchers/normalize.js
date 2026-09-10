@@ -79,4 +79,38 @@ async function upsertDatapoints(items) {
   return rows;
 }
 
-module.exports = { upsertDatapoints };
+// Bugfix (Nutzer-Report: "Warnungen werden weiterhin angezeigt, obwohl aktuell keine aktiv sind"):
+// event-basierte Quellen (eine Warnung/Meldung/Sichtung je external_id, kein wiederkehrender
+// Messwert wie bei pegelonline/hochwasserzentralen) melden das ENDE eines Ereignisses dadurch, dass
+// es in der naechsten Abfrage einfach nicht mehr vorkommt - nicht durch ein explizites valid_until.
+// upsertDatapoints() allein kann das nicht abbilden: es aktualisiert nur, was im aktuellen Fetch
+// ankommt, und fasst nie die Zeilen an, die diesmal fehlen. Ohne diese Funktion blieb eine beendete
+// Warnung (valid_until war fuer bbk_warnung/dwd_unwetter oft schon NULL, wenn die Quelle kein festes
+// Enddatum mitliefert) bis zur naechsten retentionsbasierten Aufraeumung (Tage) sichtbar, obwohl die
+// Quelle sie laengst nicht mehr fuehrt - konkret bei bbk_warnung sogar trotz eines expliziten
+// CAP-"Cancel"-Nachrichtentyps, der schon ankam, aber nur uebersprungen statt verarbeitet wurde
+// (siehe fetchers/bbkWarnungen.js).
+//
+// Aufruf NACH einem erfolgreichen upsertDatapoints() mit den external_ids, die der aktuelle Fetch
+// tatsaechlich geliefert hat: setzt bei allen anderen, noch als aktiv geltenden Zeilen derselben
+// Quelle valid_until = now(), wodurch der bereits ueberall vorhandene Sichtbarkeits-Filter
+// ("valid_until IS NULL OR valid_until >= now()", siehe routes/datapoints.js) sie automatisch
+// ausblendet - ohne die Zeile zu loeschen (Historie/Audit bleibt erhalten, die eigentliche Loeschung
+// macht weiterhin nur scheduler.js::cleanupOldDatapoints() nach Ablauf der Aufbewahrungsfrist).
+// Bewusst NICHT fuer kontinuierliche Messwert-Quellen (pegelonline, hochwasserzentralen,
+// waldbrandindex, kachelmann, wetter_vorhersage) aufgerufen: dort hat jede Station/jeder Messpunkt
+// eine dauerhaft gleichbleibende external_id und wird bei jedem Fetch ohnehin neu geschrieben - ein
+// leeres/fehlgeschlagenes Ergebnis fuer eine einzelne Station wuerde sie hier faelschlich als
+// "beendet" markieren, statt schlicht "diesmal nicht aktualisiert".
+async function expireStaleItems(source, currentExternalIds) {
+  await query(
+    `UPDATE live_datapoint
+     SET valid_until = now()
+     WHERE source = $1
+       AND external_id != ALL($2::text[])
+       AND (valid_until IS NULL OR valid_until > now())`,
+    [source, currentExternalIds]
+  );
+}
+
+module.exports = { upsertDatapoints, expireStaleItems };

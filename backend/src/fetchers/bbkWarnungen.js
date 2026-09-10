@@ -33,7 +33,7 @@
 // mit Titel/Dringlichkeit/Quelle/Kreis nutzbar - kein Abbruch des gesamten Laufs.
 
 const { fetchJson } = require('./httpClient');
-const { upsertDatapoints } = require('./normalize');
+const { upsertDatapoints, expireStaleItems } = require('./normalize');
 const { query } = require('../db');
 const { loadZustaendigkeitsgebiet } = require('../utils/zustaendigkeit');
 
@@ -121,6 +121,7 @@ async function fetchBbkWarnungen() {
   }
 
   const rows = await upsertDatapoints(items);
+  await expireStaleItems('bbk_warnung', items.map((i) => i.external_id));
   return { source: 'bbk_warnung', fetched: items.length, written: rows.length, rows };
 }
 

@@ -10,7 +10,7 @@
 // Rate-Limit: 5000 Transaktionen/10 Minuten pro Key - fuer V1 mit stuendlichem/45-min-Abruf unkritisch.
 
 const { fetchText } = require('./httpClient');
-const { upsertDatapoints } = require('./normalize');
+const { upsertDatapoints, expireStaleItems } = require('./normalize');
 const { bboxForRadius } = require('../utils/geo');
 const { query } = require('../db');
 const config = require('../config');
@@ -109,6 +109,7 @@ async function fetchNasaFirms() {
   }
 
   const rows = await upsertDatapoints(items);
+  await expireStaleItems('firms', items.map((i) => i.external_id));
   return { source: 'firms', fetched: items.length, written: rows.length, rows };
 }
 

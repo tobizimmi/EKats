@@ -13,7 +13,7 @@
 // Warnzellen-IDs in V1) – identisch zur Vereinfachung, die FKatInfo bereits dokumentiert.
 
 const { fetchText } = require('./httpClient');
-const { upsertDatapoints } = require('./normalize');
+const { upsertDatapoints, expireStaleItems } = require('./normalize');
 
 const URL = 'https://www.dwd.de/DWD/warnungen/warnapp/json/warnings.json';
 
@@ -64,6 +64,7 @@ async function fetchDwdUnwetter() {
   }
 
   const rows = await upsertDatapoints(items);
+  await expireStaleItems('dwd_unwetter', items.map((i) => i.external_id));
   return { source: 'dwd_unwetter', fetched: items.length, written: rows.length, rows };
 }
 
