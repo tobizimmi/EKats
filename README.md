@@ -980,17 +980,63 @@ nutzen will, muss sie im Vorlagen-Editor selbst ergänzen.
 `einsatztagebuch.html` ("Einsatzführung" in der Seitenleiste) schließt die größte inhaltliche Lücke
 aus dem Produkt-Review: EKats bündelt externe Lage-Informationen sehr gut, bot aber bisher keine
 Möglichkeit, während eines Einsatzes selbst etwas zu protokollieren. Ein durchlaufendes,
-chronologisches Logbuch je Wehr (`einsatztagebuch_eintrag`, Migration 017) — bewusst **kein**
-eigenes "Einsatz"-Konzept mit Beginn/Ende/Zuordnung (das wäre ein deutlich größerer Baustein mit
-eigenem Lebenszyklus); ein Eintrag "Einsatz X begonnen" trägt sich als normaler Tagebucheintrag
-genauso ein. Jeder Eintrag hat einen frei wählbaren `entry_time` (Default: jetzt, aber änderbar, da
-ein Eintrag oft erst nachträglich getippt wird, den tatsächlichen Ereigniszeitpunkt aber zeigen
-soll), eine optionale Kategorie (Meldung/Maßnahme/Lageänderung/Sonstiges) und den Freitext.
+chronologisches Logbuch je Wehr (`einsatztagebuch_eintrag`, Migration 017). Jeder Eintrag hat einen
+frei wählbaren `entry_time` (Default: jetzt, aber änderbar, da ein Eintrag oft erst nachträglich
+getippt wird, den tatsächlichen Ereigniszeitpunkt aber zeigen soll), eine optionale Kategorie
+(Meldung/Maßnahme/Lageänderung/Sonstiges) und den Freitext.
 
 Lesen für alle Rollen, Anlegen/Ändern/Löschen nur für `stab`/`admin` (dasselbe Muster wie bei
 `critical_object`) — die Formular-Karte ist für `mitglied` per `data-role="stab-only"` ausgeblendet.
 API: `GET/POST/PATCH/DELETE /api/einsatztagebuch`, `GET` filterbar über `?since=&until=` (ISO-Zeit,
-filtert auf `entry_time`). Kein PDF-Export in dieser ersten Ausbaustufe.
+filtert auf `entry_time`).
+
+### Einsatz/Lagemeldung (Migration 022 — Neubewertung des ursprünglichen "kein Einsatz-Konzept")
+
+Migration 017 hatte bewusst **kein** eigenes Einsatz-Konzept mit Beginn/Ende/Zuordnung vorgesehen
+("ein deutlich größerer Baustein mit eigenem Lebenszyklus"). Diese Entscheidung wurde jetzt
+revidiert: der Nutzer hat ein eigenes, bereits in seiner Wehr genutztes Referenztool
+("Lagemeldung2", React/TypeScript, clientseitig mit `localStorage` + `jsPDF`) als Vorlage
+geschickt, das genau dieses Konzept abbildet — Einsatz mit Stichwort/Adresse/Nummer starten,
+darunter strukturierte Funk-Lagemeldungen (Zeitstempel automatisch, Von/An/Meldung) sammeln, beim
+Beenden einen PDF-Einsatzbericht erzeugen, danach im Archiv durchsuchbar. Die reine
+Freitext-Logbuchfunktion allein deckte diesen Bedarf nicht ab (kein Bezug zwischen Einträgen und
+einem konkreten Einsatz, keine strukturierten Von/An-Felder, kein Bericht).
+
+Umsetzung **additiv statt ersetzend**, um bestehende freie Logbucheinträge nicht zu brechen: eine
+neue Tabelle `einsatz` (`id, wehr_id, stichwort, adresse, nummer, status` `laufend`/`beendet`,
+`started_at, ended_at, created_by`) plus zwei neue, nullable Spalten auf der bestehenden
+`einsatztagebuch_eintrag`-Tabelle (`einsatz_id` als FK `ON DELETE SET NULL`, sowie `von`/`an` für
+den Funkverkehr-Partner). Ein Eintrag OHNE `einsatz_id` bleibt exakt der bisherige freie
+Logbucheintrag; ein Eintrag MIT `einsatz_id` ist eine Lagemeldung zu diesem Einsatz — beide Formen
+leben bewusst in derselben Tabelle statt in getrennten Tabellen, um Filterung/Anzeige (`GET
+/api/einsatztagebuch?einsatzId=`) und die bestehende Bearbeiten/Löschen-Logik unverändert
+wiederverwenden zu können.
+
+**API:** `GET/POST/PATCH/DELETE /api/einsaetze` (Starten/Stammdaten ändern/Beenden — `PATCH` mit
+`status: 'beendet'` setzt `ended_at`, ein Zurückwechseln auf `laufend` löscht es wieder, analog zum
+Übergabeprotokoll-Status), `GET /api/einsaetze?status=laufend|beendet&search=` fürs Archiv,
+`GET /api/einsaetze/:id/pdf` für den Bericht. Lesen für alle Rollen, Starten/Ändern/Beenden nur
+`stab`/`admin` (dasselbe Rechte-Muster wie überall sonst).
+
+**PDF-Einsatzbericht:** neuer `pdf_template`-Dokumenttyp `einsatzbericht` (wie
+`task_sheet`/`object_datasheet`, siehe „PDF-Vorlagen" oben) — anders als beim Objekt-Datenblatt aber
+mit eingebautem Standard-Layout (`DEFAULT_EINSATZBERICHT_TEMPLATE` in `routes/einsatz.js`) als
+Fallback, falls die Wehr keine eigene Vorlage hinterlegt hat. Grund: das PDF ist der eigentliche
+Zweck dieses Features im Referenztool des Nutzers und soll sofort nutzbar sein, ohne dass zuerst
+jemand eine HTML-Vorlage im Admin-Bereich anlegen muss. Nutzt dieselbe
+`{{platzhalter}}`/`{{#each}}`-Renderer-Engine wie eine echte Vorlage (kein zweiter PDF-Pfad).
+
+**Bewusste Verbesserungen gegenüber dem Referenztool** (statt eines reinen Ports): EKats persistiert
+serverseitig in Postgres statt `localStorage` (mehrbenutzerfähig, kein Datenverlust bei
+Browser-Cache-Löschung, wehr-weit statt geräte-lokal sichtbar); das Von/An-Feld ist ein
+`<input list>` mit `<datalist>`-Autovervollständigung aus den bereits vorhandenen
+Fahrzeugen/Wachen der Wehr (`GET /api/vehicles`, `/api/stations`) statt eines starren
+Select-Feldes — erlaubt sowohl schnelles Auswählen bekannter Funkpartner als auch freien Text für
+alles andere (z.B. externe Leitstelle); der PDF-Bericht läuft über die bereits vorhandene, per
+Playwright/Chromium gehärtete Rendering-Pipeline (SSRF-sicher, XSS-sicher) statt clientseitigem
+`jsPDF`. Bewusst noch **nicht** übernommen: die im Referenztool vorhandenen frei definierbaren
+Zusatzfelder beim Einsatz-Start (vergleichbar mit den `object_field_definition`-Zusatzfeldern bei
+Objekten) — als möglicher Folgeschritt vorgemerkt, falls Bedarf besteht.
 
 ## Übergabeprotokoll
 

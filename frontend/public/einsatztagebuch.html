@@ -12,8 +12,81 @@
 <body>
   <div id="app-sidebar-root"></div>
   <main class="stack">
+    <datalist id="einsatz-partner-options"></datalist>
+
+    <div class="card" data-role="stab-only" hidden id="einsatz-start-card">
+      <h2 class="section-title">Einsatz starten</h2>
+      <p class="muted">
+        Bündelt Lagemeldungen unter einem konkreten Einsatz (Stichwort/Adresse/Nummer) statt eines
+        losen Logbuchs - inkl. PDF-Einsatzbericht beim Beenden.
+      </p>
+      <form id="einsatz-start-form" class="form-row">
+        <label>
+          <span>Einsatzstichwort</span>
+          <input id="einsatz-stichwort" type="text" maxlength="200" placeholder="z.B. Brand 2" required />
+        </label>
+        <label>
+          <span>Adresse</span>
+          <input id="einsatz-adresse" type="text" maxlength="300" placeholder="z.B. Hauptstraße 123, Musterstadt" />
+        </label>
+        <label>
+          <span>Einsatznummer</span>
+          <input id="einsatz-nummer" type="text" maxlength="100" placeholder="z.B. 2026-042" />
+        </label>
+        <p class="error-message" id="einsatz-start-error" role="alert"></p>
+        <div class="dialog-actions">
+          <button type="submit" class="primary">Einsatz starten</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="card" id="einsatz-aktuell-card" hidden>
+      <div class="section-head-row">
+        <h2 class="section-title" id="einsatz-aktuell-titel">Laufender Einsatz</h2>
+        <div class="dialog-actions" data-role="stab-only" hidden>
+          <button type="button" class="secondary" id="einsatz-pdf-button">PDF-Bericht</button>
+          <button type="button" class="secondary" id="einsatz-beenden-button">Einsatz beenden</button>
+        </div>
+      </div>
+      <p class="muted" id="einsatz-aktuell-meta"></p>
+      <p class="error-message" id="einsatz-aktuell-error" role="alert"></p>
+
+      <div class="card" data-role="stab-only" hidden id="lagemeldung-form-card">
+        <h3 class="section-title">Neue Lagemeldung</h3>
+        <form id="lagemeldung-form" class="form-row">
+          <label>
+            <span>Von</span>
+            <input id="lagemeldung-von" type="text" list="einsatz-partner-options" maxlength="200" placeholder="Fahrzeug/Wache/Leitstelle" />
+          </label>
+          <label>
+            <span>An</span>
+            <input id="lagemeldung-an" type="text" list="einsatz-partner-options" maxlength="200" placeholder="Fahrzeug/Wache/Leitstelle" />
+          </label>
+          <label class="form-row-full">
+            <span>Meldung</span>
+            <textarea id="lagemeldung-message" rows="3" maxlength="4000" required></textarea>
+          </label>
+          <p class="error-message" id="lagemeldung-form-error" role="alert"></p>
+          <div class="dialog-actions">
+            <button type="submit" class="primary">Lagemeldung speichern</button>
+          </div>
+        </form>
+      </div>
+
+      <div id="lagemeldung-liste" class="stack"></div>
+    </div>
+
+    <div class="card">
+      <div class="section-head-row">
+        <h2 class="section-title">Einsatz-Archiv</h2>
+        <input id="einsatz-archiv-suche" type="text" placeholder="Suche nach Stichwort, Nummer, Adresse…" />
+      </div>
+      <p class="error-message" id="einsatz-archiv-error" role="alert"></p>
+      <div id="einsatz-archiv-liste" class="stack"></div>
+    </div>
+
     <div class="card" data-role="stab-only" hidden>
-      <h2 class="section-title" id="tagebuch-form-title">Neuer Eintrag</h2>
+      <h2 class="section-title" id="tagebuch-form-title">Freier Logbucheintrag (ohne Einsatzbezug)</h2>
       <form id="tagebuch-form" class="form-row">
         <label>
           <span>Zeitpunkt</span>
@@ -43,7 +116,7 @@
 
     <div class="card">
       <div class="section-head-row">
-        <h2 class="section-title">Einsatztagebuch</h2>
+        <h2 class="section-title">Freie Logbucheinträge</h2>
         <form id="tagebuch-filter-form" class="form-row">
           <label>
             <span>Von</span>
@@ -58,8 +131,8 @@
         </form>
       </div>
       <p class="muted">
-        Chronologisches Logbuch der Wehr - für Meldungen, Maßnahmen und Lageänderungen während eines
-        Einsatzes. Sichtbar für alle, Einträge anlegen/ändern nur für Stab/Admin.
+        Meldungen ohne Bezug zu einem konkreten Einsatz (z.B. Übungen, allgemeine Vorkommnisse).
+        Sichtbar für alle, Einträge anlegen/ändern nur für Stab/Admin.
       </p>
       <p class="error-message" id="tagebuch-list-error" role="alert"></p>
       <div id="tagebuch-entries" class="stack"></div>

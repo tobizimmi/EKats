@@ -27,6 +27,7 @@ const userPreferencesRoutes = require('./routes/userPreferences');
 const smtpSettingsRoutes = require('./routes/smtpSettings');
 const fetcherHealthRoutes = require('./routes/fetcherHealth');
 const einsatztagebuchRoutes = require('./routes/einsatztagebuch');
+const einsatzRoutes = require('./routes/einsatz');
 const uebergabeprotokollRoutes = require('./routes/uebergabeprotokoll');
 const checklistsRoutes = require('./routes/checklists');
 const hydrantenKarteRoutes = require('./routes/hydrantenKarte');
@@ -135,6 +136,7 @@ function createApp() {
   app.use('/api/smtp-settings', smtpSettingsRoutes);
   app.use('/api/fetcher-health', fetcherHealthRoutes);
   app.use('/api/einsatztagebuch', einsatztagebuchRoutes);
+  app.use('/api/einsaetze', einsatzRoutes);
   app.use('/api/uebergabeprotokoll', uebergabeprotokollRoutes);
   app.use('/api/checklists', checklistsRoutes);
   app.use('/api/hydranten-karte', hydrantenKarteRoutes);

@@ -12,7 +12,7 @@ const { renderHtmlToPdf } = require('../pdf/renderHtml');
 const router = express.Router();
 router.use(requireAuth, requireRole('admin'));
 
-const DOCUMENT_TYPES = ['task_sheet', 'object_datasheet'];
+const DOCUMENT_TYPES = ['task_sheet', 'object_datasheet', 'einsatzbericht'];
 
 // Beispieldaten fuer die Live-Vorschau im Editor - dieselbe Feldstruktur wie die echten
 // Export-Routen in objects.js liefern (siehe dortige buildTaskSheetData()/buildObjectDatasheetData()).
@@ -63,6 +63,22 @@ const SAMPLE_DATA = {
       builtYear: 1998,
     },
     erstellt: new Date().toLocaleString('de-DE'),
+  },
+  // Einsatzbericht hat (anders als die beiden obigen) einen eingebauten Fallback ohne eigene
+  // Vorlage (siehe DEFAULT_EINSATZBERICHT_TEMPLATE in routes/einsatz.js) - diese Beispieldaten dienen
+  // hier nur der Live-Vorschau, falls eine Wehr die Vorlage trotzdem individuell anpassen moechte.
+  einsatzbericht: {
+    einsatz: {
+      stichwort: 'Brand 2',
+      adresse: 'Hauptstraße 123, Musterstadt',
+      nummer: '2026-042',
+      started: new Date().toLocaleString('de-DE'),
+      ended: new Date().toLocaleString('de-DE'),
+    },
+    lagemeldungen: [
+      { datum: '10.09.2026', uhrzeit: '14:32', von: 'LF 20/1', an: 'Leitstelle', meldung: 'Ankunft Einsatzstelle, Erkundung läuft' },
+      { datum: '10.09.2026', uhrzeit: '14:41', von: 'Einsatzleiter', an: 'Leitstelle', meldung: 'Feuer im OG, Menschenrettung eingeleitet' },
+    ],
   },
 };
 
