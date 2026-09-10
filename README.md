@@ -827,11 +827,20 @@ Stationsdaten, aktuelles Wetter, Vorhersagen und Astronomie ab — **keine Warnu
 Regenradar** (kommt in der kompletten Doku nicht vor). Das separate „Unwetteralarm Pro"-Produkt des
 Nutzers (`pro.meteologix.com`) ist ein reines Web-Dashboard ohne eigenen API-Zugang — Regenradar/
 Warnungen bleiben daher weiterhin über den bestehenden DWD-WMS-Layer abgedeckt, nicht über
-Kachelmann. Der Fetcher ruft entsprechend `fetchKachelmannCurrentWeather()` statt Warnungen ab
-(Endpunktpfad `.../weather/current/{lat}/{lon}` von der einzigen im Doku-Export im Detail gezeigten
-Operation abgeleitet, aber selbst **nicht verifiziert** — vor Produktivbetrieb mit dem echten
-API-Key gegen `npm run fetch -- kachelmann` prüfen; die Fehlermeldung bei falschem Pfad enthält
-einen fertigen `curl`-Befehl zum Gegenprüfen).
+Kachelmann. Der Fetcher ruft entsprechend `fetchKachelmannCurrentWeather()` statt Warnungen ab.
+
+**Bugfix (Nutzer-Report „Kachelmann funktioniert immer noch nicht"):** Der ursprünglich geratene
+Endpunktpfad `.../weather/current/{lat}/{lon}` war falsch (kein `weather/`-Segment) und lieferte auf
+dem echten Server vermutlich ein HTTP 404. Korrigiert anhand des Quellcodes von
+[maxboettinger/kachelmann-api](https://github.com/maxboettinger/kachelmann-api) — einem aktiv
+genutzten, quelloffenen inoffiziellen TypeScript-Wrapper um dieselbe API. Dort steht der Endpunkt
+wörtlich als `https://api.kachelmannwetter.com/v02/current/{lat}/{lon}?units={units}`, mit den
+Headern `X-API-Key` (Auth) und `Accept: application/json`. Endpunktpfad, Query-Parameter `units` und
+Header-Namen gelten damit als verifiziert (echter, benutzter Fremdcode statt Vermutung) — die
+**Response-Feldnamen** (`temperature`/`condition`/`windSpeed`/...) bleiben weiterhin unverifiziert,
+da der Wrapper die Antwort ungetypt durchreicht. Bei erneutem Fehlschlag mit einem echten API-Key
+bitte `npm run fetch -- kachelmann` prüfen; die Fehlermeldung enthält einen fertigen `curl`-Befehl
+zum Gegenprüfen der Feldzuordnung.
 
 Schema: `wehr_feature_role_access`, `user_feature_access`
 (`backend/sql/migrations/009_add_feature_access.sql`).

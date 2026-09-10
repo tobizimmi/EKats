@@ -16,14 +16,19 @@
 // haben - dazu liegt noch keine Doku vor, daher bleibt Regenradar/Warnungen weiterhin ueber den
 // bestehenden DWD-WMS-Layer abgedeckt (siehe js/bundesland.js), nicht ueber Kachelmann.
 //
-// Der Endpunktpfad fuer "Current Weather" selbst (operationId get_current_weather) ist NICHT
-// verifiziert - der Doku-Export des Nutzers deckte nur "Astronomical Information" und "Weather
-// Symbol" im Detail ab (dort: lat/lon als Pfad-Parameter, z.B. GET .../tools/astronomy/{lat}/{lon}).
-// Der Pfad unten (.../weather/current/{lat}/{lon}) ist davon abgeleitet, aber eine begruendete
-// Annahme, KEINE verifizierte Tatsache. Jeder unerwartete Response-Shape wird als Fehler gemeldet
-// (nicht stillschweigend falsch geparst); bei Fehlschlag bitte gegen einen echten Account
-// gegenpruefen (z.B. `npm run fetch -- kachelmann` bzw. der curl-Befehl aus dem Fehlertext) und
-// diese Datei entsprechend korrigieren.
+// BUGFIX (Nutzer-Report "Kachelmann funktioniert immer noch nicht"): der urspruenglich geratene
+// Endpunktpfad ".../weather/current/{lat}/{lon}" war falsch (kein "weather/"-Segment) - lieferte auf
+// dem echten Server vermutlich ein HTTP 404. Korrigiert anhand des Quellcodes von
+// github.com/maxboettinger/kachelmann-api (aktiv genutzter, quelloffener inoffizieller
+// TypeScript-Wrapper um dieselbe API): dort steht der Endpunkt woertlich als
+// "https://api.kachelmannwetter.com/v02/current/" + lat + "/" + lon + "?units=" + units, mit den
+// Headern "X-API-Key" (Auth) und "Accept: application/json". Endpunktpfad, Query-Parameter "units"
+// und Header-Namen gelten damit als verifiziert (echter, benutzter Fremdcode statt Vermutung) - die
+// Response-Feldnamen (temperature/condition/windSpeed/...) bleiben weiterhin unverifiziert, da der
+// Wrapper die Antwort ungetypt durchreicht. Jeder unerwartete Response-Shape wird daher weiterhin als
+// Fehler gemeldet statt stillschweigend falsch geparst; bei erneutem Fehlschlag bitte gegen einen
+// echten Account gegenpruefen (z.B. `npm run fetch -- kachelmann` bzw. der curl-Befehl aus dem
+// Fehlertext) und die Feldzuordnung unten entsprechend korrigieren.
 const { fetchJson } = require('./httpClient');
 const { upsertDatapoints } = require('./normalize');
 const { query } = require('../db');
@@ -58,14 +63,16 @@ async function fetchKachelmannCurrentWeather() {
 
   const items = [];
   for (const wehr of wehren) {
-    const url = `${BASE_URL}/weather/current/${wehr.center_lat}/${wehr.center_lon}`;
+    const url = `${BASE_URL}/current/${wehr.center_lat}/${wehr.center_lon}?units=metric`;
     let data;
     try {
-      data = await fetchJson(url, { headers: { 'X-API-Key': config.kachelmannApiKey } });
+      data = await fetchJson(url, {
+        headers: { 'X-API-Key': config.kachelmannApiKey, Accept: 'application/json' },
+      });
     } catch (err) {
       throw new Error(
-        `Kachelmann-API-Request fehlgeschlagen (Endpunktpfad unverifiziert, siehe Dateikopf kachelmann.js) - ` +
-          `zum Gegenpruefen: curl --header 'X-API-Key: <key>' --url '${url}' : ${err.message}`
+        `Kachelmann-API-Request fehlgeschlagen (Response-Feldnamen weiterhin unverifiziert, siehe Dateikopf kachelmann.js) - ` +
+          `zum Gegenpruefen: curl --header 'X-API-Key: <key>' --header 'Accept: application/json' --url '${url}' : ${err.message}`
       );
     }
     if (!data || typeof data !== 'object' || Array.isArray(data)) {
