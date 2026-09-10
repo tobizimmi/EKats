@@ -845,15 +845,33 @@ aus der Fehlermeldung mit seinem echten API-Key direkt auf dem Produktivserver a
 {"status":403,"detail":"you are not allowed to request forecasts for [lat: 48.6226, lon: 10.0196]"}
 ```
 
-Das ist **kein Auth-/Code-Fehler mehr** — URL, Header und Key kommen korrekt an (sonst käme ein
-generisches 401/„invalid key"), die API lehnt aber genau diese Koordinaten explizit ab. Deutet auf
-eine geografische Einschränkung des gebuchten Meteologix-Plans hin (z.B. auf einen registrierten
-Heimatstandort statt beliebiger Koordinaten — typisch für günstigere Pläne gegenüber einem vollen
-Business-Plan mit freier Standortwahl). **Nicht im Code lösbar**, offen beim Nutzer zu klären: den
-gebuchten Plan bzw. die dafür freigeschalteten Koordinaten im Meteologix-Kundenkonto prüfen, ggf.
-beim Kachelmann-Support nachfragen. Die **Response-Feldnamen**
-(`temperature`/`condition`/`windSpeed`/...) bleiben entsprechend weiterhin unverifiziert, da noch
-keine erfolgreiche 200-Antwort vorliegt.
+Zunächst als dauerhafte geografische Plan-Einschränkung eingestuft — **falsch**: derselbe `curl`-
+Aufruf mit denselben Koordinaten/demselben Key hat direkt danach mit HTTP 200 und echten Daten
+geantwortet. Der 403 ist also transient (vermutlich eine kurzzeitige serverseitige Drossel/ein
+Cache-Warmup bei erstmaliger Abfrage einer noch „ungesehenen" Koordinate), keine dauerhafte Sperre.
+Der Fetcher macht bei HTTP 403 jetzt automatisch **einen Retry nach 2 Sekunden**, bevor er den Lauf
+als fehlgeschlagen meldet.
+
+**Bugfix 3 — echter, bis dahin unentdeckter Parsing-Fehler:** Die erste erfolgreiche 200-Antwort hat
+gezeigt, dass die komplett unverifizierte Feldannahme falsch war. Tatsächliche Struktur:
+
+```json
+{"lat":48.6226,"lon":10.0196,"systemOfUnits":"metric",
+ "data":{"temp":{"value":11.6,"dateTime":"..."},"weatherSymbol":{"value":"partlycloudy"},
+         "windSpeed":{"value":0.6}, "windDirection":{...}, "windGust":{...},
+         "humidityRelative":{...}, "pressureMsl":{...}, "prec1h":{...}, ...}}
+```
+
+Jedes Feld ist ein **verschachteltes** Objekt (`{value, dateTime, type, name, source}`) unter `data`,
+nicht wie ursprünglich angenommen ein flacher Wert auf oberster Ebene (kein `data.temperature`, kein
+`data.condition`). Der bisherige Code hätte daher auch bei einer erfolgreichen 200-Antwort
+durchgehend nur `null`-Werte geschrieben — ein struktureller Objekt-Check allein reicht hier nicht,
+weil `data` ja tatsächlich ein Objekt war, nur mit anderem Inhalt als angenommen. Jetzt korrekt auf
+`data.data.<feld>.value` umgestellt und gegen die echte Beispielantwort getestet (`temp.value`,
+`weatherSymbol.value` etc.). Windgeschwindigkeit/-böen als `windSpeedMs`/`windGustMs` benannt statt
+der bisherigen falschen „Kmh"-Annahme (Einheit trotz `systemOfUnits: "metric"` nicht explizit
+dokumentiert, aber ein Wert von 0.6 bei „kaum Wind" passt eher zu m/s, wie in der professionellen
+Meteorologie üblich — bei Bedarf gegen eine Referenzmessung gegenprüfen).
 
 Schema: `wehr_feature_role_access`, `user_feature_access`
 (`backend/sql/migrations/009_add_feature_access.sql`).

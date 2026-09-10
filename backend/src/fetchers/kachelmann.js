@@ -25,21 +25,36 @@
 // Headern "X-API-Key" (Auth) und "Accept: application/json". Endpunktpfad, Query-Parameter "units"
 // und Header-Namen gelten damit als verifiziert (echter, benutzter Fremdcode statt Vermutung).
 //
-// NACH BUGFIX 1 weiterhin fehlgeschlagen, diesmal mit HTTP 403 statt 404 - vom Nutzer per echtem
-// curl-Aufruf gegen den echten Account verifiziert (Server-Log, Health-Dashboard):
-//   {"status":403,"detail":"you are not allowed to request forecasts for [lat: 48.6226, lon: 10.0196]"}
-// Das ist KEIN Auth-/Code-Fehler mehr (Header/URL/Key kommen an, sonst gaebe es einen generischen
-// 401/"invalid key"): die Meteologix-API lehnt genau diese Koordinaten explizit ab, vermutlich weil
-// der gebuchte Kachelmann/Meteologix-Plan geografisch eingeschraenkt ist (z.B. auf einen bestimmten
-// registrierten Standort statt beliebiger Koordinaten - typisch fuer guenstigere/private Plaene
-// gegenueber einem vollen Business-Plan mit freier Standortwahl). Das ist ausserhalb des Codes nicht
-// loesbar; zu pruefen auf Nutzerseite: (a) im Meteologix-Kundenkonto den gebuchten Plan/dessen
-// erlaubte Standorte/Koordinaten pruefen, (b) ggf. beim Kachelmann-Support nachfragen, fuer welche
-// Koordinaten der Key freigeschaltet ist, (c) alternativ `KACHELMANN_RADIUS_KM`/die Wehr-Zentrums-
-// Koordinate an einen vom Plan abgedeckten Standort anpassen, falls es einen "Heimatstandort" gibt.
-// Response-Feldnamen (temperature/condition/windSpeed/...) bleiben weiterhin unverifiziert, da noch
-// keine erfolgreiche 200-Antwort vorliegt und der Wrapper die Antwort ungetypt durchreicht - das kann
-// erst nach Klaerung der Plan-Einschraenkung final geprueft werden.
+// BUGFIX 2 (nach Bugfix 1 weiterhin fehlgeschlagen, HTTP 403 statt 404): vom Nutzer per echtem curl
+// gegen den echten Account reproduziert - {"status":403,"detail":"you are not allowed to request
+// forecasts for [lat: 48.6226, lon: 10.0196]"}. Zunaechst als dauerhafte Plan-/Geo-Einschraenkung
+// eingestuft - falsch: derselbe curl-Aufruf mit denselben Koordinaten/demselben Key hat direkt danach
+// mit HTTP 200 und echten Daten geantwortet. Der 403 ist also TRANSIENT (vermutlich eine kurzzeitige
+// serverseitige Drossel/ein Cache-Warmup bei erstmaliger Anfrage fuer eine noch nicht abgerechnete
+// Koordinate, keine dauerhafte Sperre) - daher unten ein einmaliger Retry mit kurzer Wartezeit
+// speziell fuer HTTP 403, statt den ganzen Lauf sofort als Fehler zu melden.
+//
+// BUGFIX 3 (echter, bisher unentdeckter Parsing-Fehler): die erste erfolgreiche 200-Antwort hat die
+// bis hierhin komplett unverifizierte Feldannahme widerlegt. Tatsaechliche Struktur (verifiziert am
+// echten Account, Koordinaten 48.6226/10.0196):
+//   { "lat":..,"lon":..,"alt":..,"systemOfUnits":"metric",
+//     "data": { "temp": {"value":11.6,"dateTime":"...","type":"float",...},
+//               "weatherSymbol": {"value":"partlycloudy",...}, "windSpeed": {"value":0.6,...},
+//               "windDirection": {...}, "windGust": {...}, "humidityRelative": {...},
+//               "pressureMsl": {...}, "prec1h": {...}, "dewpoint": {...}, "cloudCoverage": {...},
+//               "isDay": {...}, "sunHours": {...}, "snowAmount": {...}, "snowHeight": {...},
+//               "wmoCode": {...} } }
+// Jedes Feld ist ein VERSCHACHTELTES Objekt ({value, dateTime, type, name, source}) unter "data",
+// nicht wie urspruenglich angenommen ein flacher Wert auf oberster Ebene (kein "data.temperature",
+// kein "data.condition", kein "data.time"). Die bisherige Implementierung haette daher auch bei
+// einer erfolgreichen 200-Antwort durchgehend nur `null`/undefined-Werte geschrieben (der explizite
+// "kein Objekt"-Fehlerfall traf nie zu, da `data` ja ein Objekt ist - der Fehler war rein inhaltlich,
+// nicht strukturell, und waere ohne einen echten 200er nie aufgefallen). Unten entsprechend auf
+// `data.data.<feld>.value` umgestellt. Windgeschwindigkeit/-boen: Einheit trotz "systemOfUnits":
+// "metric" nicht explizit dokumentiert (Wert 0.6 bei "kaum Wind" passt eher zu m/s als zu km/h,
+// professionelle Meteorologie-APIs nutzen ueblicherweise m/s) - als `windSpeedMs`/`windGustMs`
+// benannt statt der bisherigen (falschen) "Kmh"-Annahme; bei Bedarf spaeter gegen eine Referenzmessung
+// gegenpruefen.
 const { fetchJson } = require('./httpClient');
 const { upsertDatapoints } = require('./normalize');
 const { query } = require('../db');
@@ -55,6 +70,25 @@ async function anyWehrHasKachelmannAccess() {
      LIMIT 1`
   );
   return rows.length > 0;
+}
+
+function wait(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+// Ein einmaliger, kurzer Retry NUR bei HTTP 403 - siehe BUGFIX 2 im Dateikopf (beobachtet transient,
+// derselbe Request hat direkt danach funktioniert). Andere Fehler (Netzwerk, 4xx/5xx sonst) werden
+// weiterhin sofort durchgereicht, um echte Dauerfehler nicht zu verschleiern.
+async function fetchCurrentWeatherWithRetry(url, headers) {
+  try {
+    return await fetchJson(url, { headers });
+  } catch (err) {
+    if (!err.message.includes('HTTP 403')) {
+      throw err;
+    }
+    await wait(2000);
+    return await fetchJson(url, { headers });
+  }
 }
 
 async function fetchKachelmannCurrentWeather() {
@@ -75,42 +109,49 @@ async function fetchKachelmannCurrentWeather() {
   const items = [];
   for (const wehr of wehren) {
     const url = `${BASE_URL}/current/${wehr.center_lat}/${wehr.center_lon}?units=metric`;
-    let data;
+    let response;
     try {
-      data = await fetchJson(url, {
-        headers: { 'X-API-Key': config.kachelmannApiKey, Accept: 'application/json' },
+      response = await fetchCurrentWeatherWithRetry(url, {
+        'X-API-Key': config.kachelmannApiKey,
+        Accept: 'application/json',
       });
     } catch (err) {
       throw new Error(
-        `Kachelmann-API-Request fehlgeschlagen (Response-Feldnamen weiterhin unverifiziert, siehe Dateikopf kachelmann.js) - ` +
+        `Kachelmann-API-Request fehlgeschlagen (auch nach Retry bei HTTP 403, siehe Dateikopf kachelmann.js) - ` +
           `zum Gegenpruefen: curl --header 'X-API-Key: <key>' --header 'Accept: application/json' --url '${url}' : ${err.message}`
       );
     }
+    const data = response?.data;
     if (!data || typeof data !== 'object' || Array.isArray(data)) {
       throw new Error(
-        'Kachelmann-API: unerwartetes Antwortformat (kein Objekt) - Response-Schema muss gegen einen echten Account verifiziert werden.'
+        'Kachelmann-API: unerwartetes Antwortformat (kein "data"-Objekt in der Antwort) - Response-Schema hat sich vermutlich geaendert, siehe Dateikopf kachelmann.js.'
       );
     }
 
+    const temp = data.temp?.value ?? null;
+    const condition = data.weatherSymbol?.value ?? null;
+    const itemTimestamp = data.temp?.dateTime || new Date().toISOString();
+
     items.push({
       source: 'kachelmann',
-      external_id: `${wehr.id}:${data.time || Date.now()}`,
-      title: data.condition ? `Aktuelles Wetter: ${data.condition}` : 'Aktuelles Wetter (Kachelmann)',
+      external_id: `${wehr.id}:${itemTimestamp}`,
+      title: condition ? `Aktuelles Wetter: ${condition}` : 'Aktuelles Wetter (Kachelmann)',
       lat: wehr.center_lat,
       lon: wehr.center_lon,
-      value_numeric: data.temperature ?? null,
+      value_numeric: temp,
       unit: '°C',
-      severity: data.condition ?? null,
-      item_timestamp: data.time || new Date().toISOString(),
+      severity: condition,
+      item_timestamp: itemTimestamp,
       valid_until: null,
       payload: {
-        precipitation: data.precipitation ?? null,
-        windSpeedKmh: data.windSpeed ?? null,
-        windDirectionDeg: data.windDirection ?? null,
-        windGustKmh: data.windGust ?? null,
-        humidity: data.humidity ?? null,
-        pressure: data.pressure ?? null,
-        raw: data,
+        precipitationMm: data.prec1h?.value ?? null,
+        windSpeedMs: data.windSpeed?.value ?? null,
+        windDirectionDeg: data.windDirection?.value ?? null,
+        windGustMs: data.windGust?.value ?? null,
+        humidityPercent: data.humidityRelative?.value ?? null,
+        pressureMslHpa: data.pressureMsl?.value ?? null,
+        cloudCoveragePercent: data.cloudCoverage?.value ?? null,
+        raw: response,
       },
     });
   }
