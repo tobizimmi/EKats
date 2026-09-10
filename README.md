@@ -836,11 +836,24 @@ dem echten Server vermutlich ein HTTP 404. Korrigiert anhand des Quellcodes von
 genutzten, quelloffenen inoffiziellen TypeScript-Wrapper um dieselbe API. Dort steht der Endpunkt
 wörtlich als `https://api.kachelmannwetter.com/v02/current/{lat}/{lon}?units={units}`, mit den
 Headern `X-API-Key` (Auth) und `Accept: application/json`. Endpunktpfad, Query-Parameter `units` und
-Header-Namen gelten damit als verifiziert (echter, benutzter Fremdcode statt Vermutung) — die
-**Response-Feldnamen** (`temperature`/`condition`/`windSpeed`/...) bleiben weiterhin unverifiziert,
-da der Wrapper die Antwort ungetypt durchreicht. Bei erneutem Fehlschlag mit einem echten API-Key
-bitte `npm run fetch -- kachelmann` prüfen; die Fehlermeldung enthält einen fertigen `curl`-Befehl
-zum Gegenprüfen der Feldzuordnung.
+Header-Namen gelten damit als verifiziert (echter, benutzter Fremdcode statt Vermutung).
+
+**Danach weiterhin fehlgeschlagen — diesmal HTTP 403 statt 404:** Der Nutzer hat den `curl`-Befehl
+aus der Fehlermeldung mit seinem echten API-Key direkt auf dem Produktivserver ausgeführt. Antwort:
+
+```json
+{"status":403,"detail":"you are not allowed to request forecasts for [lat: 48.6226, lon: 10.0196]"}
+```
+
+Das ist **kein Auth-/Code-Fehler mehr** — URL, Header und Key kommen korrekt an (sonst käme ein
+generisches 401/„invalid key"), die API lehnt aber genau diese Koordinaten explizit ab. Deutet auf
+eine geografische Einschränkung des gebuchten Meteologix-Plans hin (z.B. auf einen registrierten
+Heimatstandort statt beliebiger Koordinaten — typisch für günstigere Pläne gegenüber einem vollen
+Business-Plan mit freier Standortwahl). **Nicht im Code lösbar**, offen beim Nutzer zu klären: den
+gebuchten Plan bzw. die dafür freigeschalteten Koordinaten im Meteologix-Kundenkonto prüfen, ggf.
+beim Kachelmann-Support nachfragen. Die **Response-Feldnamen**
+(`temperature`/`condition`/`windSpeed`/...) bleiben entsprechend weiterhin unverifiziert, da noch
+keine erfolgreiche 200-Antwort vorliegt.
 
 Schema: `wehr_feature_role_access`, `user_feature_access`
 (`backend/sql/migrations/009_add_feature_access.sql`).

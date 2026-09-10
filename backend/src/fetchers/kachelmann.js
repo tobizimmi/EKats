@@ -16,19 +16,30 @@
 // haben - dazu liegt noch keine Doku vor, daher bleibt Regenradar/Warnungen weiterhin ueber den
 // bestehenden DWD-WMS-Layer abgedeckt (siehe js/bundesland.js), nicht ueber Kachelmann.
 //
-// BUGFIX (Nutzer-Report "Kachelmann funktioniert immer noch nicht"): der urspruenglich geratene
+// BUGFIX 1 (Nutzer-Report "Kachelmann funktioniert immer noch nicht"): der urspruenglich geratene
 // Endpunktpfad ".../weather/current/{lat}/{lon}" war falsch (kein "weather/"-Segment) - lieferte auf
 // dem echten Server vermutlich ein HTTP 404. Korrigiert anhand des Quellcodes von
 // github.com/maxboettinger/kachelmann-api (aktiv genutzter, quelloffener inoffizieller
 // TypeScript-Wrapper um dieselbe API): dort steht der Endpunkt woertlich als
 // "https://api.kachelmannwetter.com/v02/current/" + lat + "/" + lon + "?units=" + units, mit den
 // Headern "X-API-Key" (Auth) und "Accept: application/json". Endpunktpfad, Query-Parameter "units"
-// und Header-Namen gelten damit als verifiziert (echter, benutzter Fremdcode statt Vermutung) - die
-// Response-Feldnamen (temperature/condition/windSpeed/...) bleiben weiterhin unverifiziert, da der
-// Wrapper die Antwort ungetypt durchreicht. Jeder unerwartete Response-Shape wird daher weiterhin als
-// Fehler gemeldet statt stillschweigend falsch geparst; bei erneutem Fehlschlag bitte gegen einen
-// echten Account gegenpruefen (z.B. `npm run fetch -- kachelmann` bzw. der curl-Befehl aus dem
-// Fehlertext) und die Feldzuordnung unten entsprechend korrigieren.
+// und Header-Namen gelten damit als verifiziert (echter, benutzter Fremdcode statt Vermutung).
+//
+// NACH BUGFIX 1 weiterhin fehlgeschlagen, diesmal mit HTTP 403 statt 404 - vom Nutzer per echtem
+// curl-Aufruf gegen den echten Account verifiziert (Server-Log, Health-Dashboard):
+//   {"status":403,"detail":"you are not allowed to request forecasts for [lat: 48.6226, lon: 10.0196]"}
+// Das ist KEIN Auth-/Code-Fehler mehr (Header/URL/Key kommen an, sonst gaebe es einen generischen
+// 401/"invalid key"): die Meteologix-API lehnt genau diese Koordinaten explizit ab, vermutlich weil
+// der gebuchte Kachelmann/Meteologix-Plan geografisch eingeschraenkt ist (z.B. auf einen bestimmten
+// registrierten Standort statt beliebiger Koordinaten - typisch fuer guenstigere/private Plaene
+// gegenueber einem vollen Business-Plan mit freier Standortwahl). Das ist ausserhalb des Codes nicht
+// loesbar; zu pruefen auf Nutzerseite: (a) im Meteologix-Kundenkonto den gebuchten Plan/dessen
+// erlaubte Standorte/Koordinaten pruefen, (b) ggf. beim Kachelmann-Support nachfragen, fuer welche
+// Koordinaten der Key freigeschaltet ist, (c) alternativ `KACHELMANN_RADIUS_KM`/die Wehr-Zentrums-
+// Koordinate an einen vom Plan abgedeckten Standort anpassen, falls es einen "Heimatstandort" gibt.
+// Response-Feldnamen (temperature/condition/windSpeed/...) bleiben weiterhin unverifiziert, da noch
+// keine erfolgreiche 200-Antwort vorliegt und der Wrapper die Antwort ungetypt durchreicht - das kann
+// erst nach Klaerung der Plan-Einschraenkung final geprueft werden.
 const { fetchJson } = require('./httpClient');
 const { upsertDatapoints } = require('./normalize');
 const { query } = require('../db');
